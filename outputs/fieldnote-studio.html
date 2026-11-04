@@ -38,11 +38,12 @@ const NAVER_CATEGORIES=[
 {id:'econ-dopamine',name:'경제도 도파민이다',parent:null,note:'경제·소비·투자 속 도파민 이야기 전반. 보상 예측과 심리의 관점으로 읽는다'},
 {id:'invest-psych',name:'투자 심리',parent:'econ-dopamine',note:'손실 회피·확증 편향·FOMO 등 투자 판단을 흔드는 심리 메커니즘 (투자 권유 없음)'},
 {id:'sg-observe',name:'싱가포르 관찰',parent:'econ-dopamine',note:'싱가포르에서 일하며 본 돈·소비·도박 규제·생활 장면의 관찰. 직접 경험 중심, 제도는 사실 확인'},
-{id:'macro',name:'매크로 끄적',parent:null,note:'금리·환율·유동성 등 거시 이슈를 개인의 시선으로 짧게 끄적이는 글. 전망·권유 없이 메커니즘과 불확실성 중심'}
+{id:'macro',name:'매크로 끄적',parent:null,note:'금리·환율·유동성 등 거시 이슈를 개인의 시선으로 짧게 끄적이는 글. 전망·권유 없이 메커니즘과 불확실성 중심'},
+{id:'variational',name:'Variational',parent:null,own:true,note:'Variational(Arbitrum 퍼프 DEX) 분석 — 트레저리·바이백·포인트·토크노믹스. 직접 만든 var-metrics.com 데이터 기반'}
 ];
 const NAVER_BY_ID=Object.fromEntries(NAVER_CATEGORIES.map(c=>[c.id,c]));
 const NAVER_BY_NAME=Object.fromEntries(NAVER_CATEGORIES.map(c=>[c.name,c]));
-/* 상위 카테고리도 글·주제를 붙일 수 있다(9개 모두 게시 가능). 상위는 그룹의 첫 항목으로 표시한다. */
+/* 상위 카테고리도 글·주제를 붙일 수 있다(10개 모두 게시 가능). 상위는 그룹의 첫 항목으로 표시한다. */
 const NAVER_POSTABLE=NAVER_CATEGORIES.slice();
 const naverParentName=c=>c&&c.parent&&NAVER_BY_ID[c.parent]?NAVER_BY_ID[c.parent].name:'';
 const OLD_BLOG_SEED_IDS=['faith','jyp','heresy','multicultural','sg','immigration','patriot','conservative'];
@@ -76,10 +77,17 @@ const BLOG_STARTERS=[
 {sid:'econ-1',v:2,cat:'econ-dopamine',title:`소비도 투자도 결국 보상 예측이다: 경제 행동을 도파민으로 읽기`,angle:`경제 행동을 보상 예측과 기대의 틀로 읽는 이 카테고리의 관점을 소개하고 하위 주제 지도를 그린다.`,hook:`돈을 쓰는 순간보다 쓰기 직전이 더 설레는 이유`,outline:[`쇼핑 장바구니나 세일 알림 같은 일상 장면으로 시작한다`,`보상 예측과 기대가 소비·투자 행동에 미치는 영향을 개관한다 [확인 필요: 행동경제·신경경제학 개관 출처]`,`'도파민'이라는 말을 비유로 쓰는 범위와 한계를 밝힌다`,`하위 카테고리(투자 심리·싱가포르 관찰)에서 다룰 주제를 소개한다`,`마지막에 한 줄: 투자 권유가 아니며 일반적인 심리 설명입니다`],verify:[`보상 예측과 경제 행동을 다룬 연구의 서지`,`도파민 용어 사용의 정확성`]},
 {sid:'econ-2',v:2,cat:'econ-dopamine',title:`할인·한정판·무료 배송 문턱: 소비 설계에 숨은 보상 장치`,angle:`쇼핑 환경이 소비를 부추기는 장치를 게임 설계의 시선으로 해부하되, 소비 자체를 비난하지 않는다.`,hook:`장바구니를 채우게 만드는 작은 숫자들`,outline:[`무료 배송 문턱·타임 세일·한정 수량을 일상 장면으로 소개한다`,`각 장치가 손실 회피·희소성 인식과 연결되는 방식을 설명한다 [확인 필요: 소비자 행동 연구 출처]`,`게임·카지노의 보상 설계와 닮은 점과 다른 점을 구분한다`,`[직접 경험: 충동구매를 해 본 장면이 있다면]`,`스스로 점검할 질문 한 가지로 마무리한다 (구매 권유 없음)`],verify:[`희소성·손실 회피 효과를 다룬 연구와 한계`,`언급한 판매 기법의 실제 사용 현황`]},
 {sid:'econ-3',v:2,cat:'econ-dopamine',title:`나는 왜 돈 이야기에 끌리는가: 경제 콘텐츠 소비와 기대감`,angle:`수익 인증·경제 뉴스·유튜브 콘텐츠를 계속 찾아보게 되는 심리를 구조로 설명한다.`,hook:`읽고 나면 뭔가 알게 된 것 같은 착각`,outline:[`경제 콘텐츠를 반복해서 소비하는 장면으로 시작한다`,`정보를 얻는 느낌과 실제 판단력 향상의 차이를 설명한다 [확인 필요: 정보 과잉·과신 관련 연구]`,`알고리즘 추천이 비슷한 콘텐츠를 반복 노출하는 구조를 짚는다`,`[직접 경험: 경제 콘텐츠를 끊거나 줄여 본 경험이 있다면]`,`마지막에 한 줄: 투자 권유가 아니며 일반적인 심리 설명입니다`],verify:[`정보 소비와 과신을 다룬 연구`,`추천 알고리즘 설명의 정확성`]}
+,{sid:'variational-1',v:3,cat:'variational',title:`Variational 트레저리 유입은 어떻게 계산하나: 온체인 USDC로 보는 수익 추정의 한계`,angle:`트레저리 지갑의 온체인 USDC 잔고 변화로 유입을 추정하는 방식과, 그 추정이 실제 수익과 어긋날 수 있는 지점을 설명한다.`,hook:`잔고가 늘었다고 전부 수익일까`,outline:[`트레저리 유입을 잔고 변화로 측정한다는 아이디어를 소개한다 [확인 필요: 트레저리 지갑 주소와 측정 기준 시점]`,`수익이 아닌 이체가 섞일 수 있는 경우를 정리한다`,`총 스프레드·OLP 몫·헤지 비용으로 추정치를 나누는 방식과 한계를 설명한다 [확인 필요: var-metrics.com 실시간 값]`,`[직접 경험: 대시보드를 만들며 부딪힌 계산상의 문제]`,`감사받은 수익이 아닌 추정치라는 점을 분명히 하며 마무리한다`],verify:[`트레저리 지갑 주소와 최근 유입 내역 [확인 필요: var-metrics.com 실시간 값]`,`공식 격주 리포트의 트레저리 몫 비율 [확인 필요: 최신 리포트]`,`비수익 이체 사례의 온체인 근거`]}
+,{sid:'variational-2',v:3,cat:'variational',title:`VAR 바이백 100% 정책, 지금 어디까지 왔나`,angle:`트레저리 수익을 $VAR 매수·소각에 쓰겠다는 의도된 정책을 현재 시점에서 정리한다. 아직 실행 전이라는 점을 전제로 쓴다.`,hook:`말로 한 약속과 실제 실행 사이의 거리`,outline:[`바이백 정책이 무엇이라고 공개되어 있는지 정리한다 [확인 필요: 공식 발표 원문과 날짜]`,`의도된 정책과 실행된 거래를 구분하는 기준을 제시한다`,`실행 여부를 온체인에서 확인하는 방법을 설명한다 [확인 필요: 바이백 지갑·거래 내역]`,`트레저리 규모와의 비교는 실시간 값으로 채운다 [확인 필요: var-metrics.com 실시간 값]`,`가격 전망 없이 확인할 체크포인트로 마무리한다`],verify:[`바이백 정책의 공식 문구와 시행 시점`,`현재까지의 바이백 실행 여부와 온체인 내역`,`트레저리 몫 비율의 최신 값`]}
+,{sid:'variational-3',v:3,cat:'variational',title:`Variational 포인트 계산기로 보는 에어드랍 시나리오 — 가정과 함정`,angle:`주당 포인트 증가 가정으로 시나리오를 계산하는 방식과, 가정이 결과를 얼마나 바꾸는지 보여 준다. 에어드랍 수량 예측은 하지 않는다.`,hook:`계산기에 넣는 숫자가 곧 결론이 되는 함정`,outline:[`포인트 계산기의 입력과 가정을 소개한다 [확인 필요: 계산기의 현재 가정값]`,`TGE 시점이 정해지지 않았다는 불확실성을 설명한다 [확인 필요: 공식 TGE 공지]`,`전체 포인트 풀 가정이 개인 몫 추정에 미치는 영향을 설명한다 [확인 필요: var-metrics.com 실시간 값]`,`토크노믹스에서 에어드랍 몫과 해제 조건을 정리한다 [확인 필요: 공식 토크노믹스 문서]`,`가격·수익 예측 없이 시나리오의 한계를 정리한다`],verify:[`포인트 지급 규칙과 공식 공지`,`TGE 일정과 에어드랍 해제 조건`,`계산기가 쓰는 포인트 풀 가정의 출처`]}
 ];
 function migrateBlogTopics(x,stripOld){
  for(const t of stripOld?x.interests:[]){if(!t||typeof t!=='object'||!OLD_BLOG_SEED_IDS.includes(t.id))continue;if(Array.isArray(t.channels))t.channels=t.channels.filter(c=>c!=='blog');if(t.channelFavorites&&typeof t.channelFavorites==='object')delete t.channelFavorites.blog}
  for(const c of NAVER_POSTABLE){const id='nv-'+c.id;if(x.interests.some(t=>t?.id===id))continue;x.interests.push({id,name:c.name,note:c.note,channels:['blog'],favorite:true,channelFavorites:{},naverCategory:c.name,parentCategory:naverParentName(c)})}
+}
+function migrateVariationalTopic(x){
+ const c=NAVER_BY_ID.variational;if(x.interests.some(t=>t?.id==='nv-variational'))return;
+ x.interests.push({id:'nv-variational',name:c.name,note:c.note,channels:['blog'],favorite:true,channelFavorites:{},naverCategory:c.name,parentCategory:''});
 }
 function seedBlogStarters(x){
  const have=new Set(x.ideas.map(i=>i&&i.id));const base=Date.now();let k=0;
@@ -138,7 +146,7 @@ for(const top of NAVER_CATEGORIES.filter(k=>!k.parent)){
  const kids=NAVER_CATEGORIES.filter(k=>k.parent===top.id),names=kids.length?[top.name,...kids.map(k=>k.name)]:[top.name];
  const topics=names.map(n=>list.find(t=>t.naverCategory===n)).filter(Boolean);
  topics.forEach(t=>used.add(t.id));
- if(kids.length)groups.push({label:top.name,topics});
+ if(kids.length||top.own)groups.push({label:top.name,topics});
  else{let g=groups.find(x=>x.standalone);if(!g){g={label:'단독 카테고리',topics:[],standalone:true};groups.push(g)}g.topics.push(...topics)}
 }
 const rest=list.filter(t=>!used.has(t.id));
@@ -156,14 +164,15 @@ document.addEventListener('click',e=>{const t=e.target.closest('button');if(!t)r
 function ensureAnalytics(x){
 if(x.interests===undefined)x.interests=CHANNEL_TOPIC_SEEDS.map(t=>({...t,channels:[...t.channels],favorite:true,channelFavorites:{}}));
 if(x.traffic===undefined)x.traffic=[];
-if(Array.isArray(x.interests)&&![1,2,3,4].includes(x.channelTopicsVersion)){
+if(Array.isArray(x.interests)&&![1,2,3,4,5].includes(x.channelTopicsVersion)){
  for(const t of x.interests){if(!t||typeof t!=='object')continue;const seed=CHANNEL_TOPIC_SEEDS.find(s=>s.id===t.id);if(t.channels===undefined)t.channels=seed?[...seed.channels]:['islam','identity'].includes(t.id)?['blog','insta']:Object.keys(CH);if(t.channelFavorites===undefined)t.channelFavorites={};if(seed&&t.note===undefined)t.note=seed.note;}
  for(const seed of CHANNEL_TOPIC_SEEDS){if(!x.interests.some(t=>t?.id===seed.id))x.interests.push({...seed,channels:[...seed.channels],favorite:true,channelFavorites:{}});}
  x.channelTopicsVersion=1;
 }
 if(Array.isArray(x.interests)&&(x.channelTopicsVersion===1||x.channelTopicsVersion===2)){migrateBlogTopics(x,x.channelTopicsVersion===1);x.channelTopicsVersion=3}
 if(Array.isArray(x.interests)&&x.channelTopicsVersion===3){migrateYoutubeTopics(x);x.channelTopicsVersion=4}
-if(Array.isArray(x.interests)&&Array.isArray(x.ideas)&&x.blogSeedVersion!==2){seedBlogStarters(x);x.blogSeedVersion=2}
+if(Array.isArray(x.interests)&&x.channelTopicsVersion===4){migrateVariationalTopic(x);x.channelTopicsVersion=5}
+if(Array.isArray(x.interests)&&Array.isArray(x.ideas)&&x.blogSeedVersion!==3){seedBlogStarters(x);x.blogSeedVersion=3}
 if(x.profile&&typeof x.profile==='object'&&typeof x.profile.blogVoice!=='string')x.profile.blogVoice=DEFAULT_BLOG_VOICE;
 if(x.profile&&typeof x.profile==='object'&&typeof x.profile.youtubeVoice!=='string')x.profile.youtubeVoice=DEFAULT_YOUTUBE_VOICE;
 return x}
@@ -305,7 +314,7 @@ function allCategoryTitles(name){return [...db.ideas.filter(i=>i.naverCategory==
 function categoryTitles(name){const seen=new Set(),out=[];for(const t of allCategoryTitles(name)){if(seen.has(t))continue;seen.add(t);out.push(t.slice(0,300))}return out.slice(0,200)}
 function aiMarkCount(body){return (String(body||'').match(/\[(?:확인 필요|직접 경험)/g)||[]).length}
 const AI_MARK_MSG=n=>`원고에 [확인 필요]·[직접 경험] 표시가 ${n}곳 남아 있습니다. 사실을 확인하고 직접 경험을 채우거나 지운 뒤 승인하세요.`;
-function categoryGroups(){const groups=[];for(const top of NAVER_CATEGORIES.filter(k=>!k.parent)){const kids=NAVER_CATEGORIES.filter(k=>k.parent===top.id);if(kids.length)groups.push({label:top.name,cats:[top,...kids]});else{let g=groups.find(x=>x.standalone);if(!g){g={label:'단독 카테고리',cats:[],standalone:true};groups.push(g)}g.cats.push(top)}}return groups}
+function categoryGroups(){const groups=[];for(const top of NAVER_CATEGORIES.filter(k=>!k.parent)){const kids=NAVER_CATEGORIES.filter(k=>k.parent===top.id);if(kids.length||top.own)groups.push({label:top.name,cats:[top,...kids]});else{let g=groups.find(x=>x.standalone);if(!g){g={label:'단독 카테고리',cats:[],standalone:true};groups.push(g)}g.cats.push(top)}}return groups}
 function categoryOptions(val,by='name'){const groups=categoryGroups().map(g=>`<optgroup label="${esc(g.label)}">${g.cats.map(c=>`<option value="${esc(by==='id'?c.id:c.name)}" ${(by==='id'?val===c.id:val===c.name)?'selected':''}>${esc(NAVER_CATEGORIES.some(k=>k.parent===c.id)?c.name+' (전체)':c.name)}</option>`).join('')}</optgroup>`).join('');if(by==='id')return groups;const known=g=>g.cats.some(c=>c.name===val);const legacy=val&&!categoryGroups().some(known)?`<option value="${esc(val)}" selected>${esc(val)} (기존 입력)</option>`:'';return `<option value="">선택 안 함</option>${groups}${legacy}`}
 function setCategoryValue(v){const s=$('#postNaverCategory');if(!s)return;v=v||'';if(v&&![...s.options].some(o=>o.value===v)){const o=document.createElement('option');o.value=v;o.textContent=v+' (기존 입력)';s.append(o)}s.value=v}
 function ideaTag(i){return (i.aiGenerated?'<span class="sampletag ai">AI 생성</span>':'')+(i.starter?'<span class="sampletag">시작 주제</span>':'')+(i.naverCategory?`<span class="sampletag">${esc(i.naverCategory)}</span>`:'')}
