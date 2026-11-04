@@ -1,8 +1,8 @@
 {
   "rewrites": [
-    {
-      "source": "/",
-      "destination": "/outputs/fieldnote-studio.html"
-    }
-  ]
+    { "source": "/", "destination": "/outputs/fieldnote-studio.html" }
+  ],
+  "functions": {
+    "api/generate/*.js": { "maxDuration": 300 }
+  }
 }

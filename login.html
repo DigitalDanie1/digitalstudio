@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>FIELDNOTE — 로그인</title><style>
+:root{color-scheme:dark;--bg:#0c0e11;--panel:#14171c;--line:#282d35;--muted:#8b929e;--text:#eceef2;--lime:#c4f27b;--red:#ff7777}*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:grid;place-items:center;padding:16px;background:var(--bg);color:var(--text);font:14px/1.6 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif}
+.card{width:100%;max-width:360px;border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:28px}
+.brand{font-weight:800;letter-spacing:2px;display:flex;align-items:center;gap:10px;font-size:17px;margin-bottom:6px}
+.brandmark{width:31px;height:31px;display:grid;place-items:center;background:var(--lime);color:#172016;border-radius:9px;letter-spacing:-3px;padding-right:3px}
+p{color:var(--muted);font-size:12px;margin:0 0 20px}label{display:block;font-size:12px;color:#c1c7d0;margin-bottom:6px}
+input{width:100%;font:inherit;color:var(--text);background:#0f1217;border:1px solid var(--line);border-radius:7px;padding:10px 12px;outline-offset:3px}
+input:focus{border-color:#6b8550}
+button{width:100%;margin-top:16px;font:inherit;font-weight:700;color:#14200e;background:var(--lime);border:1px solid var(--lime);border-radius:7px;padding:10px 13px;cursor:pointer}
+button:disabled{opacity:.5;cursor:not-allowed}.err{min-height:20px;margin-top:12px;font-size:12px;color:var(--red)}
+</style></head><body>
+<form class="card" id="f" autocomplete="on">
+<div class="brand"><span class="brandmark">f/</span> FIELDNOTE</div>
+<p>개인 콘텐츠 스튜디오입니다. 비밀번호를 입력하세요.</p>
+<label for="pw">비밀번호</label>
+<input id="pw" name="password" type="password" autocomplete="current-password" required autofocus>
+<button id="go" type="submit">로그인</button>
+<div class="err" id="err" role="alert"></div>
+</form>
+<script>
+(function(){
+  function target(){
+    var n=new URLSearchParams(location.search).get('next');
+    // Only same-origin relative paths: must start with a single "/" (no "//", no "/\", no scheme).
+    if(n&&/^\/(?![\/\\])/.test(n)&&!/[\u0000-\u001f]/.test(n))return n;
+    return '/';
+  }
+  var f=document.getElementById('f'),pw=document.getElementById('pw'),go=document.getElementById('go'),err=document.getElementById('err');
+  f.addEventListener('submit',function(e){
+    e.preventDefault();err.textContent='';go.disabled=true;go.textContent='확인 중…';
+    fetch('/api/login',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw.value})})
+      .then(function(r){return r.json().catch(function(){return {}}).then(function(d){return {ok:r.ok,d:d}})})
+      .then(function(x){
+        if(x.ok&&x.d.ok){location.replace(target());return}
+        err.textContent=x.d.message||'로그인하지 못했습니다.';pw.select();
+      })
+      .catch(function(){err.textContent='서버에 연결하지 못했습니다. 네트워크를 확인하세요.'})
+      .then(function(){go.disabled=false;go.textContent='로그인'});
+  });
+})();
+</script></body></html>

@@ -1,0 +1,6 @@
+# Not part of the deployment: local bridge, local tests/backups, git metadata.
+naver-bridge/
+work/
+.git/
+.env
+.env.*

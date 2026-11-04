@@ -1,8 +1,18 @@
 # Local browser credentials and runtime state
 naver-bridge/.naver-profile/
+
+# Dependencies (root = Vercel functions + shared lib, naver-bridge = Playwright)
+node_modules/
 naver-bridge/node_modules/
 
 # Operating-system and local development files
 .DS_Store
 .vercel/
 *.log
+
+# Secrets: real values live only in .env files / Vercel env vars, never in git
+.env
+.env.*
+!.env.example
+*.env.local
+naver-bridge/.env

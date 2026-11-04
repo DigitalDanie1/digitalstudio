@@ -1,0 +1,13 @@
+{
+  "name": "fieldnote-studio",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "FIELDNOTE Studio: static studio + Vercel functions (password gate, cloud sync, AI generation)",
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.4.0",
+    "@upstash/redis": "^1.35.0",
+    "zod": "^4.6.7"
+  }
+}
