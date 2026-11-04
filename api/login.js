@@ -6,7 +6,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export default async function handler(req, res) {
   if (!methodGuard(req, res, ['POST'])) return;
   try {
-    const password = process.env.STUDIO_PASSWORD;
+    const password = (process.env.STUDIO_PASSWORD || process.env.stuidopassword);
     if (!password) return sendJson(res, 503, { ok: false, message: 'STUDIO_PASSWORD 환경변수가 설정되지 않아 로그인할 수 없습니다.' });
     const body = await readJson(req, 10_000);
     if (!(await passwordMatches(body?.password, password))) {

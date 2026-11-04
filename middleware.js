@@ -12,7 +12,7 @@ const isApi = (p) => p === '/api' || p.startsWith('/api/');
 export default async function middleware(request) {
   const url = new URL(request.url);
   const path = url.pathname;
-  const password = process.env.STUDIO_PASSWORD;
+  const password = (process.env.STUDIO_PASSWORD || process.env.stuidopassword);
 
   if (!password) {
     const message = 'STUDIO_PASSWORD 환경변수가 설정되지 않아 접근을 차단했습니다. Vercel 프로젝트 설정에서 STUDIO_PASSWORD를 추가하고 다시 배포하세요.';
