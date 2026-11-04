@@ -15,7 +15,8 @@
 .publish-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.publish-card{border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:18px}.publish-card h3{margin:10px 0 6px}.publish-card p{color:var(--muted);font-size:11px;min-height:35px}.publish-card .actions{margin-top:15px}.publish-status{display:flex;gap:8px;align-items:center;font-size:10px;color:var(--muted)}.publish-status .dot{background:var(--orange)}.publish-status.ready .dot{background:var(--green)}.queue-row{display:grid;grid-template-columns:34px minmax(0,1fr) auto auto;gap:12px;align-items:center;padding:14px 0;border-bottom:1px solid var(--line)}.queue-row:last-child{border:0}.bridge-note{border-left:3px solid var(--orange);padding:10px 12px;background:#1d1a14;color:#cfc4ac;font-size:11px;margin-top:15px}@media(max-width:1150px){.publish-grid{grid-template-columns:1fr}}@media(max-width:760px){.queue-row{grid-template-columns:30px 1fr}.queue-row .actions,.queue-row>.statuspill{grid-column:2}}
 .gen-panel{margin:0 0 20px}.gen-controls{display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin:12px 0 6px}.gen-controls .field{margin:0;min-width:220px;flex:1}.gen-panel .idea{padding:16px}.gen-panel .idea h3{margin:4px 0 8px}.topic-group{margin:0 0 12px}.topic-group:last-child{margin-bottom:0}.topic-group-label{font-size:11px;color:var(--muted);margin:0 0 4px}.sampletag.ai{color:var(--lime);border-color:#4b5f36;background:#1d2618}.sampletag{margin-left:0;margin-right:4px}h3 .sampletag{margin-left:6px;margin-right:0}#logoutBtn[hidden]{display:none}#cloudLoading{position:fixed;inset:0;z-index:100;background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:14px}#cloudBanner{position:fixed;top:0;left:0;right:0;z-index:60;margin:0;border-radius:0;justify-content:center}
 .weekly{margin:0 0 27px}.weekly-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.wcard{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 20px;display:flex;flex-direction:column;gap:8px}.wcard.focus{border-color:var(--lime)}.wcard .whead{display:flex;justify-content:space-between;align-items:center;gap:8px}.wcard .wwhy{color:var(--muted);font-size:12px;margin:0}.wcard .wnum{font-size:20px;font-variant-numeric:tabular-nums}.wbar{height:6px;background:#242930;border-radius:4px;overflow:hidden}.wbar i{display:block;height:100%;background:#6f7886;border-radius:4px}.wbar i.done{background:var(--lime)}.wcard .btn{margin-top:auto;align-self:flex-start}.wpill{font-size:11px;color:var(--muted);border:1px dashed #3a414b;border-radius:99px;padding:1px 9px}.wfocusline{margin:10px 0 0;font-size:12px;color:var(--lime)}@media(max-width:760px){.weekly-grid{grid-template-columns:1fr}}.wrows{display:flex;flex-direction:column;gap:10px}.wrow{display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:8px}.wrow.focus{border-color:var(--lime)}.wrow .wrowhead{display:flex;justify-content:space-between;gap:8px;font-size:13px}.wrow .wrowhead b{font-variant-numeric:tabular-nums}.wrow .wbar{grid-column:1}.wrow .btn{grid-column:2;grid-row:1/3;margin:0;padding:4px 10px;font-size:12px}.wrow small{grid-column:1}.yt-tabs{margin:0 0 14px}
-</style></head><body><div class="app"><aside class="sidebar" id="sidebar"><div class="brand"><span class="brandmark">f/</span> FIELDNOTE</div><div class="workspace">싱가포르에서, 한국을 보다<small>개인 콘텐츠 워크스페이스</small></div><div class="nav-label">WORKSPACE</div><button class="nav active" data-view="dashboard"><span class="navicon">▦</span>운영 현황</button><button class="nav" data-view="review"><span class="navicon">▤</span>검수함<span class="count" id="reviewCount">0</span></button><button class="nav" data-view="ideas"><span class="navicon">◇</span>경험·소재함</button><button class="nav" data-view="analytics"><span class="navicon">⌕</span>키워드·주제</button><button class="nav" data-view="research"><span class="navicon">↗</span>공개 조사 결과</button><button class="nav" data-view="topics"><span class="navicon">☆</span>채널별 관심 주제</button><button class="nav" data-view="publish"><span class="navicon">⇧</span>발행 센터</button><div class="nav-label">CHANNELS</div><button class="nav" data-view="blog"><span class="dot blog"></span>네이버 블로그</button><button class="nav" data-view="insta"><span class="dot insta"></span>인스타그램</button><button class="nav" data-view="youtube"><span class="dot youtube"></span>유튜브</button><div class="sidebottom"><button class="nav" data-view="settings"><span class="navicon">⚙</span>설정·데이터</button><div class="local"><span class="dot"></span><span id="storageState">이 브라우저에 저장</span><div id="sideConn" style="margin:5px 0 0 13px;color:#626c78">외부 계정 · 연결 안 됨</div></div><button class="nav" id="logoutBtn" hidden><span class="navicon">⇥</span>로그아웃</button></div></aside><div class="sidebar-backdrop" id="sidebarBackdrop"></div><main><header class="topbar"><div><button class="menu" id="mobileMenu" aria-label="메뉴 열기">☰</button>워크스페이스 <span style="margin:0 12px;color:#454d59">/</span><b id="breadcrumb">운영 현황</b></div><div class="topmeta"><span id="date"></span><span>LOCAL EDITION</span><div class="avatar">FN</div></div></header><div class="content" id="content"></div></main></div><div id="modalRoot"></div><div class="toasts" id="toasts" role="status" aria-live="polite"></div><input type="file" accept="application/json,.json" id="importFile" hidden>
+.reach-chip{cursor:pointer}.reach-chip:hover{border-color:var(--lime)}.reach-recent{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:10px}.reach-rbtn{background:transparent;border:1px solid var(--line);border-radius:6px;padding:1px 8px;color:var(--muted);font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.reach-rbtn:hover{color:var(--text);border-color:var(--muted)}.reach-pill{display:inline-block;background:var(--lime);color:#14200e;border-radius:999px;padding:0 8px;font-size:10px;font-weight:700;white-space:nowrap}.reach-pill.s{background:var(--purple)}.reach-drawer{position:fixed;top:0;right:0;bottom:0;width:min(520px,100%);background:var(--panel);border-left:1px solid var(--line);z-index:40;display:flex;flex-direction:column;box-shadow:-10px 0 50px #0008}.reach-dhead{display:flex;gap:12px;justify-content:space-between;align-items:flex-start;padding:14px 16px;border-bottom:1px solid var(--line)}.reach-dhead h2{margin:0;font-size:14px;overflow-wrap:anywhere}.reach-dbody{flex:1;overflow:auto;padding:14px 16px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px}
+</style></head><body><div class="app"><aside class="sidebar" id="sidebar"><div class="brand"><span class="brandmark">f/</span> FIELDNOTE</div><div class="workspace">싱가포르에서, 한국을 보다<small>개인 콘텐츠 워크스페이스</small></div><div class="nav-label">WORKSPACE</div><button class="nav active" data-view="dashboard"><span class="navicon">▦</span>운영 현황</button><button class="nav" data-view="review"><span class="navicon">▤</span>검수함<span class="count" id="reviewCount">0</span></button><button class="nav" data-view="ideas"><span class="navicon">◇</span>경험·소재함</button><button class="nav" data-view="analytics"><span class="navicon">⌕</span>키워드·주제</button><button class="nav" data-view="research"><span class="navicon">↗</span>공개 조사 결과</button><button class="nav" data-view="reach"><span class="navicon">⌖</span>Reach 리서치</button><button class="nav" data-view="topics"><span class="navicon">☆</span>채널별 관심 주제</button><button class="nav" data-view="publish"><span class="navicon">⇧</span>발행 센터</button><div class="nav-label">CHANNELS</div><button class="nav" data-view="blog"><span class="dot blog"></span>네이버 블로그</button><button class="nav" data-view="insta"><span class="dot insta"></span>인스타그램</button><button class="nav" data-view="youtube"><span class="dot youtube"></span>유튜브</button><div class="sidebottom"><button class="nav" data-view="settings"><span class="navicon">⚙</span>설정·데이터</button><div class="local"><span class="dot"></span><span id="storageState">이 브라우저에 저장</span><div id="sideConn" style="margin:5px 0 0 13px;color:#626c78">외부 계정 · 연결 안 됨</div></div><button class="nav" id="logoutBtn" hidden><span class="navicon">⇥</span>로그아웃</button></div></aside><div class="sidebar-backdrop" id="sidebarBackdrop"></div><main><header class="topbar"><div><button class="menu" id="mobileMenu" aria-label="메뉴 열기">☰</button>워크스페이스 <span style="margin:0 12px;color:#454d59">/</span><b id="breadcrumb">운영 현황</b></div><div class="topmeta"><span id="date"></span><span>LOCAL EDITION</span><div class="avatar">FN</div></div></header><div class="content" id="content"></div></main></div><div id="modalRoot"></div><div class="toasts" id="toasts" role="status" aria-live="polite"></div><input type="file" accept="application/json,.json" id="importFile" hidden>
 <script>
 'use strict';
 const $=s=>document.querySelector(s), KEY='fieldnote-studio-v1';
@@ -349,14 +350,196 @@ function postList(){const c=CH[view]?view:null;const posts=filteredPosts().filte
 const checks=['직접 경험한 내용과 외부 자료를 구분했습니다.','수치·인용·사실의 출처를 확인했습니다.','개인의 해석과 집단 전체에 대한 일반화를 점검했습니다.'];
 function editor(){const p=db.posts.find(p=>p.id===editing);if(!p){editing=null;return dashboard()}const idea=p.ideaId&&db.ideas.find(i=>i.id===p.ideaId),d=draftGet(p.id),draftNew=d&&d.savedAt>p.updated;return head('원고 편집','저장 후 다른 화면으로 이동하세요. 원고 수정 시 기존 승인은 해제됩니다.',false)+`<div class="actions" style="margin-bottom:20px"><button class="btn ghost" data-action="back">← 목록으로</button>${badge(p)}${sample(p)}${idea?`<button class="linkbtn" data-view="ideas" title="경험·소재함으로 이동">소재: ${esc(idea.title)}</button>`:''}<span class="small" id="saveIndicator">저장된 원고</span></div>${draftNew?`<div class="draft-banner" id="draftBanner" role="status"><span>저장하지 않은 임시 원고가 있습니다 (${esc(new Date(d.savedAt).toLocaleString('ko-KR'))})</span><button class="btn" data-action="restoreDraft">복원</button><button class="btn ghost" data-action="discardDraft">버리기</button></div>`:''}<div class="editor-layout"><section class="panel"><div class="field"><label for="postTitle">제목</label><input class="input" id="postTitle" value="${esc(p.title)}" maxlength="200"></div><div class="field"><label for="postChannel">채널</label><select id="postChannel">${Object.keys(CH).map(c=>`<option value="${c}" ${p.channel===c?'selected':''}>${CH[c].name}</option>`).join('')}</select></div><div class="field" id="ytChField" ${p.channel==='youtube'?'':'hidden'}><label for="postYtChannel">유튜브 채널</label><select id="postYtChannel">${ytValidCh(p.ytChannel)?'':'<option value="" selected>미지정</option>'}${YT_CHANNELS.map(y=>`<option value="${y.id}" ${p.ytChannel===y.id?'selected':''}>${esc(ytChName(y.id))}</option>`).join('')}</select></div><div class="field" id="naverCatField" ${p.channel==='blog'?'':'hidden'}><label for="postNaverCategory">네이버 카테고리 · 선택</label><select id="postNaverCategory">${categoryOptions(p.naverCategory||'')}</select><div class="help">발행 브리지가 네이버 발행 설정에서 같은 이름의 카테고리를 미리 선택해 봅니다. 실패하면 직접 선택하세요.</div></div><details class="memo-panel"><summary>작업 메모 · 발행되지 않음</summary><div class="inner"><textarea id="postMemo" style="min-height:180px" placeholder="소재 메모, 문체 기준 등 작업용 메모">${esc(p.memo||'')}</textarea><div class="help">이 메모는 발행 브리지로 전송되지 않고 Markdown 내보내기에도 포함되지 않습니다. JSON 백업에는 포함됩니다.</div></div></details><div class="field"><label for="postBody">원고 · Markdown / 일반 텍스트</label><textarea id="postBody" style="min-height:350px">${esc(p.body)}</textarea><div class="charcount" id="charCount">${p.body.length.toLocaleString()}자</div></div><div class="field"><label for="postSources">출처 · 한 줄에 하나씩, URL과 메모</label><textarea id="postSources" placeholder="https://… — 자료 제목 / 확인 날짜">${esc(p.sources)}</textarea></div><div class="actions"><button class="btn primary" data-action="savePost">원고 저장</button><button class="btn" data-action="requestReview">검수함으로 보내기</button></div></section><section><div class="panel"><div class="sectionhead" style="margin-top:0"><h2>콘텐츠 미리보기</h2><span class="small">Markdown 미리보기</span></div><div class="preview"><h2 id="previewTitle">${esc(p.title)}</h2><div id="previewBody">${md(p.body)}</div></div><div class="help">실제 SNS 편집기와 서식이 다를 수 있습니다.</div></div><div class="panel" style="margin-top:16px"><h2>발행 전 검수</h2>${checks.map((t,i)=>`<label class="checkrow"><input type="checkbox" data-check="${i}" ${p.checks[i]?'checked':''}><span>${t}</span></label>`).join('')}<div class="edit-toolbar"><button class="btn primary" data-action="approve">검수 완료 · 승인</button><button class="btn" data-action="exportCurrent">↓ Markdown</button>${p.status==='approved'&&!p.sample?'<button class="btn" data-view="publish">발행 센터로</button>':''}${p.status==='approved'&&!p.sample&&p.channel==='blog'?`<button class="btn" data-naver-copy="${esc(p.id)}">본문 복사 · 네이버 글쓰기 열기</button>`:''}</div><div class="warning">승인해도 바로 게시되지 않습니다. 발행은 발행 센터에서 직접 전송하세요.</div></div><div class="actions" style="margin-top:16px;justify-content:flex-end"><button class="btn ghost danger" data-action="deletePost">원고 삭제</button></div></section></div>`}
 function settings(){return head('설정·데이터','워크스페이스의 문체와 로컬 데이터를 관리하세요.',false)+`<div class="settingsgrid"><section class="panel"><h2>편집 기준</h2><div class="field"><label for="profileName">워크스페이스 이름</label><input class="input" id="profileName" maxlength="80" value="${esc(db.profile.name)}"></div><div class="field"><label for="profileTone">내 문체와 편집 원칙</label><textarea id="profileTone" style="min-height:150px">${esc(db.profile.tone)}</textarea><div class="help">원고 틀과 작업 패키지에 포함됩니다. AI에는 자동 전달되지 않습니다.</div></div><div class="field"><label for="profileBlogVoice">블로그 소개·문체</label><textarea id="profileBlogVoice" style="min-height:150px">${esc(db.profile.blogVoice??DEFAULT_BLOG_VOICE)}</textarea><div class="help">블로그 주제·AI 초안 생성 시 브리지를 거쳐 Claude에 전달됩니다. 메모·토큰 등 다른 데이터는 보내지 않습니다.</div></div>${YT_CHANNELS.map(y=>`<div class="field"><label for="ytName-${y.id}">유튜브 · ${esc(y.tab)} 채널 이름</label><input class="input" id="ytName-${y.id}" maxlength="80" value="${esc(ytChName(y.id))}"><label for="ytVoice-${y.id}" style="margin-top:8px">소개·말투</label><textarea id="ytVoice-${y.id}" style="min-height:100px">${esc(ytChVoice(y.id))}</textarea></div>`).join('')}<div class="help">유튜브 주제·AI 대본 생성 시 해당 채널의 소개·말투가 서버(또는 브리지)를 거쳐 Claude에 전달됩니다. 메모·토큰 등 다른 데이터는 보내지 않습니다.</div><button class="btn primary" data-action="saveSettings">설정 저장</button></section><section class="panel"><h2>외부 연결</h2>${Object.keys(CH).map(c=>`<div class="connection">${icon(c)}<div class="grow"><h3>${CH[c].name}</h3><div class="small">${isConnected(c)?'발행 브리지 주소 설정됨 · 상태 확인은 발행 센터에서':'로그인·발행 연결부 구현 필요'}</div></div>${isConnected(c)?'<span class="statuspill" style="color:var(--green);border-color:#2b4d3d">브리지 설정됨</span><button class="btn ghost" data-view="publish">발행 센터</button>':'<span class="statuspill">미연결</span>'}</div>`).join('')}<p class="help">이 파일에는 비밀번호나 API 키를 입력하지 않습니다. 실제 AI 생성·수집·예약·발행은 별도 실행 프로그램이 필요합니다.</p></section><section class="panel"><h2>백업과 복원</h2><p class="subtitle">소재·원고·설정을 JSON 파일로 보관합니다.</p><div class="actions" style="margin-top:18px"><button class="btn" data-action="backup">↓ JSON 백업</button><button class="btn" data-action="import">↑ JSON 복원</button></div><p class="help">브라우저·파일 위치에 따라 저장 공간이 달라질 수 있습니다. 복원 시 현재 데이터를 교체합니다. 개인 메모가 포함되므로 백업은 직접 보관하세요. 브리지 토큰은 백업에 포함되지 않으며, 복원해도 이 브라우저의 토큰은 유지됩니다.</p></section><section class="panel"><h2>예시 데이터</h2><p class="subtitle">처음 제공된 예시 소재와 예시 원고만 삭제합니다.</p><div class="actions" style="margin-top:18px"><button class="btn danger" data-action="clearSamples">예시 데이터 지우기</button></div><p class="help">직접 추가한 소재와 원고는 유지됩니다.</p></section></div>`}
-const TITLES={dashboard:'운영 현황',review:'검수함',ideas:'경험·소재함',settings:'설정·데이터',analytics:'키워드·주제',research:'공개 조사 결과',topics:'채널별 관심 주제',publish:'발행 센터',...Object.fromEntries(Object.entries(CH).map(([k,v])=>[k,v.name]))};
-const ROUTES=['dashboard','review','ideas','analytics','research','topics','publish','settings',...Object.keys(CH)];
+/* ===== Reach 리서치 (로컬 브리지 /reach/* 읽기 전용 조사: 유튜브 아웃라이어 · 네이버 빈틈 · Reddit) ===== */
+const REACH_KEY='fieldnote-reach-v1';
+const REACH_TABS=[['yt','유튜브 아웃라이어'],['nv','네이버 빈틈 점검'],['rd','해외 소재 (Reddit)']];
+const REACH_YT_Q={wrestling:'주짓수 그래플링',debate:'토론 레전드',faith:'기독교 간증',heresy:'이단 사이비','yt-weird':'이상한 영상 레전드','yt-faith-life':'신앙 간증','yt-immigration-critique':'이민 정책 논란','yt-islam-critique':'이슬람 정책 논란',multicultural:'다문화 가정 이야기',conservative:'보수 논평',patriot:'애국 역사','yt-political-debate':'정치 토론 레전드','yt-pro-wrestling':'프로레슬링 명장면','yt-grappling':'주짓수 명장면'};
+const REACH_NV_Q={addiction:'중독 원리 뇌과학','game-design':'슬롯머신 설계 도박 중독','real-cases':'도박 중독 실제 사례','stock-addiction':'주식 중독','coin-addiction':'코인 중독','econ-dopamine':'경제 도파민 소비','invest-psych':'투자 심리 손실회피','sg-observe':'싱가포르 생활 물가',macro:'매크로 금리 전망',variational:'Variational 거래소'};
+const REACH_RD_CHIPS=['bjj','grappling','debate','christianity','weird videos'];
+const REACH_CLEAN=t=>(t||'').replace(/^#.*\n/,'').replace(/[#>*_`]/g,'').replace(/\s+/g,' ').trim().slice(0,260);
+let reachTab='yt',reachHealth=null,reachHealthAt=0,reachDrawer=null;
+const reachSt={yt:{q:'',lim:'15',ctx:null,sctx:null,state:'idle',items:[],msg:'',seq:0,subs:{}},nv:{q:'',ctx:null,sctx:null,state:'idle',items:[],msg:'',seq:0,kw:''},rd:{q:'',lim:'15',ctx:null,sctx:null,state:'idle',items:[],msg:'',seq:0,bodies:{}}};
+function reachStore(){try{const v=JSON.parse(localStorage.getItem(REACH_KEY)||'null');if(v&&typeof v==='object'&&v.recent)return v}catch(_){}return {recent:{yt:[],nv:[],rd:[]}}}
+function reachRecent(tab){const r=reachStore().recent[tab];return Array.isArray(r)?r.filter(x=>typeof x==='string'):[]}
+function reachPushRecent(tab,q){try{const s=reachStore();s.recent={yt:[],nv:[],rd:[],...s.recent};s.recent[tab]=[q,...reachRecent(tab).filter(x=>x!==q)].slice(0,8);localStorage.setItem(REACH_KEY,JSON.stringify(s))}catch(_){}}
+function reachFmtViews(n){if(n==null)return'-';if(n>=10000){const v=n/10000;return(v>=100?Math.round(v):v.toFixed(1).replace(/\.0$/,''))+'만'}if(n>=1000)return(n/1000).toFixed(1).replace(/\.0$/,'')+'천';return String(n)}
+function reachFmtDur(s){if(s==null)return'-';s=Math.round(s);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
+function reachMedian(a){if(!a.length)return 0;const b=[...a].sort((x,y)=>x-y),m=b.length>>1;return b.length%2?b[m]:(b[m-1]+b[m])/2}
+const reachSafe=u=>/^https?:\/\//i.test(u||'')?u:'#';
+async function bridgeGet(path,params={}){
+ const x=db.integrations.blog;let url;try{url=new URL(path,(x.endpoint||'').trim()||'http://127.0.0.1:8787')}catch(_){return {ok:false,offline:true,message:'발행 센터의 네이버 블로그 연결에 브리지 URL을 먼저 설정하세요.'}}
+ for(const [k,v] of Object.entries(params))url.searchParams.set(k,v);
+ const ctrl=new AbortController(),to=setTimeout(()=>ctrl.abort(),135000);
+ try{
+  const res=await fetch(url,{credentials:'omit',headers:x.token?{'X-Fieldnote-Token':x.token}:{},signal:ctrl.signal});
+  let data=null;try{data=await res.json()}catch(_){}
+  if(!data)return {ok:false,message:'HTTP '+res.status};
+  if(!res.ok&&data.ok!==false)data.ok=false;
+  return data;
+ }catch(err){
+  if(err&&err.name==='AbortError')return {ok:false,message:'응답이 너무 오래 걸려요. 다시 시도해보세요'};
+  return {ok:false,offline:true,message:'브리지에 연결하지 못했어요'};
+ }finally{clearTimeout(to)}
+}
+async function reachCheck(force){
+ if(reachHealth==='checking')return;
+ if(!force&&reachHealthAt&&Date.now()-reachHealthAt<(reachHealth&&reachHealth.ok?60000:30000))return;
+ reachHealth='checking';reachHealthAt=Date.now();reachPaintHealth();
+ const r=await bridgeGet('/reach/health');
+ reachHealth=r;reachHealthAt=Date.now();reachPaintHealth();
+}
+function reachHealthHTML(){
+ const h=reachHealth;
+ if(h==='checking'||h===null)return `<span class="statuspill">확인 중…</span>`;
+ if(h.ok)return `<span class="statuspill" style="color:var(--green);border-color:#2f5a46">브리지 연결됨${h.version?' · agent-reach '+esc(h.version):''}</span>`;
+ const msg=h.offline?'로컬 브리지가 꺼져 있어요. 이 Mac에서 naver-bridge를 실행하면 써요.':'agent-reach를 쓸 수 없어요'+(h.message?' · '+h.message:'');
+ return `<span class="statuspill" style="color:var(--orange);border-color:#5b4329">${esc(msg)}</span><button class="btn ghost" data-reach="recheck">다시 확인</button>`;
+}
+function reachPaintHealth(){if(view!=='reach'||editing)return;const e=$('#reachHealth');if(e)e.innerHTML=reachHealthHTML()}
+function reachPresets(tab){
+ if(tab==='rd')return [{label:'',chips:REACH_RD_CHIPS.map(c=>({label:c,q:c}))}];
+ if(tab==='yt'){
+  const list=topicsFor('youtube').filter(t=>topicEnabled(t,'youtube'));
+  const groups=YT_CHANNELS.map(ch=>({label:ytChName(ch.id)||ch.name,chips:list.filter(t=>t.ytChannel===ch.id).map(t=>({label:t.name,q:REACH_YT_Q[t.id]||t.name,ctx:{ytChannel:ch.id,topicId:t.id}}))}));
+  const rest=list.filter(t=>!ytValidCh(t.ytChannel));
+  if(rest.length)groups.push({label:'미지정',chips:rest.map(t=>({label:t.name,q:REACH_YT_Q[t.id]||t.name,ctx:{topicId:t.id}}))});
+  return groups.filter(g=>g.chips.length);
+ }
+ const list=topicsFor('blog').filter(t=>topicEnabled(t,'blog'));
+ return [{label:'',chips:list.map(t=>{const c=NAVER_BY_NAME[t.naverCategory]||NAVER_BY_NAME[t.name];return {label:t.name,q:REACH_NV_Q[c&&c.id]||t.name,ctx:{topicId:t.id,...(t.naverCategory?{naverCategory:t.naverCategory}:{})}}})}];
+}
+function reachFormHTML(tab){
+ const st=reachSt[tab],groups=reachPresets(tab),howto={yt:'주제를 고르거나 직접 입력하면 조회수 상위 영상을 찾고, 중앙값의 2배 이상인 영상을 아웃라이어로 표시해요.',nv:'키워드로 네이버 블로그 상위 글을 찾고, 작성일·분량을 읽어 경쟁 글이 오래됐는지(빈틈) 판단해요.',rd:'영어 키워드로 Reddit 인기 글을 찾아 해외에서 먹히는 소재를 확인해요.'}[tab];
+ const chips=groups.map(g=>`<div class="topic-group">${g.label?`<p class="topic-group-label">${esc(g.label)}</p>`:''}<div class="interest-chips" style="margin:0">${g.chips.map(c=>`<button class="interest-chip reach-chip" data-reach="chip" data-q="${esc(c.q)}" data-ctx="${esc(JSON.stringify(c.ctx||null))}" title="${esc(c.q)}">${esc(c.label)}</button>`).join('')}</div></div>`).join('')||'<p class="small">현재 이 채널에 켜 둔 주제가 없어요. 직접 입력하세요.</p>';
+ const rec=reachRecent(tab);
+ return `<p class="small" style="font-size:12px;margin:0 0 12px">${howto}</p>${chips}<form id="reachForm" class="analysis-controls" autocomplete="off" style="margin-top:14px"><div class="field"><label for="reachQ">검색어</label><input class="input" id="reachQ" maxlength="200" placeholder="${tab==='rd'?'예: bjj':tab==='nv'?'예: 코인 중독':'예: 주짓수 그래플링'}" value="${esc(st.q)}"></div>${st.lim!==undefined?`<div class="field" style="flex:0 0 90px;min-width:90px"><label for="reachLim">결과 수</label><select class="input" id="reachLim">${['10','15','25'].map(n=>`<option ${st.lim===n?'selected':''}>${n}</option>`).join('')}</select></div>`:''}<div class="actions" style="margin-top:0"><button class="btn primary" type="submit">검색</button></div></form><div class="reach-recent" id="reachRecent">${reachRecentHTML(tab)}</div>`;
+}
+function reachRecentHTML(tab){const r=reachRecent(tab);return r.length?`<span class="small">최근 검색</span>${r.map(q=>`<button class="reach-rbtn" data-reach="chip" data-q="${esc(q)}" data-ctx="null" title="${esc(q)}">${esc(q)}</button>`).join('')}`:''}
+function reachView(){
+ setTimeout(()=>{if(view==='reach'&&!editing)reachCheck(false)},0);
+ const tab=reachTab;
+ return head('Reach 리서치','유튜브 아웃라이어·네이버 빈틈·해외 소재를 이 Mac의 로컬 브리지로 조사합니다. 읽기 전용이며 아무것도 게시하지 않습니다.',false)
+ +`<div class="toolbar"><div class="filters" role="tablist" aria-label="리서치 탭">${REACH_TABS.map(([k,v])=>`<button class="filter ${tab===k?'active':''}" role="tab" aria-selected="${tab===k}" data-reach="tab" data-tab="${k}">${v}</button>`).join('')}</div><div class="actions" style="margin:0" id="reachHealth">${reachHealthHTML()}</div></div>`
+ +`<section class="panel" id="reachForm0">${reachFormHTML(tab)}</section><div id="reachOut" style="margin-top:16px">${reachOutHTML()}</div><div id="reachDrawer">${reachDrawerHTML()}</div>`;
+}
+function reachPaintOut(tab){if(view!=='reach'||editing||reachTab!==tab)return;const e=$('#reachOut');if(e)e.innerHTML=reachOutHTML()}
+function reachStateBox(t,err){return `<div class="panel" style="text-align:center;color:${err?'var(--red)':'var(--muted)'};${err?'border-color:#5a3434':''}">${t}</div>`}
+function reachOutHTML(){
+ const tab=reachTab,st=reachSt[tab];
+ if(st.state==='idle')return reachStateBox('프리셋을 누르거나 검색어를 입력하세요. 결과는 10–30초 걸릴 수 있어요.');
+ if(st.state==='loading')return reachStateBox('검색 중… 10–30초 걸려요');
+ if(st.state==='error')return reachStateBox(esc(st.msg||'오류가 발생했어요'),true);
+ if(st.state==='empty')return reachStateBox('결과가 없어요. 다른 검색어를 써보세요.');
+ if(tab==='yt'){
+  const items=st.items,med=st.med;
+  return `<div class="small" style="font-size:12px;color:var(--text);margin-bottom:10px">중앙값 ${Math.round(med).toLocaleString()}회 · 아웃라이어 ${items.filter(i=>i.out).length}개 · 숏폼(≤60s) ${items.filter(i=>i.dur!=null&&i.dur<=60).length}개</div><div class="analysis-table-wrap"><table class="analysis-table" style="min-width:760px"><thead><tr><th style="text-align:right">조회수</th><th style="text-align:right">길이</th><th>제목</th><th>채널</th><th></th></tr></thead><tbody>${items.map((i,n)=>`<tr><td class="metric">${reachFmtViews(i.views)}</td><td class="metric">${reachFmtDur(i.dur)}</td><td><a href="${esc(reachSafe(i.url))}" target="_blank" rel="noopener noreferrer">${esc(i.title)}</a>${i.out?' <span class="reach-pill">아웃라이어</span>':''}${i.dur!=null&&i.dur<=60?' <span class="reach-pill s">숏</span>':''}</td><td>${esc(i.author)}</td><td style="white-space:nowrap"><button class="btn ghost" data-reach="sub" data-n="${n}">자막</button> <button class="btn" data-reach="idea" data-n="${n}">소재함에 추가</button> <button class="btn ghost" data-reach="copy" data-n="${n}">복사</button></td></tr>`).join('')}</tbody></table></div>`;
+ }
+ if(tab==='nv'){
+  const rows=st.items,done=rows.filter(r=>r.st==='done'),busy=rows.some(r=>r.st==='run');
+  let verdict='';const ys=done.map(r=>r.year).filter(Boolean);
+  if(ys.length){
+   const my=reachMedian(ys),cl=done.filter(r=>r.chars!=null),avg=Math.round(cl.reduce((a,r)=>a+r.chars,0)/(cl.length||1)),cy=new Date().getFullYear();let v,c,ex;
+   if(my<=cy-3){v='빈틈 큼';c='var(--lime)';ex=`상위 글 작성일 중앙값이 ${my}년이라 오래된 글이 많아요. 최신 관점으로 쓰면 올라갈 여지가 커요.`}
+   else if(my<=cy-1){v='보통';c='var(--orange)';ex=`중앙값 ${my}년으로 어느 정도 갱신돼 있어요. 차별화된 각도가 필요해요.`}
+   else{v='경쟁 치열';c='var(--red)';ex=`중앙값 ${my}년으로 최근 글이 상위를 채우고 있어요. 다른 키워드나 각도를 고려하세요.`}
+   verdict=`<div class="analysis-callout" style="border-left:4px solid ${c};margin:0 0 14px"><strong style="color:${c};font-size:17px">${v}</strong><p style="color:var(--text);font-size:12px">${ex} 평균 분량 ${avg.toLocaleString()}자 (${done.length}/${rows.length}개 확인).</p></div>`;
+  }
+  return `<div class="actions" style="margin:0 0 12px"><button class="btn primary" data-reach="check" ${busy?'disabled':''}>${busy?'읽는 중…':'작성일·분량 확인'}</button><button class="btn ghost" data-reach="nvcopy" ${done.length?'':'disabled'}>결과 복사</button></div>${verdict}<div class="analysis-table-wrap"><table class="analysis-table" style="min-width:700px"><thead><tr><th>제목</th><th>블로그</th><th>작성일</th><th style="text-align:right">분량(자)</th><th></th></tr></thead><tbody>${rows.map((r,n)=>`<tr><td><a href="${esc(reachSafe(r.url))}" target="_blank" rel="noopener noreferrer">${esc(r.title)}</a></td><td>${esc(r.blog)}</td><td>${r.st==='done'?esc(r.date||'미확인')+(r.dateSource==='image'?' <span class="small" title="본문 날짜를 못 찾아 이미지 경로로 추정">(추정)</span>':''):r.st==='run'?'읽는 중…':r.st==='err'?'<span style="color:var(--red)">실패</span>':'-'}</td><td class="metric">${r.chars!=null?r.chars.toLocaleString():'-'}</td><td style="white-space:nowrap"><button class="btn" data-reach="idea" data-n="${n}">소재함에 추가</button> <button class="btn ghost" data-reach="copy" data-n="${n}">복사</button></td></tr>`).join('')}</tbody></table></div>`;
+ }
+ return `<div class="idea-grid" style="grid-template-columns:1fr">${st.items.map((i,n)=>`<article class="idea"><h3 style="margin:0 0 4px"><a href="${esc(reachSafe(i.url))}" target="_blank" rel="noopener noreferrer">${esc(i.title)}</a></h3><div class="small">${esc(i.author||'')} ${i.published_at?'· '+esc(String(i.published_at).slice(0,10)):''}</div><p style="max-height:none;margin:8px 0">${esc(REACH_CLEAN(i.text))}</p><div class="actions" style="margin:0"><button class="btn ghost" data-reach="body" data-n="${n}">본문 보기</button><button class="btn" data-reach="idea" data-n="${n}">소재함에 추가</button><button class="btn ghost" data-reach="copy" data-n="${n}">복사</button></div></article>`).join('')}</div>`;
+}
+function reachDrawerHTML(){
+ const d=reachDrawer;if(!d)return '';
+ return `<aside class="reach-drawer open" role="dialog" aria-label="상세"><div class="reach-dhead"><h2>${esc(d.title)}</h2><div class="actions" style="margin:0"><button class="btn" data-reach="didea">소재함에 추가</button><button class="btn ghost" data-reach="dcopy">복사</button><button class="btn ghost" data-reach="dclose">닫기</button></div></div><div class="small" style="padding:8px 16px 0">${esc(d.meta||'')}</div><div class="reach-dbody">${esc(d.body)}</div></aside>`;
+}
+function reachOpenDrawer(tab,n,meta,body){const it=reachSt[tab].items[n];reachDrawer={tab,n,title:it.title,meta,body};const e=$('#reachDrawer');if(e)e.innerHTML=reachDrawerHTML()}
+function reachCloseDrawer(){if(!reachDrawer)return;reachDrawer=null;const e=$('#reachDrawer');if(e)e.innerHTML=''}
+function reachMd(tab,n){
+ const st=reachSt[tab],i=st.items[n];
+ if(tab==='yt'){const s=st.subs[i.url];return `## ${i.title}\n- ${i.url}\n- ${reachFmtViews(i.views)}회 / ${reachFmtDur(i.dur)} / ${i.author}\n- 자막 발췌: ${s?s.slice(0,400):'(미로드)'}`}
+ if(tab==='nv')return `## ${i.title}\n- ${i.url}\n- ${i.blog} / ${i.date||'작성일 미확인'} / ${i.chars!=null?i.chars.toLocaleString()+'자':'분량 미확인'}\n- 발췌: ${(i.excerpt||'(미로드)').slice(0,400)}`;
+ const b=st.bodies[i.url];return `## ${i.title}\n- ${i.url}\n- ${i.author||''}\n- ${b?'본문':'발췌'}: ${(b||REACH_CLEAN(i.text)).slice(0,400)}`;
+}
+function reachNvMd(){
+ const st=reachSt.nv;
+ return `### 네이버 빈틈 점검: ${st.kw}\n\n| 제목 | 블로그 | 작성일 | 분량(자) |\n|---|---|---|---|\n`+st.items.map(r=>`| [${r.title.replace(/\|/g,'\\|')}](${r.url}) | ${r.blog} | ${r.date||'-'} | ${r.chars??'-'} |`).join('\n');
+}
+function reachAddIdea(tab,n){
+ const st=reachSt[tab],i=st.items[n];if(!i)return;
+ const sctx=st.sctx||{},day=new Date().toISOString().slice(0,10);
+ let label,facts,excerpt,chan={};
+ if(tab==='yt'){label='유튜브 아웃라이어';facts=`채널: ${i.author||'-'}\n조회수: ${reachFmtViews(i.views)}회 · 길이 ${reachFmtDur(i.dur)}${i.out?' · 아웃라이어(중앙값의 2배 이상)':''}`;excerpt=st.subs[i.url]?'자막 발췌: '+st.subs[i.url].slice(0,400):'자막 발췌: (미로드)';chan={preferredChannel:'youtube',...(sctx.ytChannel?{ytChannel:sctx.ytChannel}:{}),...(sctx.topicId?{topicId:sctx.topicId}:{})}}
+ else if(tab==='nv'){label='네이버 빈틈 점검';facts=`블로그: ${i.blog||'-'}\n작성일: ${i.date||'미확인'}${i.dateSource==='image'?'(이미지 경로로 추정)':''} · 분량 ${i.chars!=null?i.chars.toLocaleString()+'자':'미확인'}\n검색어: ${st.kw}`;excerpt=i.excerpt?'본문 발췌: '+i.excerpt.slice(0,400):'본문 발췌: (미로드)';chan={preferredChannel:'blog',...(sctx.naverCategory?{naverCategory:sctx.naverCategory}:{}),...(sctx.topicId?{topicId:sctx.topicId}:{})}}
+ else{label='Reddit 해외 소재';const b=st.bodies[i.url];facts=`작성자: ${i.author||'-'}${i.published_at?' · '+String(i.published_at).slice(0,10):''}`;excerpt=(b?'본문 발췌: ':'발췌: ')+(b||REACH_CLEAN(i.text)).slice(0,400)}
+ db.ideas.unshift({id:uid(),title:i.title,note:`[Reach 리서치 · ${label} / ${day}]\n${facts}\n링크: ${i.url}\n\n${excerpt}\n\n직접 경험: [본인이 작성]\n확인할 사실: [원문 조사]\n내 해석: [사실과 구분해 작성]`,sources:`${i.title}: ${i.url}`,...chan,sample:false,created:Date.now()});
+ log('Reach 리서치에서 소재 저장: '+i.title);persist();toast('링크와 발췌를 포함해 소재함에 저장했습니다.');
+}
+async function reachCopy(text){try{await navigator.clipboard.writeText(text);toast('복사했어요')}catch(_){const ta=document.createElement('textarea');ta.value=text;document.body.append(ta);ta.select();try{document.execCommand('copy');toast('복사했어요')}catch(__){toast('복사하지 못했어요')}ta.remove()}}
+async function reachSearch(){
+ const tab=reachTab,st=reachSt[tab],q=($('#reachQ').value||'').trim();
+ if(!q){toast('검색어를 입력하세요.');return}
+ st.q=q;const lim=$('#reachLim');if(lim)st.lim=lim.value;
+ st.sctx=st.ctx&&st.ctx.q===q?st.ctx:null;
+ reachPushRecent(tab,q);const rc=$('#reachRecent');if(rc)rc.innerHTML=reachRecentHTML(tab);
+ const seq=++st.seq;st.state='loading';reachPaintOut(tab);
+ const r=await bridgeGet(tab==='yt'?'/reach/yt/search':tab==='nv'?'/reach/naver/search':'/reach/reddit/search',{q,limit:tab==='nv'?10:st.lim});
+ if(seq!==st.seq)return;
+ if(r.offline&&reachHealth!=='checking'){reachHealth=r;reachHealthAt=Date.now();reachPaintHealth()}
+ if(!r.ok){st.state='error';st.msg=r.message||(r.error&&r.error.message)||'';reachPaintOut(tab);return}
+ const raw=r.items||[];
+ if(tab==='yt'){
+  st.items=raw.map(i=>({title:i.title,url:i.url,author:i.author,views:i.raw?.view_count??null,dur:i.raw?.duration??null})).sort((a,b)=>(b.views??-1)-(a.views??-1));
+  st.med=reachMedian(st.items.map(i=>i.views).filter(v=>v!=null));st.subs={};
+  st.items.forEach(i=>i.out=i.views!=null&&st.med>0&&i.views>=2*st.med);
+ }else if(tab==='nv'){
+  st.kw=q;
+  st.items=raw.map(i=>({title:i.title,url:i.url,blog:(()=>{try{const u=new URL(i.url);return u.searchParams.get('blogId')||u.pathname.split('/').filter(Boolean)[0]||''}catch(_){return''}})(),date:null,year:null,chars:null,excerpt:'',st:'idle'}));
+ }else{st.items=raw;st.bodies={}}
+ st.state=st.items.length?'ok':'empty';reachPaintOut(tab);
+}
+async function reachCheckNaver(){
+ const st=reachSt.nv,todo=st.items.filter(r=>r.st!=='done');if(!todo.length||st.items.some(r=>r.st==='run'))return;
+ todo.forEach(r=>r.st='run');reachPaintOut('nv');let idx=0;const seq=st.seq;
+ const worker=async()=>{while(idx<todo.length){const r=todo[idx++];const j=await bridgeGet('/reach/naver/read',{url:r.url});if(seq!==st.seq)return;if(j.ok){r.st='done';r.date=j.date;r.dateSource=j.dateSource;r.year=j.year;r.chars=j.chars;r.excerpt=j.excerpt||''}else r.st='err';reachPaintOut('nv')}};
+ await Promise.all([worker(),worker(),worker()]);reachPaintOut('nv');
+}
+document.addEventListener('submit',e=>{if(e.target.id==='reachForm'){e.preventDefault();reachSearch()}});
+document.addEventListener('input',e=>{if(e.target.id==='reachQ'){reachSt[reachTab].q=e.target.value}if(e.target.id==='reachLim'){reachSt[reachTab].lim=e.target.value}});
+document.addEventListener('change',e=>{if(e.target.id==='reachLim')reachSt[reachTab].lim=e.target.value});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&reachDrawer&&!$('#modalRoot').firstChild)reachCloseDrawer()});
+document.addEventListener('click',async e=>{
+ const t=e.target.closest('button[data-reach]');if(!t||t.disabled||view!=='reach')return;
+ const act=t.dataset.reach,tab=reachTab,st=reachSt[tab],n=+t.dataset.n;
+ if(act==='tab'){if(REACH_TABS.some(x=>x[0]===t.dataset.tab)){reachTab=t.dataset.tab;reachDrawer=null;render()}return}
+ if(act==='recheck'){reachCheck(true);return}
+ if(act==='chip'){let ctx=null;try{ctx=JSON.parse(t.dataset.ctx||'null')}catch(_){}const q=t.dataset.q;st.ctx=ctx?{...ctx,q}:null;st.q=q;$('#reachQ').value=q;reachSearch();return}
+ if(act==='dclose'){reachCloseDrawer();return}
+ if(act==='dcopy'&&reachDrawer){reachCopy(reachDrawer.body);return}
+ if(act==='didea'&&reachDrawer){reachAddIdea(reachDrawer.tab,reachDrawer.n);return}
+ if(act==='idea'){reachAddIdea(tab,n);return}
+ if(act==='copy'){reachCopy(reachMd(tab,n));return}
+ if(act==='nvcopy'){reachCopy(reachNvMd());return}
+ if(act==='check'){reachCheckNaver();return}
+ if(act==='sub'||act==='body'){
+  const i=st.items[n];if(!i)return;const old=t.textContent;t.disabled=true;t.textContent='불러오는 중…';
+  const j=await bridgeGet(act==='sub'?'/reach/yt/subtitle':'/reach/reddit/read',{url:i.url,...(act==='sub'?{lang:'ko'}:{})});
+  t.disabled=false;t.textContent=old;
+  if(view!=='reach'||reachTab!==tab)return;
+  if(!j.ok){reachOpenDrawer(tab,n,act==='sub'?'자막을 가져오지 못했어요':'본문을 가져오지 못했어요',j.message||(j.error&&j.error.message)||'오류');return}
+  const text=(j.items&&j.items[0]&&j.items[0].text)||'';
+  if(act==='sub')st.subs[i.url]=text;else st.bodies[i.url]=text;
+  reachOpenDrawer(tab,n,`${text.length.toLocaleString()}자`,text||(act==='sub'?'(자막이 비어 있어요)':'(본문이 비어 있어요)'));
+ }
+});
+
+const TITLES={dashboard:'운영 현황',review:'검수함',ideas:'경험·소재함',settings:'설정·데이터',analytics:'키워드·주제',research:'공개 조사 결과',reach:'Reach 리서치',topics:'채널별 관심 주제',publish:'발행 센터',...Object.fromEntries(Object.entries(CH).map(([k,v])=>[k,v.name]))};
+const ROUTES=['dashboard','review','ideas','analytics','research','reach','topics','publish','settings',...Object.keys(CH)];
 function connectedCount(){return Object.keys(CH).filter(isConnected).length}
 /* Hash routing: #<view> or #edit/<postId>. render() keeps location.hash in sync with state. */
 function routeHash(){return editing?'#edit/'+encodeURIComponent(editing):'#'+view}
 function syncHash(replace){const h=routeHash();if(location.hash===h)return;if(replace){try{history.replaceState(null,'',h)}catch(_){location.hash=h}}else location.hash=h}
 function parseHash(h){h=String(h||'').replace(/^#/,'');if(h==='keywords')h='analytics';if(h.startsWith('edit/')){let id=h.slice(5);try{id=decodeURIComponent(id)}catch(_){}const p=db.posts.find(p=>p.id===id);return p?{edit:id,view:p.channel}:{view:'dashboard'}}return {view:ROUTES.includes(h)?h:'dashboard'}}
-function render(){ensurePublish();const screen=editing?editor():view==='dashboard'?dashboard():view==='ideas'?ideas():view==='settings'?settings():view==='analytics'?analytics():view==='research'?publicResearch():view==='topics'?topicsPage():view==='publish'?publishing():postList();document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view===view));$('#breadcrumb').textContent=editing?'원고 편집':TITLES[view];$('#reviewCount').textContent=db.posts.filter(p=>p.status==='review').length;$('.workspace').firstChild.textContent=db.profile.name;paintStorage();const n=connectedCount();$('#sideConn').textContent=n?`발행 브리지 ${n}/${Object.keys(CH).length} 설정됨`:'외부 계정 · 연결 안 됨';$('#content').innerHTML=screen+`<footer class="footer"><span>FIELDNOTE STUDIO / LOCAL EDITION</span><span>${view==='publish'&&!editing?'승인은 당신이, 게시 권한은 플랫폼이.':'경험은 당신에게서, 근거는 원문에서.'}</span></footer>`;syncHash(false)}
+function render(){ensurePublish();const screen=editing?editor():view==='dashboard'?dashboard():view==='ideas'?ideas():view==='settings'?settings():view==='analytics'?analytics():view==='research'?publicResearch():view==='reach'?reachView():view==='topics'?topicsPage():view==='publish'?publishing():postList();document.querySelectorAll('.nav').forEach(n=>n.classList.toggle('active',n.dataset.view===view));$('#breadcrumb').textContent=editing?'원고 편집':TITLES[view];$('#reviewCount').textContent=db.posts.filter(p=>p.status==='review').length;$('.workspace').firstChild.textContent=db.profile.name;paintStorage();const n=connectedCount();$('#sideConn').textContent=n?`발행 브리지 ${n}/${Object.keys(CH).length} 설정됨`:'외부 계정 · 연결 안 됨';$('#content').innerHTML=screen+`<footer class="footer"><span>FIELDNOTE STUDIO / LOCAL EDITION</span><span>${view==='publish'&&!editing?'승인은 당신이, 게시 권한은 플랫폼이.':'경험은 당신에게서, 근거는 원문에서.'}</span></footer>`;syncHash(false)}
 function canLeave(){if(!dirty)return true;if(!confirm('저장하지 않은 수정이 있습니다. 버리고 이동할까요?'))return false;if(editing){clearTimeout(draftTimer);draftDel(editing)}return true}
 function closeSidebar(){$('#sidebar').classList.remove('open')}
 function navigate(v){if(!canLeave())return;view=v;editing=null;dirty=false;filter='all';query='';closeSidebar();render();window.scrollTo(0,0)}

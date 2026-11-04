@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { buildPostText } from './text.mjs';
 import { BadInput, MODEL, hasKey, runGenerate } from './generate.mjs';
+import { reachRoute } from './reach.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 8787);
@@ -152,6 +153,11 @@ const server = http.createServer(async (req, res) => {
   if (origin !== undefined) res.fieldnoteOrigin = origin;
   if (req.method === 'OPTIONS') { res.fieldnotePreflight = true; return reply(res, 204, {}); }
   if (req.method === 'GET' && req.url === '/health') return reply(res, 200, { ok: true, service: 'fieldnote-naver-bridge', generate: hasKey, model: MODEL, lastJob });
+  if (req.method === 'GET' && req.url.startsWith('/reach/')) { // Reach 리서치 (read-only): same origin + token rules as the routes below
+    if (TOKEN && req.headers['x-fieldnote-token'] !== TOKEN) return reply(res, 401, { ok: false, message: '브리지 토큰이 일치하지 않습니다.' });
+    const r = await reachRoute(new URL(req.url, 'http://127.0.0.1').pathname, new URL(req.url, 'http://127.0.0.1').searchParams);
+    return r ? reply(res, r.status, r.body) : reply(res, 404, { ok: false, message: '지원하지 않는 경로입니다.' });
+  }
   const generating = req.method === 'POST' && (req.url === '/generate/topics' || req.url === '/generate/draft');
   if (req.method !== 'POST' || (req.url !== '/publish/naver' && !generating)) return reply(res, 404, { ok: false, message: '지원하지 않는 경로입니다.' });
   if (TOKEN && req.headers['x-fieldnote-token'] !== TOKEN) return reply(res, 401, { ok: false, message: '브리지 토큰이 일치하지 않습니다.' });
