@@ -1,0 +1,8 @@
+# Local browser credentials and runtime state
+naver-bridge/.naver-profile/
+naver-bridge/node_modules/
+
+# Operating-system and local development files
+.DS_Store
+.vercel/
+*.log

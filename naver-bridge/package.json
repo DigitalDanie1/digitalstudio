@@ -1,0 +1,11 @@
+{
+  "name": "fieldnote-naver-bridge",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.56.0"
+  }
+}
