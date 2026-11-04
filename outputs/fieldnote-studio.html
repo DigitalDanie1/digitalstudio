@@ -39,7 +39,7 @@ const NAVER_CATEGORIES=[
 {id:'invest-psych',name:'투자 심리',parent:'econ-dopamine',note:'손실 회피·확증 편향·FOMO 등 투자 판단을 흔드는 심리 메커니즘 (투자 권유 없음)'},
 {id:'sg-observe',name:'싱가포르 관찰',parent:'econ-dopamine',note:'싱가포르에서 일하며 본 돈·소비·도박 규제·생활 장면의 관찰. 직접 경험 중심, 제도는 사실 확인'},
 {id:'macro',name:'매크로 끄적',parent:null,note:'금리·환율·유동성 등 거시 이슈를 개인의 시선으로 짧게 끄적이는 글. 전망·권유 없이 메커니즘과 불확실성 중심'},
-{id:'variational',name:'Variational',parent:null,own:true,note:'Variational(Arbitrum 퍼프 DEX) 분석 — 트레저리·바이백·포인트·토크노믹스. 직접 만든 var-metrics.com 데이터 기반'}
+{id:'variational',name:'Variational 관련',parent:null,own:true,note:'Variational(Arbitrum 퍼프 DEX) 분석 — 트레저리·바이백·포인트·토크노믹스. 직접 만든 var-metrics.com 데이터 기반'}
 ];
 const NAVER_BY_ID=Object.fromEntries(NAVER_CATEGORIES.map(c=>[c.id,c]));
 const NAVER_BY_NAME=Object.fromEntries(NAVER_CATEGORIES.map(c=>[c.name,c]));
@@ -172,6 +172,7 @@ if(Array.isArray(x.interests)&&![1,2,3,4,5].includes(x.channelTopicsVersion)){
 if(Array.isArray(x.interests)&&(x.channelTopicsVersion===1||x.channelTopicsVersion===2)){migrateBlogTopics(x,x.channelTopicsVersion===1);x.channelTopicsVersion=3}
 if(Array.isArray(x.interests)&&x.channelTopicsVersion===3){migrateYoutubeTopics(x);x.channelTopicsVersion=4}
 if(Array.isArray(x.interests)&&x.channelTopicsVersion===4){migrateVariationalTopic(x);x.channelTopicsVersion=5}
+if(Array.isArray(x.interests)&&x.channelTopicsVersion===5){const V='Variational 관련';for(const t of x.interests){if(t&&t.id==='nv-variational'){if(t.name==='Variational')t.name=V;if(t.naverCategory==='Variational')t.naverCategory=V}}for(const a of [x.ideas,x.posts])if(Array.isArray(a))for(const i of a){if(i&&i.naverCategory==='Variational')i.naverCategory=V}x.channelTopicsVersion=6}
 if(Array.isArray(x.interests)&&Array.isArray(x.ideas)&&x.blogSeedVersion!==3){seedBlogStarters(x);x.blogSeedVersion=3}
 if(x.profile&&typeof x.profile==='object'&&typeof x.profile.blogVoice!=='string')x.profile.blogVoice=DEFAULT_BLOG_VOICE;
 if(x.profile&&typeof x.profile==='object'&&typeof x.profile.youtubeVoice!=='string')x.profile.youtubeVoice=DEFAULT_YOUTUBE_VOICE;
