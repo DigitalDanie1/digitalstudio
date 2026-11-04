@@ -5,6 +5,7 @@
 
 .analysis-platforms{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:22px}.analysis-platform{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:17px;text-align:left}.analysis-platform.active{border-color:#6b8550;background:#1b2318}.analysis-platform .left{display:flex;gap:11px;align-items:center;margin-bottom:10px}.analysis-platform p{color:var(--muted);font-size:11px;margin:5px 0}.analysis-platform strong{font-size:13px}.analysis-layout{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:18px;align-items:start}.analysis-controls{display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin-bottom:18px}.analysis-controls .field{margin:0;min-width:145px;flex:1}.analysis-controls .actions{margin-left:auto}.interest-chips{display:flex;gap:8px;flex-wrap:wrap;margin:13px 0}.interest-chip{padding:5px 10px;border:1px solid #3b4734;background:#20291b;border-radius:20px;color:var(--lime);font-size:11px}.interest-chip.off{color:var(--muted);background:transparent;border-color:var(--line)}.analysis-table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:9px}.analysis-table{width:100%;border-collapse:collapse;text-align:left;min-width:650px;background:var(--panel)}.analysis-table th{font-size:10px;font-weight:500;color:var(--muted);padding:12px 14px;background:#191d23;border-bottom:1px solid var(--line)}.analysis-table td{padding:13px 14px;font-size:11px;border-bottom:1px solid var(--line)}.analysis-table tr:last-child td{border:0}.analysis-table .metric{text-align:right;font-size:14px;font-variant-numeric:tabular-nums}.analysis-callout{padding:16px 18px;background:#1b2117;border:1px solid #35432b;border-radius:9px;margin:0 0 18px;font-size:12px}.analysis-callout strong{color:var(--lime)}.analysis-callout p{margin:7px 0 0;color:#aab5a1;font-size:11px}.topic-card{border-bottom:1px solid var(--line);padding:13px 0}.topic-card:first-of-type{padding-top:3px}.topic-card:last-child{border:0;padding-bottom:0}.topic-card h3{font-size:12px}.topic-card p{font-size:11px;color:var(--muted);margin:6px 0 10px}.analysis-mini{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px}.analysis-mini .panel{padding:14px}.analysis-mini strong{font-size:20px;display:block;margin:6px 0 2px}.analysis-notes{font-size:11px;color:var(--muted);margin-top:20px}.analysis-notes summary{cursor:pointer;color:#c1c7d0}.analysis-notes p{margin:9px 0}.topic-manage{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--line)}.topic-manage span{flex:1;font-size:12px}.source-block{white-space:pre-wrap;overflow-wrap:anywhere;background:#101318;padding:14px;border:1px solid var(--line);border-radius:7px;font-size:12px}.analysis-empty{padding:36px 22px;border:1px dashed #3e4853;border-radius:10px;text-align:center}.analysis-empty h3{font-size:16px}.analysis-empty p{max-width:470px;margin:10px auto 20px;color:var(--muted);font-size:12px}.rec-evidence{font-size:10px;color:var(--green);margin-bottom:8px}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.analysis-hero{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:17px}.analysis-hero .actions{justify-content:flex-end}.pill-muted{font-size:10px;padding:2px 7px;border:1px solid var(--line);border-radius:20px;color:var(--muted)}
 @media(max-width:1150px){.analysis-layout{grid-template-columns:1fr}.analysis-sidebar{display:grid;grid-template-columns:1fr 1fr;gap:15px}.analysis-sidebar .panel{margin:0!important}.analysis-platform{padding:13px}}@media(max-width:760px){.analysis-platforms{grid-template-columns:1fr}.analysis-platform p{margin:0}.analysis-platform .left{margin-bottom:6px}.analysis-sidebar{display:block}.analysis-sidebar .panel{margin-top:15px!important}.analysis-hero{flex-direction:column}.analysis-mini{grid-template-columns:1fr 1fr 1fr}.analysis-mini .panel{padding:11px}.analysis-mini strong{font-size:17px}.form-grid{grid-template-columns:1fr}}
+.topic-map{margin:0 0 26px}.topic-map-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.topic-map-col{margin:0}.topic-map-none{margin-top:10px}@media(max-width:900px){.topic-map-grid{grid-template-columns:1fr}}
 .channel-topics{margin:0 0 20px}.channel-topics .interest-chips{margin-bottom:0}.channel-topics+.toolbar{margin-top:18px}
 .preview{white-space:normal}.preview h3{font-size:17px;line-height:1.5;margin:22px 0 8px;font-weight:650}.preview h4{font-size:14px;line-height:1.5;margin:18px 0 6px;font-weight:650}.preview p{margin:0 0 1em}.preview ul{margin:0 0 1em;padding-left:1.4em}.preview a{color:#2f6b3a}
 .memo-panel{border:1px solid var(--line);border-radius:8px;background:#12151a;margin-bottom:16px}.memo-panel summary{cursor:pointer;padding:10px 12px;font-size:12px;color:#c1c7d0}.memo-panel .inner{padding:0 12px 12px}
@@ -39,11 +40,12 @@ const NAVER_CATEGORIES=[
 {id:'invest-psych',name:'투자 심리',parent:'econ-dopamine',note:'손실 회피·확증 편향·FOMO 등 투자 판단을 흔드는 심리 메커니즘 (투자 권유 없음)'},
 {id:'sg-observe',name:'싱가포르 관찰',parent:'econ-dopamine',note:'싱가포르에서 일하며 본 돈·소비·도박 규제·생활 장면의 관찰. 직접 경험 중심, 제도는 사실 확인'},
 {id:'macro',name:'매크로 끄적',parent:null,note:'금리·환율·유동성 등 거시 이슈를 개인의 시선으로 짧게 끄적이는 글. 전망·권유 없이 메커니즘과 불확실성 중심'},
-{id:'variational',name:'Variational 관련',parent:null,own:true,note:'Variational(Arbitrum 퍼프 DEX) 분석 — 트레저리·바이백·포인트·토크노믹스. 직접 만든 var-metrics.com 데이터 기반'}
+{id:'variational',name:'Variational 관련',parent:null,own:true,note:'Variational(Arbitrum 퍼프 DEX) 분석 — 트레저리·바이백·포인트·토크노믹스. 직접 만든 var-metrics.com 데이터 기반'},
+{id:'society',name:'사회·신앙',parent:null,own:true,note:'이민·다문화·이슬람·신앙에 대한 생각과 비판. 확인된 사실과 의견을 구분하고 사람을 비하하지 않음'}
 ];
 const NAVER_BY_ID=Object.fromEntries(NAVER_CATEGORIES.map(c=>[c.id,c]));
 const NAVER_BY_NAME=Object.fromEntries(NAVER_CATEGORIES.map(c=>[c.name,c]));
-/* 상위 카테고리도 글·주제를 붙일 수 있다(10개 모두 게시 가능). 상위는 그룹의 첫 항목으로 표시한다. */
+/* 상위 카테고리도 글·주제를 붙일 수 있다(11개 모두 게시 가능). 상위는 그룹의 첫 항목으로 표시한다. */
 const NAVER_POSTABLE=NAVER_CATEGORIES.slice();
 const naverParentName=c=>c&&c.parent&&NAVER_BY_ID[c.parent]?NAVER_BY_ID[c.parent].name:'';
 const OLD_BLOG_SEED_IDS=['faith','jyp','heresy','multicultural','sg','immigration','patriot','conservative'];
@@ -80,10 +82,29 @@ const BLOG_STARTERS=[
 ,{sid:'variational-1',v:3,cat:'variational',title:`Variational 트레저리 유입은 어떻게 계산하나: 온체인 USDC로 보는 수익 추정의 한계`,angle:`트레저리 지갑의 온체인 USDC 잔고 변화로 유입을 추정하는 방식과, 그 추정이 실제 수익과 어긋날 수 있는 지점을 설명한다.`,hook:`잔고가 늘었다고 전부 수익일까`,outline:[`트레저리 유입을 잔고 변화로 측정한다는 아이디어를 소개한다 [확인 필요: 트레저리 지갑 주소와 측정 기준 시점]`,`수익이 아닌 이체가 섞일 수 있는 경우를 정리한다`,`총 스프레드·OLP 몫·헤지 비용으로 추정치를 나누는 방식과 한계를 설명한다 [확인 필요: var-metrics.com 실시간 값]`,`[직접 경험: 대시보드를 만들며 부딪힌 계산상의 문제]`,`감사받은 수익이 아닌 추정치라는 점을 분명히 하며 마무리한다`],verify:[`트레저리 지갑 주소와 최근 유입 내역 [확인 필요: var-metrics.com 실시간 값]`,`공식 격주 리포트의 트레저리 몫 비율 [확인 필요: 최신 리포트]`,`비수익 이체 사례의 온체인 근거`]}
 ,{sid:'variational-2',v:3,cat:'variational',title:`VAR 바이백 100% 정책, 지금 어디까지 왔나`,angle:`트레저리 수익을 $VAR 매수·소각에 쓰겠다는 의도된 정책을 현재 시점에서 정리한다. 아직 실행 전이라는 점을 전제로 쓴다.`,hook:`말로 한 약속과 실제 실행 사이의 거리`,outline:[`바이백 정책이 무엇이라고 공개되어 있는지 정리한다 [확인 필요: 공식 발표 원문과 날짜]`,`의도된 정책과 실행된 거래를 구분하는 기준을 제시한다`,`실행 여부를 온체인에서 확인하는 방법을 설명한다 [확인 필요: 바이백 지갑·거래 내역]`,`트레저리 규모와의 비교는 실시간 값으로 채운다 [확인 필요: var-metrics.com 실시간 값]`,`가격 전망 없이 확인할 체크포인트로 마무리한다`],verify:[`바이백 정책의 공식 문구와 시행 시점`,`현재까지의 바이백 실행 여부와 온체인 내역`,`트레저리 몫 비율의 최신 값`]}
 ,{sid:'variational-3',v:3,cat:'variational',title:`Variational 포인트 계산기로 보는 에어드랍 시나리오 — 가정과 함정`,angle:`주당 포인트 증가 가정으로 시나리오를 계산하는 방식과, 가정이 결과를 얼마나 바꾸는지 보여 준다. 에어드랍 수량 예측은 하지 않는다.`,hook:`계산기에 넣는 숫자가 곧 결론이 되는 함정`,outline:[`포인트 계산기의 입력과 가정을 소개한다 [확인 필요: 계산기의 현재 가정값]`,`TGE 시점이 정해지지 않았다는 불확실성을 설명한다 [확인 필요: 공식 TGE 공지]`,`전체 포인트 풀 가정이 개인 몫 추정에 미치는 영향을 설명한다 [확인 필요: var-metrics.com 실시간 값]`,`토크노믹스에서 에어드랍 몫과 해제 조건을 정리한다 [확인 필요: 공식 토크노믹스 문서]`,`가격·수익 예측 없이 시나리오의 한계를 정리한다`],verify:[`포인트 지급 규칙과 공식 공지`,`TGE 일정과 에어드랍 해제 조건`,`계산기가 쓰는 포인트 풀 가정의 출처`]}
+,{sid:'society-1',v:4,cat:'society',title:`이슬람 교리 비판과 무슬림 혐오는 어떻게 다른가: 비판의 선을 긋는 법`,angle:`교리·주장·제도에 대한 비판과 사람 전체에 대한 일반화를 구분하는 기준을 세우고, 글을 쓸 때 스스로 점검하는 체크리스트로 정리한다.`,hook:`비판했을 뿐인데 혐오가 되는 지점은 어디일까`,outline:[`비판과 혐오가 뒤섞여 쓰이는 온라인 논쟁의 장면을 짚는다 [직접 경험: 이 구분이 필요했던 대화나 댓글]`,`교리·텍스트·제도에 대한 비판과, 신자 개인·집단 전체에 대한 일반화의 차이를 정리한다`,`근거로 삼는 자료를 어떻게 확인하는가(원문 구절, 학자 해석의 다양성) [확인 필요: 인용할 원문과 해석의 출처]`,`가장 강한 반대 의견(비판 자체가 배제로 이어진다는 우려)을 한 대목으로 소개한다`,`글을 올리기 전에 스스로 묻는 질문 목록으로 마무리한다`],verify:[`인용할 교리·원문의 정확한 출처와 해석 범위`,`특정 집단에 대한 통계나 사례를 쓸 경우 1차 자료와 집계 기준`]}
+,{sid:'society-2',v:4,cat:'society',title:`이민 정책 논쟁에서 자주 인용되는 통계, 출처와 집계 기준부터 확인하는 법`,angle:`체류 외국인·범죄·복지 등 논쟁에서 인용되는 숫자가 어떤 기준으로 집계되는지 짚고, 숫자를 읽는 방법을 정리한다. 특정 국적·인종에 대한 일반화는 하지 않는다.`,hook:`같은 통계가 정반대 주장의 근거가 되는 이유`,outline:[`논쟁에서 같은 숫자가 다르게 쓰이는 장면을 소개한다 [직접 경험: 주변에서 본 논쟁 사례]`,`체류 외국인 통계의 집계 기준(장기·단기·불법체류 등)을 구분한다 [확인 필요: 법무부 출입국·외국인정책 통계의 정의]`,`비율과 절대 수치, 비교 대상 선택이 결론을 바꾸는 방식을 설명한다`,`이민에 찬성·반대하는 쪽이 각각 가장 강하게 내세우는 논거를 짧게 소개한다`,`숫자를 인용하기 전 확인할 체크포인트로 마무리한다`],verify:[`인용하는 통계의 발표 기관·연도·집계 기준`,`비교 대상 국가나 기간이 동일한 기준인지 여부`]}
+,{sid:'society-3',v:4,cat:'society',title:`다문화 가정 지원 제도, 무엇이 있고 어디가 논쟁거리인가`,angle:`다문화 가정을 대상으로 한 지원 제도를 사실 중심으로 정리하고, 제도를 둘러싼 찬반 논점을 균형 있게 소개한다.`,hook:`지원이 필요하다와 형평성이 문제다, 두 말이 모두 나오는 이유`,outline:[`제도를 다루게 된 계기를 한 장면으로 시작한다 [직접 경험: 다문화 가정과 관련해 직접 본 장면]`,`현재 운영되는 주요 지원 제도를 정리한다 [확인 필요: 현행 제도의 명칭·대상·예산 출처]`,`지원 확대를 주장하는 논거와 형평성을 문제 삼는 논거를 각각 소개한다`,`개별 가정의 경험을 일반화하지 않고 제도 차원의 쟁점으로 정리한다`,`독자가 더 확인해 볼 공식 자료로 마무리한다`],verify:[`지원 제도의 현재 내용과 소관 부처`,`제도 효과를 다룬 공식 평가나 연구의 결론`]}
 ];
 function migrateBlogTopics(x,stripOld){
  for(const t of stripOld?x.interests:[]){if(!t||typeof t!=='object'||!OLD_BLOG_SEED_IDS.includes(t.id))continue;if(Array.isArray(t.channels))t.channels=t.channels.filter(c=>c!=='blog');if(t.channelFavorites&&typeof t.channelFavorites==='object')delete t.channelFavorites.blog}
  for(const c of NAVER_POSTABLE){const id='nv-'+c.id;if(x.interests.some(t=>t?.id===id))continue;x.interests.push({id,name:c.name,note:c.note,channels:['blog'],favorite:true,channelFavorites:{},naverCategory:c.name,parentCategory:naverParentName(c)})}
+}
+function migrateSocietyYoutubeV7(x){
+ const SOC='사회·신앙',soc=NAVER_BY_ID.society,has=id=>x.interests.some(t=>t&&t.id===id);
+ if(!has('nv-society'))x.interests.push({id:'nv-society',name:soc.name,note:soc.note,channels:['blog'],favorite:true,channelFavorites:{},naverCategory:SOC,parentCategory:''});
+ const stripYt=t=>{if(Array.isArray(t.channels))t.channels=t.channels.filter(c=>c!=='youtube');if(t.channelFavorites&&typeof t.channelFavorites==='object')delete t.channelFavorites.youtube};
+ for(const t of x.interests){
+  if(!t||typeof t!=='object')continue;
+  if(YT_BY_ID[t.id])continue;
+  if(YT_BLOG_MOVE.includes(t.id)){stripYt(t);if(!Array.isArray(t.channels))t.channels=Object.keys(CH).filter(c=>c!=='youtube');if(!t.channels.includes('blog'))t.channels.push('blog');t.naverCategory=SOC;t.parentCategory=SOC;continue}
+  if(YT_LEGACY_BY_ID[t.id]||CHANNEL_TOPIC_SEEDS.some(s=>s.id===t.id))stripYt(t);
+ }
+ for(const d of YT_TOPICS){
+  const t=x.interests.find(i=>i&&i.id===d.id);
+  if(t){if(!Array.isArray(t.channels))t.channels=Object.keys(CH);if(!t.channels.includes('youtube'))t.channels.push('youtube');if(d.old){if(d.old.name&&t.name===d.old.name)t.name=d.name;if(t.note===undefined||d.old.notes.includes(t.note))t.note=d.note}}
+  else x.interests.push({id:d.id,name:d.name,note:d.note,channels:['youtube'],favorite:true,channelFavorites:{}});
+ }
 }
 function migrateVariationalTopic(x){
  const c=NAVER_BY_ID.variational;if(x.interests.some(t=>t?.id==='nv-variational'))return;
@@ -112,7 +133,7 @@ const CHANNEL_TOPIC_SEEDS=[
 {id:'crime',name:'범죄·수사 사건',channels:['youtube','insta'],note:'사건 경위·수사 과정·확인된 후속 결과'},
 {id:'marriage',name:'결혼·연애의 황당한 사건',channels:['youtube','insta'],note:'결혼식·배우자·가족 갈등의 범위는 미정. 원문과 사실 여부 확인'}
 ];
-const YT_TOPICS=[
+const YT_LEGACY=[
 {id:'wrestling',name:'레슬링',note:'각본(스토리라인)과 실제 경기·부상을 구분. 경기·선수·라이벌 관계 해설',old:{name:'레슬링',note:'경기·선수·라이벌 관계·극적인 순간. 세부 종목은 미정'}},
 {id:'faith',name:'기독교',note:'성경·교리·신앙에 관한 글과 해설'},
 {id:'yt-faith-life',name:'신앙',note:'신앙 생활·고민·성경 이야기. 교리 해석과 개인 의견을 구분'},
@@ -123,10 +144,20 @@ const YT_TOPICS=[
 {id:'nuisance',name:'민폐 끼치는 사람들',note:'공공장소 민폐 사건. 원본·날짜·장소 확인, 일반인 신상 가림',old:{name:'민폐·진상 사건',note:'공공장소 소란·규칙 위반 등 구체적인 사건'}},
 {id:'yt-crazy-stories',name:'또라이 스토리',note:'황당한 실화·사연. 실화/각색 구분, 사실 확인'}
 ];
+const YT_LEGACY_BY_ID=Object.fromEntries(YT_LEGACY.map(t=>[t.id,t]));
+const YT_TOPICS=[
+{id:'wrestling',name:'레슬링·그래플링',note:'프로레슬링·주짓수·그래플링 명장면, 라이벌, 반전. 각본(프로레슬링)과 실제 경기 구분',old:{name:'레슬링',notes:['경기·선수·라이벌 관계·극적인 순간. 세부 종목은 미정','각본(스토리라인)과 실제 경기·부상을 구분. 경기·선수·라이벌 관계 해설']}},
+{id:'debate',name:'토론',note:'모순된 주장·반론·토론 장면. 전후 발언 확인, 가장 강한 반대 의견도 소개'},
+{id:'faith',name:'기독교',note:'성경·교리·신앙에 관한 글과 해설'},
+{id:'heresy',name:'이단',note:'이단 교주·집단의 황당한 주장과 실제 사건. 교단 공식 판단·당사자 설명과 사실을 구분',old:{notes:['교단의 공식 판단, 당사자 설명, 개인 해석을 구분']}},
+{id:'yt-weird',name:'이상한 영상',note:'민폐·또라이·황당 영상과 사연. 원본·날짜·장소 확인, 일반인 신상 가림, 실화/각색 구분'}
+];
 const YT_BY_ID=Object.fromEntries(YT_TOPICS.map(t=>[t.id,t])),YT_ORDER=YT_TOPICS.map(t=>t.id);
+const YT_BLOG_MOVE=['yt-islam-critique','yt-immigration-critique','multicultural','yt-faith-life'];
+const ytDef=id=>YT_BY_ID[id]||YT_LEGACY_BY_ID[id];
 function migrateYoutubeTopics(x){
- for(const t of x.interests){if(!t||typeof t!=='object')continue;if(YT_BY_ID[t.id])continue;if(!CHANNEL_TOPIC_SEEDS.some(s=>s.id===t.id))continue;if(Array.isArray(t.channels))t.channels=t.channels.filter(c=>c!=='youtube');if(t.channelFavorites&&typeof t.channelFavorites==='object')delete t.channelFavorites.youtube}
- for(const d of YT_TOPICS){
+ for(const t of x.interests){if(!t||typeof t!=='object')continue;if(YT_LEGACY_BY_ID[t.id])continue;if(!CHANNEL_TOPIC_SEEDS.some(s=>s.id===t.id))continue;if(Array.isArray(t.channels))t.channels=t.channels.filter(c=>c!=='youtube');if(t.channelFavorites&&typeof t.channelFavorites==='object')delete t.channelFavorites.youtube}
+ for(const d of YT_LEGACY){
   const t=x.interests.find(i=>i&&i.id===d.id);
   if(t){if(!Array.isArray(t.channels))t.channels=Object.keys(CH);if(!t.channels.includes('youtube'))t.channels.push('youtube');if(d.old){if(t.name===d.old.name)t.name=d.name;if(t.note===undefined||t.note===d.old.note)t.note=d.note}}
   else if(d.id.startsWith('yt-'))x.interests.push({id:d.id,name:d.name,note:d.note,channels:['youtube'],favorite:true,channelFavorites:{}});
@@ -144,7 +175,7 @@ if(c!=='blog')return [{label:'',topics:list}];
 const used=new Set(),groups=[];
 for(const top of NAVER_CATEGORIES.filter(k=>!k.parent)){
  const kids=NAVER_CATEGORIES.filter(k=>k.parent===top.id),names=kids.length?[top.name,...kids.map(k=>k.name)]:[top.name];
- const topics=names.map(n=>list.find(t=>t.naverCategory===n)).filter(Boolean);
+ const topics=names.flatMap(n=>list.filter(t=>t.naverCategory===n).sort((a,b)=>(a.id==='nv-'+top.id?0:1)-(b.id==='nv-'+top.id?0:1)));
  topics.forEach(t=>used.add(t.id));
  if(kids.length||top.own)groups.push({label:top.name,topics});
  else{let g=groups.find(x=>x.standalone);if(!g){g={label:'단독 카테고리',topics:[],standalone:true};groups.push(g)}g.topics.push(...topics)}
@@ -156,7 +187,12 @@ return groups.filter(g=>g.topics.length);
 function topicChip(t,c){return `<button class="interest-chip ${topicEnabled(t,c)?'':'off'}" aria-pressed="${topicEnabled(t,c)}" data-toggle-topic="${esc(t.id)}" data-topic-channel="${c}">${topicEnabled(t,c)?'★':'☆'} ${esc(t.name)}</button>`}
 function topicSummary(c){const list=topicsFor(c);const body=c==='blog'?(topicGroups(c).map(g=>`<div class="topic-group"><div class="topic-group-label">${esc(g.label)}</div><div class="interest-chips">${g.topics.map(t=>topicChip(t,c)).join('')}</div></div>`).join('')||'<div class="interest-chips"><span class="small">배치된 주제가 없습니다.</span></div>'):`<div class="interest-chips">${list.map(t=>topicChip(t,c)).join('')||'<span class="small">배치된 주제가 없습니다.</span>'}</div>`;return `<section class="panel channel-topics"><div class="sectionhead" style="margin:0 0 10px"><h2>${CH[c].name} 관심 주제</h2><button class="linkbtn" data-view="topics">채널별 편집 ↗</button></div>${body}${c==='insta'?'<p class="help">인스타 관심사는 별도 지정 전까지 글·카드뉴스와 영상·릴스 주제를 함께 배치했습니다. 원하는 주제만 켜서 사용하세요.</p>':''}</section>`}
 function topicCard(t,c){return `<article class="idea"><div class="actions" style="justify-content:space-between;margin:0 0 10px"><span class="pill-muted">${topicEnabled(t,c)?'사용 중':'사용 안 함'}</span><button class="linkbtn" data-rename-topic="${esc(t.id)}">이름 수정</button></div><h3>${esc(t.name)}</h3>${c==='blog'&&t.parentCategory?`<div class="small">${esc(t.parentCategory)} ›</div>`:''}<p style="max-height:none">${esc(t.note||'추가한 관심 주제입니다. 직접 경험과 확인할 자료를 기록하세요.')}</p>${t.id==='marriage'?'<p class="warning">세부 범위 미정 · 자유롭게 이름을 수정하세요.</p>':''}<div class="actions"><button class="btn primary" data-channel-topic-idea="${esc(t.id)}" data-topic-channel="${c}">소재 메모 만들기</button>${c==='blog'&&t.naverCategory&&NAVER_BY_NAME[t.naverCategory]?`<button class="btn" data-action="genTopics" data-gen-cat="${esc(t.naverCategory)}" ${genBusy!==null?'disabled':''}>${genBusy==='topics:'+t.naverCategory?'생성 중…':'주제 5개 생성'}</button>`:''}${c==='youtube'&&YT_BY_ID[t.id]?`<button class="btn" data-action="ytGenTopics" data-yt-topic="${esc(t.id)}" ${genBusy!==null?'disabled':''}>${genBusy==='yt-topics:'+t.id?'생성 중…':'주제 5개 생성'}</button>`:''}<button class="btn ghost" data-toggle-topic="${esc(t.id)}" data-topic-channel="${c}">${topicEnabled(t,c)?'관심 끄기':'관심 켜기'}</button></div></article>`}
-function topicsPage(){const c=preferenceChannel;return head('채널별 관심 주제','블로그의 글 주제와 유튜브의 영상 주제를 나누고, 인스타에 배치할 주제를 직접 고르세요.',false)+`<div class="analysis-platforms">${Object.keys(CH).map(k=>`<button class="analysis-platform ${c===k?'active':''}" data-preference-channel="${k}"><div class="left">${icon(k)}<strong>${CH[k].name}</strong><span class="small" style="margin-left:auto">${favoriteTopics(k).length}개 선택</span></div><p>${k==='blog'?'중독·도박 설계·투자 심리·매크로에 관한 글':k==='youtube'?'레슬링·신앙·이슬람 비판·토론·이민·민폐·또라이 스토리 영상 대본':'글·카드뉴스 + 사건·영상 주제 · 임시 배치'}</p></button>`).join('')}</div>${topicSummary(c)}<div class="sectionhead"><h2>${CH[c].name}의 제작 방향</h2><button class="btn" data-action="manageInterests">전체 주제 배치</button></div>${c==='blog'?topicGroups(c).map(g=>`<div class="topic-group-label" style="margin:14px 0 8px">${esc(g.label)}</div><div class="idea-grid">${g.topics.map(t=>topicCard(t,c)).join('')}</div>`).join(''):`<div class="idea-grid">${topicsFor(c).map(t=>topicCard(t,c)).join('')}</div>`}`}
+const CHANNEL_CHARACTER={blog:{title:'블로그 · 생각의 장소',desc:'검색해서 읽는 글'},youtube:{title:'유튜브 · 도파민의 장소',desc:'생각이 아니라 보는 재미'},insta:{title:'인스타 · 보여주는 장소',desc:'보여주는 카드·릴스'}};
+function topicMap(){
+ const none=db.interests.filter(t=>!Object.keys(CH).some(c=>(t.channels||Object.keys(CH)).includes(c)));
+ const col=c=>{const ch=CHANNEL_CHARACTER[c];const body=c==='blog'?(topicGroups(c).map(g=>`<div class="topic-group"><div class="topic-group-label">${esc(g.label)}</div><div class="interest-chips">${g.topics.map(t=>topicChip(t,c)).join('')}</div></div>`).join('')):`<div class="interest-chips">${topicsFor(c).map(t=>topicChip(t,c)).join('')}</div>`;return `<div class="panel topic-map-col" data-map-channel="${c}"><div class="sectionhead" style="margin:0 0 4px"><h3 style="margin:0">${ch.title}</h3></div><p class="small" style="margin:0 0 10px">${ch.desc}</p>${body||'<span class="small">배치된 주제가 없습니다.</span>'}</div>`};
+ return `<section class="topic-map"><div class="sectionhead" style="margin:0 0 10px"><h2>채널 성격별 주제 지도</h2></div><div class="topic-map-grid">${['blog','youtube','insta'].map(col).join('')}</div>${none.length?`<div class="small topic-map-none" data-map-none>채널 없음 · ${none.map(t=>esc(t.name)).join(' · ')}</div>`:''}</section>`}
+function topicsPage(){const c=preferenceChannel;return head('채널별 관심 주제','블로그의 글 주제와 유튜브의 영상 주제를 나누고, 인스타에 배치할 주제를 직접 고르세요.',false)+topicMap()+`<div class="analysis-platforms">${Object.keys(CH).map(k=>`<button class="analysis-platform ${c===k?'active':''}" data-preference-channel="${k}"><div class="left">${icon(k)}<strong>${CH[k].name}</strong><span class="small" style="margin-left:auto">${favoriteTopics(k).length}개 선택</span></div><p>${k==='blog'?'생각의 장소 · 중독·투자 심리·매크로·Variational·사회·신앙':k==='youtube'?'도파민의 장소 · 레슬링·그래플링·토론·기독교·이단·이상한 영상':'글·카드뉴스 + 사건·영상 주제 · 임시 배치'}</p></button>`).join('')}</div>${topicSummary(c)}<div class="sectionhead"><h2>${CH[c].name}의 제작 방향</h2><button class="btn" data-action="manageInterests">전체 주제 배치</button></div>${c==='blog'?topicGroups(c).map(g=>`<div class="topic-group-label" style="margin:14px 0 8px">${esc(g.label)}</div><div class="idea-grid">${g.topics.map(t=>topicCard(t,c)).join('')}</div>`).join(''):`<div class="idea-grid">${topicsFor(c).map(t=>topicCard(t,c)).join('')}</div>`}`}
 function channelInterestModal(){modal(`<div class="modalhead"><h2 id="modalTitle">채널별 주제 배치</h2><button class="close" data-action="close" aria-label="닫기">×</button></div><p class="subtitle">채널별로 독립 설정됩니다. 다른 채널의 관심 설정은 바뀌지 않습니다.</p><div class="analysis-table-wrap" style="margin-top:16px"><table class="analysis-table" style="min-width:440px"><thead><tr><th>주제</th>${Object.values(CH).map(c=>`<th>${c.short}</th>`).join('')}</tr></thead><tbody>${db.interests.map(t=>`<tr><td>${esc(t.name)}</td>${Object.keys(CH).map(c=>`<td><button class="btn ${topicEnabled(t,c)?'primary':'ghost'}" data-toggle-topic="${esc(t.id)}" data-topic-channel="${c}" aria-label="${esc(t.name)} · ${CH[c].name}" aria-pressed="${topicEnabled(t,c)}">${topicEnabled(t,c)?'✓':'＋'}</button></td>`).join('')}</tr>`).join('')}</tbody></table></div><form id="interestForm" style="margin-top:20px"><div class="form-grid"><div class="field"><label for="interestName">새 관심 주제</label><input class="input" id="interestName" required maxlength="100"></div><div class="field"><label for="newInterestChannel">추가할 채널</label><select id="newInterestChannel">${Object.keys(CH).map(c=>`<option value="${c}" ${currentTopicChannel()===c?'selected':''}>${CH[c].name}</option>`).join('')}</select></div></div><div class="modalfooter"><button class="btn primary" type="submit">주제 추가</button></div></form>`)}
 function channelTopicIdea(id,c){const topic=db.interests.find(t=>t.id===id);if(!topic)return;db.ideas.unshift({id:uid(),title:topic.name,note:`[관심 주제에서 만든 소재 메모 / 유입·인기 검증 전]\n채널: ${CH[c].name}\n주제: ${topic.name}\n편집 메모: ${topic.note||'직접 경험과 확인할 자료를 기록하세요.'}\n\n다루고 싶은 구체적인 사건·질문: [직접 작성]\n원문·원본 영상과 발생 날짜: [확인 후 작성]\n직접 경험 / 확인된 사실 / 해석: [구분해 작성]\n영상·사진 사용 권리와 출처: [확인 후 작성]`,sources:'',preferredChannel:c,topicId:id,...(c==='blog'&&topic.naverCategory?{naverCategory:topic.naverCategory}:{}),sample:false,created:Date.now()});log(CH[c].short+' 관심 주제에서 소재 저장: '+topic.name);persist();toast('선택한 채널을 지정해 소재함에 저장했습니다.');}
 document.addEventListener('click',e=>{const t=e.target.closest('button');if(!t)return;if(t.dataset.preferenceChannel){preferenceChannel=t.dataset.preferenceChannel;render()}if(t.dataset.channelTopicIdea)channelTopicIdea(t.dataset.channelTopicIdea,t.dataset.topicChannel)});
@@ -164,7 +200,7 @@ document.addEventListener('click',e=>{const t=e.target.closest('button');if(!t)r
 function ensureAnalytics(x){
 if(x.interests===undefined)x.interests=CHANNEL_TOPIC_SEEDS.map(t=>({...t,channels:[...t.channels],favorite:true,channelFavorites:{}}));
 if(x.traffic===undefined)x.traffic=[];
-if(Array.isArray(x.interests)&&![1,2,3,4,5].includes(x.channelTopicsVersion)){
+if(Array.isArray(x.interests)&&![1,2,3,4,5,6,7].includes(x.channelTopicsVersion)){
  for(const t of x.interests){if(!t||typeof t!=='object')continue;const seed=CHANNEL_TOPIC_SEEDS.find(s=>s.id===t.id);if(t.channels===undefined)t.channels=seed?[...seed.channels]:['islam','identity'].includes(t.id)?['blog','insta']:Object.keys(CH);if(t.channelFavorites===undefined)t.channelFavorites={};if(seed&&t.note===undefined)t.note=seed.note;}
  for(const seed of CHANNEL_TOPIC_SEEDS){if(!x.interests.some(t=>t?.id===seed.id))x.interests.push({...seed,channels:[...seed.channels],favorite:true,channelFavorites:{}});}
  x.channelTopicsVersion=1;
@@ -173,7 +209,8 @@ if(Array.isArray(x.interests)&&(x.channelTopicsVersion===1||x.channelTopicsVersi
 if(Array.isArray(x.interests)&&x.channelTopicsVersion===3){migrateYoutubeTopics(x);x.channelTopicsVersion=4}
 if(Array.isArray(x.interests)&&x.channelTopicsVersion===4){migrateVariationalTopic(x);x.channelTopicsVersion=5}
 if(Array.isArray(x.interests)&&x.channelTopicsVersion===5){const V='Variational 관련';for(const t of x.interests){if(t&&t.id==='nv-variational'){if(t.name==='Variational')t.name=V;if(t.naverCategory==='Variational')t.naverCategory=V}}for(const a of [x.ideas,x.posts])if(Array.isArray(a))for(const i of a){if(i&&i.naverCategory==='Variational')i.naverCategory=V}x.channelTopicsVersion=6}
-if(Array.isArray(x.interests)&&Array.isArray(x.ideas)&&x.blogSeedVersion!==3){seedBlogStarters(x);x.blogSeedVersion=3}
+if(Array.isArray(x.interests)&&x.channelTopicsVersion===6){migrateSocietyYoutubeV7(x);x.channelTopicsVersion=7}
+if(Array.isArray(x.interests)&&Array.isArray(x.ideas)&&x.blogSeedVersion!==4){seedBlogStarters(x);x.blogSeedVersion=4}
 if(x.profile&&typeof x.profile==='object'&&typeof x.profile.blogVoice!=='string')x.profile.blogVoice=DEFAULT_BLOG_VOICE;
 if(x.profile&&typeof x.profile==='object'&&typeof x.profile.youtubeVoice!=='string')x.profile.youtubeVoice=DEFAULT_YOUTUBE_VOICE;
 return x}
@@ -384,8 +421,8 @@ let ytTopicId=YT_TOPICS[0].id;
 const ytFormat=()=>db.profile.youtubeFormat==='long'?'long':'shorts';
 const ytFormatName=f=>f==='long'?'롱폼 (8~10분)':'쇼츠 (60초)';
 const ytVoice=()=>db.profile.youtubeVoice||DEFAULT_YOUTUBE_VOICE;
-const ytTopicNote=id=>{const t=db.interests.find(i=>i.id===id);return (t&&t.note)||YT_BY_ID[id].note};
-const ytCatPayload=id=>({name:YT_BY_ID[id].name,parent:null,note:ytTopicNote(id)});
+const ytTopicNote=id=>{const t=db.interests.find(i=>i.id===id);return (t&&t.note)||ytDef(id).note};
+const ytCatPayload=id=>({name:ytDef(id).name,parent:null,note:ytTopicNote(id)});
 function ytIdeas(id){return db.ideas.filter(i=>i.preferredChannel==='youtube'&&i.topicId===id&&i.aiGenerated)}
 function ytAllTitles(id){const ideas=db.ideas.filter(i=>i.preferredChannel==='youtube'&&i.topicId===id),ids=new Set(ideas.map(i=>i.id));return [...ideas.map(i=>i.title),...db.posts.filter(p=>p.channel==='youtube'&&ids.has(p.ideaId)).map(p=>p.title)].map(t=>String(t).trim()).filter(Boolean)}
 function ytTitles(id){const seen=new Set(),out=[];for(const t of ytAllTitles(id)){if(seen.has(t))continue;seen.add(t);out.push(t.slice(0,300))}return out.slice(0,200)}
@@ -417,7 +454,7 @@ function ytBody(d){
  return `## 썸네일 문구\n${t(d.thumbnail_text)}\n\n## 첫 3초\n${t(d.hook)}\n\n## 대본\n${segs.join('\n\n')}\n\n## 설명란\n${t(d.description)}`;
 }
 async function ytDraft(idea){
- const def=YT_BY_ID[idea.topicId];
+ const def=ytDef(idea.topicId);
  if(!def){toast('이 소재에는 유튜브 주제가 지정되어 있지 않습니다.');return}
  if(!genReady()){toast('블로그 브리지 URL이 설정되지 않았습니다. 발행 센터에서 먼저 연결하세요.');return}
  if(editing&&!canLeave())return;
