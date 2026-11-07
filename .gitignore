@@ -16,3 +16,5 @@ naver-bridge/node_modules/
 !.env.example
 *.env.local
 naver-bridge/.env
+.vercel
+.env*

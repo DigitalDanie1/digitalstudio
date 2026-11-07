@@ -3,6 +3,14 @@
   "framework": null,
   "rewrites": [
     {
+      "source": "/fieldnote-manual-ai.js",
+      "destination": "/outputs/fieldnote-manual-ai.js"
+    },
+    {
+      "source": "/fieldnote-workflow.js",
+      "destination": "/outputs/fieldnote-workflow.js"
+    },
+    {
       "source": "/",
       "destination": "/outputs/fieldnote-studio.html"
     }
