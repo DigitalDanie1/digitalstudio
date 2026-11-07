@@ -652,11 +652,41 @@ const PLATFORM_STARTERS = [
   { sid:'th-break-even', platform:'Threads', title:'"본전만 오면 판다"고 말했던 날', angle:'본전 심리를 내 경험(또는 각색 사례라고 밝힌 이야기)으로 짧게.', hook:'"본전만 오면 판다. 그 말을 몇 번 했더라"', outline:['[직접 경험 또는 각색 사례 — 각색이면 밝히기]','그때 몰랐던 것 한 줄','질문: "여러분은 멈추는 기준이 있나요?"','답글에 '+HELP_LINE], verify:['매매 방법으로 읽히지 않는지','상담처 정보 최신 여부'] },
   { sid:'th-fx-feel', platform:'Threads', title:'해외 살면서 환율 볼 때마다 드는 생각', angle:'같은 월급이 환율에 따라 다르게 느껴지는 체감을 질문으로 연다.', hook:'"월급은 그대로인데 이번 달은 왜 가난한 느낌일까"', outline:['[직접 경험: 환율을 체감한 장면]','내 생각 한 줄','질문: "해외 사는 분들은 어떻게 관리하세요?"'], verify:['환율 수치를 쓰면 날짜·출처'] },
 ];
-const PLATFORM_SEED_VERSION = 1;
+const YT_MORE_STARTERS = [
+  // 쇼츠 (15~60초)
+  { sid:'yt-s-double-vs-single', platform:'YouTube', ytFormat:'shorts', yt:'yt-wrestling-technique', title:'더블렉 vs 싱글렉, 언제 뭘 쓸까', angle:'두 기술의 진입 장면을 나란히 놓고 상대 자세에 따라 고르는 기준 하나만 보여준다.', hook:'0~1.5초 · "상대가 이렇게 서 있으면 더블렉은 막힌다"', outline:['훅: 두 진입 장면 분할 화면','기준 1: 상대 무게중심','기준 2: 거리','결론 + 첫 장면으로 돌아가는 마무리 한 줄'], verify:['기술 명칭 표기','장면 출처 선수·대회'], sources:'https://www.youtube.com/@DPSBreakdowns' },
+  { sid:'yt-s-sprawl', platform:'YouTube', ytFormat:'shorts', yt:'yt-wrestling-technique', title:'스프롤: 테이크다운을 막는 1초', angle:'다리를 잡히기 직전 엉덩이를 뒤로 빼는 순간을 멈춤 화면으로 해부한다.', hook:'0~1.5초 · "다리를 잡혀도 넘어가지 않는 방법"', outline:['훅: 잡히는 순간 멈춤','엉덩이·체중 화살표','실패 장면과 비교','마무리'], verify:['장면 출처','동작 설명이 원본 해설과 맞는지'], sources:'https://www.youtube.com/@GrapplingTheoryHQ' },
+  { sid:'yt-s-cage-wall', platform:'YouTube', ytFormat:'shorts', yt:'yt-wrestling-ufc', title:'UFC 레슬러는 왜 상대를 철장에 붙일까', angle:'케이지 벽을 이용한 압박이 일반 레슬링 매트와 다른 점 하나를 보여준다.', hook:'0~1.5초 · "철장이 레슬러의 세 번째 팔이다"', outline:['훅: 벽에 붙는 장면','벽이 막아주는 방향 화살표','테이크다운으로 이어지는 순간','마무리'], verify:['경기명·선수·라운드 [확인 필요]'], sources:'https://www.youtube.com/@smeshtalk/shorts' },
+  { sid:'yt-s-greco-legs', platform:'YouTube', ytFormat:'shorts', yt:'yt-wrestling-highlights', title:'그레코로만은 왜 다리를 못 잡을까', angle:'규칙 한 줄 + 그 규칙 때문에 생긴 화려한 메치기 장면.', hook:'0~1.5초 · "다리를 잡으면 반칙인 레슬링"', outline:['훅: 큰 메치기 장면','규칙 한 줄 [확인 필요: UWW 규정 원문]','그래서 상체 싸움이 된다','마무리'], verify:['UWW 그레코로만 규정 원문'], sources:'https://www.youtube.com/@unitedworldwrestling' },
+  { sid:'yt-s-scoring', platform:'YouTube', ytFormat:'shorts', yt:'yt-wrestling-highlights', title:'레슬링 점수 30초 정리', angle:'테이크다운·노출·밀어내기 점수를 실제 장면 하나씩으로 설명한다.', hook:'0~1.5초 · "이 장면은 몇 점일까?"', outline:['훅: 점수 퀴즈 장면','점수 종류 3개를 장면과 함께 [확인 필요: 현행 점수]','정답 공개','마무리: 다시 첫 장면 질문'], verify:['UWW 현행 점수 규정과 개정 연도'], sources:'https://www.youtube.com/@unitedworldwrestling' },
+  { sid:'yt-s-ncaa-last10', platform:'YouTube', ytFormat:'shorts', yt:'yt-wrestling-highlights', title:'NCAA 결승, 마지막 10초에 뒤집혔다', angle:'종료 직전 역전 장면 하나와 그 직전 선택을 해설한다.', hook:'0~1.5초 · "남은 시간 10초, 2점 뒤진 상황"', outline:['훅: 시계와 점수','역전 직전 움직임','점수 나는 순간 슬로우','마무리'], verify:['선수·연도·체급·최종 스코어'], sources:'https://www.youtube.com/@NCAAChampionships' },
+  { sid:'yt-s-kures', platform:'YouTube', ytFormat:'shorts', yt:'yt-wrestling-athletes', title:'카자흐 전통 씨름 쿠레스, 처음 보면 놀라는 것', angle:'한국 씨름과 닮은 점·다른 점 하나씩.', hook:'0~1.5초 · "한국 씨름이랑 뭐가 다를까?"', outline:['훅: 쿠레스 경기 장면','닮은 점','다른 점','마무리 질문'], verify:['쿠레스 규칙 출처 [확인 필요]','영상 원본 출처'], sources:'https://www.youtube.com/@QAZSPORTTV' },
+  { sid:'yt-s-women-grip', platform:'YouTube', ytFormat:'shorts', yt:'yt-wrestling-women', title:'여자 레슬러의 그립 싸움 15초', angle:'손목 컨트롤 하나로 경기를 가져가는 장면.', hook:'0~1.5초 · "손목만 잡았는데 끝났다"', outline:['훅: 손목 잡는 순간','그다음 연결 동작','결과','마무리'], verify:['선수 이름·대회 공식 표기'], sources:'https://www.youtube.com/@unitedworldwrestling' },
+  { sid:'yt-s-korea-gym', platform:'YouTube', ytFormat:'shorts', yt:'yt-wrestling-athletes', title:'한국 레슬링 체육관 하루 30초', angle:'국내 체육관 훈련 장면을 내 해설로 소개한다(원 채널 허락·출처 표기).', hook:'0~1.5초 · "한국에도 이런 레슬링 체육관이 있다"', outline:['훅: 훈련 장면','훈련 순서 3컷','내 한 줄 소감','마무리'], verify:['원 채널 사용 허락 여부','체육관 이름 표기'], sources:'https://www.youtube.com/@%EB%95%80%EB%83%84%EC%8B%9C1/shorts' },
+  { sid:'yt-s-ankle-pick', platform:'YouTube', ytFormat:'shorts', yt:'yt-wrestling-technique', title:'앵클픽: 가장 빠른 테이크다운', angle:'머리로 밀고 발목을 줍는 두 동작을 화살표로.', hook:'0~1.5초 · "0.5초 만에 넘어갔다"', outline:['훅: 넘어가는 장면','동작 1 머리','동작 2 발목','마무리'], verify:['장면 출처'], sources:'https://www.youtube.com/@FloWrestling' },
+  { sid:'yt-s-raf', platform:'YouTube', ytFormat:'shorts', yt:'yt-wrestling-highlights', title:'RAF 프리스타일, 일반 레슬링과 뭐가 다를까', angle:'규칙·무대 차이 하나를 장면으로.', hook:'0~1.5초 · "이건 올림픽 레슬링이 아니다"', outline:['훅: RAF 장면','다른 점 하나 [확인 필요: RAF 규칙]','마무리'], verify:['RAF 공식 규칙'], sources:'https://www.youtube.com/@RAFwrestling' },
+  { sid:'yt-s-head-position', platform:'YouTube', ytFormat:'shorts', yt:'yt-wrestling-technique', title:'테이크다운 마무리 실수 1위: 머리 위치', angle:'같은 기술의 성공·실패 장면을 머리 위치로 비교.', hook:'0~1.5초 · "다리를 잡고도 지는 이유"', outline:['훅: 실패 장면','머리 위치 비교','성공 장면','마무리'], verify:['장면 출처','해설이 원본 분석과 맞는지'], sources:'https://www.youtube.com/@DPSBreakdowns' },
+  { sid:'yt-s-cayden-drill', platform:'YouTube', ytFormat:'shorts', yt:'yt-wrestling-athletes', title:'선수 훈련 루틴에서 따라 할 1가지', angle:'한 선수의 훈련 영상에서 입문자가 따라 할 드릴 하나만 고른다.', hook:'0~1.5초 · "집에서도 되는 레슬링 훈련"', outline:['훅: 드릴 장면','방법 2컷','주의점','마무리'], verify:['선수 표기','부상 위험 안내'], sources:'https://www.youtube.com/@CaydenHenschel' },
+  // 롱폼 (8~12분)
+  { sid:'yt-l-khabib', platform:'YouTube', ytFormat:'long', yt:'yt-wrestling-ufc', title:'하빕 누르마고메도프의 레슬링 완전 해부', angle:'압박 → 케이지 → 바닥 컨트롤 세 단계로 하빕 스타일을 해설한다.', hook:'0~15초 · 상대가 일어나지 못하는 장면 + "왜 아무도 못 빠져나왔을까"', outline:['약속: 하빕 레슬링의 3단계','파트1 압박과 진입','파트2 케이지 활용','파트3 바닥 컨트롤','정리 3줄 + 다음 영상'], verify:['전적·경기 날짜','인용 발언 원문'], sources:'https://www.youtube.com/@smeshtalk/shorts' },
+  { sid:'yt-l-rules', platform:'YouTube', ytFormat:'long', yt:'yt-wrestling-highlights', title:'레슬링 입문 총정리: 자유형·그레코로만·포크스타일', angle:'세 종류의 규칙과 보는 재미를 실제 장면으로 비교.', hook:'0~15초 · 세 경기 장면을 연달아 + "다 같은 레슬링이 아니다"', outline:['약속','파트1 자유형','파트2 그레코로만','파트3 미국 포크스타일','정리'], verify:['UWW·NCAA 규정 원문'], sources:'https://www.youtube.com/@unitedworldwrestling\nhttps://www.youtube.com/@NCAAChampionships' },
+  { sid:'yt-l-ncaa-ufc', platform:'YouTube', ytFormat:'long', yt:'yt-wrestling-ufc', title:'미국 대학 레슬링은 어떻게 UFC 챔피언을 만들까', angle:'NCAA 레슬링 출신 선수들의 공통 기술을 장면으로 짚는다.', hook:'0~15초 · 대학 결승 장면 → 같은 선수의 UFC 장면', outline:['약속','파트1 NCAA 레슬링의 특징','파트2 UFC에서 살아남는 기술','파트3 한계','정리'], verify:['선수 경력 [확인 필요]','과장 없는지'], sources:'https://www.youtube.com/@NCAAChampionships' },
+  { sid:'yt-l-takedowns5', platform:'YouTube', ytFormat:'long', yt:'yt-wrestling-technique', title:'테이크다운 5가지 한 번에: 싱글·더블·하이크로치·앵클픽·바디락', angle:'기술마다 완성 장면 → 셋업 → 흔한 실수.', hook:'0~15초 · 다섯 기술 몽타주 + "오늘 다 구분하게 된다"', outline:['약속','파트1~5 기술별','정리 표'], verify:['기술 명칭','장면 출처'], sources:'https://www.youtube.com/@DPSBreakdowns\nhttps://www.youtube.com/@FloWrestling' },
+  { sid:'yt-l-tdd', platform:'YouTube', ytFormat:'long', yt:'yt-wrestling-ufc', title:'타격가는 레슬러를 어떻게 막을까: 테이크다운 방어의 모든 것', angle:'스프롤·언더훅·케이지 일어서기를 UFC 장면으로.', hook:'0~15초 · 테이크다운을 막고 KO로 이어진 장면', outline:['약속','파트1 거리','파트2 스프롤','파트3 일어서기','정리'], verify:['경기·선수 [확인 필요]'], sources:'https://www.youtube.com/@GrapplingTheoryHQ' },
+  { sid:'yt-l-worlds-final', platform:'YouTube', ytFormat:'long', yt:'yt-wrestling-highlights', title:'세계선수권 결승 한 경기 풀 해설', angle:'경기 흐름을 1·2피리어드로 나눠 전환점마다 멈춘다.', hook:'0~15초 · 결정적 장면 + "이 10초 전에 이미 승부가 났다"', outline:['약속','선수 소개','1피리어드','2피리어드','승부를 가른 이유','정리'], verify:['연도·체급·스코어','선수 한글 표기'], sources:'https://www.youtube.com/@unitedworldwrestling' },
+  { sid:'yt-l-women5', platform:'YouTube', ytFormat:'long', yt:'yt-wrestling-women', title:'지금 가장 강한 여자 레슬러 5명', angle:'선수마다 강점 하나와 대표 장면 하나.', hook:'0~15초 · 다섯 장면 몽타주', outline:['약속','선수 1~5','정리'], verify:['메달·대회 기록 공식 출처'], sources:'https://www.youtube.com/@unitedworldwrestling' },
+  { sid:'yt-l-dagestan', platform:'YouTube', ytFormat:'long', yt:'yt-wrestling-athletes', title:'다게스탄은 왜 레슬링 강국이 됐을까', angle:'문화·훈련·선수 계보를 확인된 자료로만 설명한다.', hook:'0~15초 · 작은 지역 지도 + 선수 장면', outline:['약속','파트1 지역 소개','파트2 훈련 문화','파트3 대표 선수','정리'], verify:['인구·메달 수치 [확인 필요]','일반화 표현 없는지'], sources:'https://www.youtube.com/@smeshtalk/shorts' },
+  { sid:'yt-l-korea-now', platform:'YouTube', ytFormat:'long', yt:'yt-wrestling-athletes', title:'한국 레슬링은 지금 어디쯤 와 있나', angle:'국내 체육관 장면과 국제 대회 결과를 함께 본다.', hook:'0~15초 · 체육관 훈련 장면 + 질문', outline:['약속','파트1 체육관','파트2 국제 대회 성적 [확인 필요]','파트3 내가 본 것','정리'], verify:['대회 성적 공식 출처','원 채널 허락'], sources:'https://www.youtube.com/@%EB%95%80%EB%83%84%EC%8B%9C1/shorts' },
+  { sid:'yt-l-kazakh', platform:'YouTube', ytFormat:'long', yt:'yt-wrestling-athletes', title:'카자흐스탄 레슬링과 전통 씨름 쿠레스', angle:'올림픽 레슬링과 전통 씨름이 어떻게 이어지는지.', hook:'0~15초 · 쿠레스 장면 → 국제 대회 장면', outline:['약속','파트1 쿠레스','파트2 카자흐 레슬링','파트3 한국 씨름과 비교','정리'], verify:['규칙·역사 출처 [확인 필요]'], sources:'https://www.youtube.com/@QAZSPORTTV' },
+];
+PLATFORM_STARTERS.push(...YT_MORE_STARTERS);
+const YT_FORMAT_TEXT = { shorts:'쇼츠 15~60초 · 1.5초 훅 → 컷 하나에 정보 하나 → 첫 장면으로 이어지는 마무리', long:'롱폼 8~12분 · 15초 훅 → 약속 → 열린 고리 있는 파트 3~5개 → 정리' };
+function ytFormatOf(i) { return i && i.ytFormat === 'long' ? 'long' : 'shorts'; }
+const PLATFORM_SEED_VERSION = 2;
 let ideaPlatformFilter = 'all';
 
 function platformStarterNote(s) {
-  return `[플랫폼 시작 소재 · ${s.platform} · 사실 확인 전 아이디어]\n형식: ${PLATFORM_FORMAT[s.platform]}\n각도: ${s.angle}\n훅: ${s.hook}\n\n구성\n${s.outline.map(x => '- ' + x).join('\n')}\n\n확인할 것\n${s.verify.map(x => '- ' + x).join('\n')}`;
+  return `[플랫폼 시작 소재 · ${s.platform}${s.ytFormat ? (s.ytFormat === 'long' ? ' 롱폼' : ' 쇼츠') : ''} · 사실 확인 전 아이디어]\n형식: ${s.ytFormat ? YT_FORMAT_TEXT[s.ytFormat] : PLATFORM_FORMAT[s.platform]}\n각도: ${s.angle}\n훅: ${s.hook}\n\n구성\n${s.outline.map(x => '- ' + x).join('\n')}\n\n확인할 것\n${s.verify.map(x => '- ' + x).join('\n')}`;
 }
 function ensurePlatformStarters() {
   if (!db || !Array.isArray(db.ideas) || (db.platformSeedVersion || 0) >= PLATFORM_SEED_VERSION) return;
@@ -664,7 +694,7 @@ function ensurePlatformStarters() {
   for (const s of PLATFORM_STARTERS) {
     const id = 'pf-starter-' + s.sid; if (have.has(id)) continue;
     const idea = { id, title:s.title, note:platformStarterNote(s), sources:s.sources || '', platform:s.platform, sample:false, aiGenerated:false, starter:true, created:base - (k++) };
-    if (s.platform === 'YouTube') { idea.preferredChannel = 'youtube'; if (s.yt) { idea.ytChannel = 'yt-wrestling'; idea.topicId = s.yt; } }
+    if (s.platform === 'YouTube') { idea.preferredChannel = 'youtube'; idea.ytFormat = s.ytFormat || 'shorts'; if (s.yt) { idea.ytChannel = 'yt-wrestling'; idea.topicId = s.yt; } }
     if (s.platform === 'Instagram') idea.preferredChannel = 'insta';
     if (s.platform === '네이버 블로그') idea.preferredChannel = 'blog';
     db.ideas.push(idea);
@@ -819,9 +849,9 @@ function platformPage(c) {
     <p class="ps-note">${esc(i.note)}</p>${ideaPlatformPicker(i)}
     <div class="actions"><button class="btn primary" data-create="${esc(i.id)}">원고 만들기</button>${c === 'youtube' ? `<button class="btn" data-yp-pick="${esc(i.id)}">▶ 제작 라인에서 작업</button>` : ''}<button class="btn ghost" data-idea-edit="${esc(i.id)}">수정</button><button class="btn ghost danger" data-idea-delete="${esc(i.id)}" aria-label="소재 삭제">×</button></div></details></li>`;
   const hero = `<section class="pf-hero" style="--pc:${pc}"><div class="pf-hero-main"><div class="eyebrow">PLATFORM</div><h1>${esc(platformLabel(p))}</h1><p>${esc(book.role)}</p></div>
-    <dl class="pf-stats"><div><dt>주제</dt><dd>${ideas.length}</dd></div><div><dt>작성 중</dt><dd>${n('draft')}</dd></div><div><dt>검수 대기</dt><dd class="orange">${n('review')}</dd></div><div><dt>승인</dt><dd class="green">${n('approved')}</dd></div></dl>
+    <dl class="pf-stats">${c === 'youtube' ? `<div><dt>쇼츠</dt><dd>${ideas.filter(i => ytFormatOf(i) === 'shorts').length}</dd></div><div><dt>롱폼</dt><dd>${ideas.filter(i => ytFormatOf(i) === 'long').length}</dd></div>` : `<div><dt>주제</dt><dd>${ideas.length}</dd></div>`}<div><dt>작성 중</dt><dd>${n('draft')}</dd></div><div><dt>검수 대기</dt><dd class="orange">${n('review')}</dd></div><div><dt>승인</dt><dd class="green">${n('approved')}</dd></div></dl>
     <button class="btn primary" data-action="newIdea">＋ 새 주제</button></section>`;
-  const board = `<section class="ps-board" style="--pc:${pc}"><div class="ps-cols">
+  let board = `<section class="ps-board" style="--pc:${pc}"><div class="ps-cols">
     <div class="ps-col"><h3><span>①</span> 주제 <em>${ideas.length}</em></h3>${ideas.length ? `<ul class="ps-topics">${ideas.map(topic).join('')}</ul>` : '<p class="small">아직 주제가 없습니다. ＋ 새 주제로 추가하세요.</p>'}</div>
     <div class="ps-col"><h3><span>②</span> 제작 방법</h3><ol class="ps-steps">${book.make.map(x => `<li>${esc(x)}</li>`).join('')}</ol>
       ${guide ? `<details class="ps-template"><summary>📄 원고 틀 보기</summary><textarea readonly aria-label="${esc(p)} 원고 틀">${esc(guide.example)}</textarea></details>` : ''}</div>
@@ -837,6 +867,10 @@ function platformPage(c) {
     <p>${esc(r ? r.role : t.use)}</p>${t.links.length ? `<p class="sub-links">${t.links.map(([label, url]) => `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(label)} ↗</a>`).join(' · ')}</p>` : ''}</article>`; }).join('');
   const toolSec = `<section class="pf-section"><div class="sectionhead"><h2><span class="pf-num" style="--pc:${pc}">⑤</span> 이 플랫폼 프로그램</h2><button class="linkbtn" data-view="common">원고 AI 등 공통 프로그램 →</button></div><div class="pf-tools">${toolCards}</div></section>`;
   if (c === 'youtube') {
+    const fmtPick = i => `<label class="idea-pf-pick yt-fmt-pick"><span>형식</span><select data-yt-format-set="${esc(i.id)}"><option value="shorts" ${ytFormatOf(i) === 'shorts' ? 'selected' : ''}>쇼츠</option><option value="long" ${ytFormatOf(i) === 'long' ? 'selected' : ''}>롱폼</option></select></label>`;
+    const ytTopic = i => topic(i).replace(ideaPlatformPicker(i), ideaPlatformPicker(i) + fmtPick(i));
+    const group = f => { const l = ideas.filter(i => ytFormatOf(i) === f); return `<div class="yt-fmt-group ${f}"><h4>${f === 'long' ? '🎬 롱폼' : '📱 쇼츠'} <em>${l.length}</em><span>${esc(YT_FORMAT_TEXT[f])}</span></h4>${l.length ? `<ul class="ps-topics">${l.map(ytTopic).join('')}</ul>` : '<p class="small">아직 없습니다.</p>'}</div>`; };
+    board = board.replace(/<div class="ps-col"><h3><span>①<\/span> 주제 <em>\d+<\/em><\/h3>[\s\S]*?<\/div>\s*<div class="ps-col"><h3><span>②/, `<div class="ps-col"><h3><span>①</span> 주제 <em>${ideas.length}</em></h3><div class="yt-fmt-groups">${group('shorts')}${group('long')}</div></div>\n    <div class="ps-col"><h3><span>②`);
     const ytBoard = board.replace(/<div class="ps-col"><h3><span>②<\/span> 제작 방법<\/h3>[\s\S]*?<\/div>\s*<div class="ps-col"><h3><span>③/, '<div class="ps-col"><h3><span>③').replace('<div class="ps-cols">', '<div class="ps-cols ps-cols2">');
     const src = `<details class="panel pf-extra" id="ytSources"><summary>📚 레슬링 소스 채널 <span class="small">${WRESTLING_SOURCES.length}곳 · 소스 다운로드 단계에서 씀</span></summary>${wrestlingSourceLibrary()}<div class="actions" style="margin-top:12px"><button class="btn ghost" data-workflow="import">쇼츠 백업 가져오기</button></div></details>`;
     return hero + ytPipeline() + ytBoard + src + drafts + toolSec;
@@ -887,53 +921,89 @@ function commonPage() {
 }
 
 
-// ===== YouTube 제작 라인: 자료조사 → 소스 다운로드 → 편집 → 업로드 (단계마다 스킬 바로 쓰기) =====
-let ytPipe = { ideaId: '', url: '', ranges: '' };
+// ===== YouTube 제작 라인: 자료조사 → 소스 다운로드 → 편집 → 업로드 (쇼츠/롱폼, 단계마다 스킬 바로 쓰기) =====
+let ytPipe = { ideaId: '', url: '', ranges: '', format: 'shorts' };
+const YT_AUDIENCE = '레슬링·UFC 좋아하는 한국 시청자(입문~중급)';
 function ytFolder(t) { return String(t || '새 주제').replace(/[\\/:*?"<>|#%&{}$!'`@+=]/g, '').replace(/\s+/g, ' ').trim().slice(0, 40) || '새 주제'; }
-function ytPipeIdea() { const list = db.ideas.filter(i => ideaPlatform(i) === 'YouTube'); return list.find(i => i.id === ytPipe.ideaId) || list[0] || null; }
+function ytFmtIdeas(f) { return db.ideas.filter(i => ideaPlatform(i) === 'YouTube' && (!f || ytFormatOf(i) === f)); }
+function ytPipeIdea() { const list = ytFmtIdeas(ytPipe.format); return list.find(i => i.id === ytPipe.ideaId) || list[0] || null; }
 function ytFirstUrl(i) { const m = String(i?.sources || '').match(/https?:\/\/(?:www\.)?(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)[\w-]+[^\s]*/); return m ? m[0] : ''; }
 function ytRanges() { return ytPipe.ranges.split(/[,\s]+/).map(x => x.trim()).filter(x => /^\d{1,2}(:\d{2}){1,2}-\d{1,2}(:\d{2}){1,2}$/.test(x)); }
 function ytPipeText(kind) {
-  const i = ytPipeIdea(), title = i ? i.title : '주제', dir = ytFolder(title), url = ytPipe.url || '<영상 URL>', rg = ytRanges();
-  if (kind === 'research') return `/source-check-research ${title} — 레슬링 해설 쇼츠 대본용. 선수·대회·기록·규정 위주로, 결과를 ~/Movies/FIELDNOTE/${dir}/research.md 로 저장해줘`;
-  if (kind === 'research-chat') return i ? researchPrompt(i) : '';
-  if (kind === 'download') return `/yt-source-download ${url} ${rg.length ? rg.join(' ') : '<시작-끝 예: 0:30-0:45>'} 주제:${dir}`;
-  if (kind === 'download-term') return `mkdir -p ~/Movies/FIELDNOTE/"${dir}"/원본 && yt-dlp -f "bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b" --merge-output-format mp4 ${(rg.length ? rg : ['0:00-0:15']).map(r => `--download-sections "*${r}"`).join(' ')} --force-keyframes-at-cuts -o ~/Movies/FIELDNOTE/"${dir}"/원본/"%(channel)s_%(id)s_%(section_start)s.%(ext)s" "${url}"`;
-  if (kind === 'edit') return `/shorts-edit-kit ${dir}`;
-  if (kind === 'upload') return `/yt-upload-pack ${dir}`;
+  const i = ytPipeIdea(), title = i ? i.title : '주제', dir = ytFolder(title), D = `~/Movies/FIELDNOTE/${dir}`, url = ytPipe.url || '<영상 URL>', rg = ytRanges(), sh = ytPipe.format !== 'long';
+  switch (kind) {
+    case 'research': return `/source-check-research ${title} — 레슬링 해설 ${sh ? '쇼츠' : '롱폼'} 대본용. 쓰임새: 영상 대본, 범위: 최근 기록 우선·한국어와 영어. 선수·대회·기록·규정 위주로 조사하고 결과를 ${D}/research.md 로 저장해줘`;
+    case 'research-chat': return i ? researchPrompt(i) : '';
+    case 'download': return `/yt-source-download ${url} ${rg.length ? rg.join(' ') : '<시작-끝 예: 0:30-0:45>'} 주제:${dir}`;
+    case 'download-term': return `mkdir -p ${D.replace(dir, `"${dir}"`)}/원본 && yt-dlp -f "bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b" --merge-output-format mp4 ${(rg.length ? rg : ['0:00-0:15']).map(r => `--download-sections "*${r}"`).join(' ')} --force-keyframes-at-cuts -o ${D.replace(dir, `"${dir}"`)}/원본/"%(channel)s_%(id)s_%(section_start)s.%(ext)s" "${url}"`;
+    case 'script': return sh
+      ? `/shorts-blueprint ${title} — 길이 45초, 소스: ${D}/원본/ 클립에서 뽑기(sources.md 참고), 시청자: ${YT_AUDIENCE}, 말투: 친구에게 말하듯. 사실은 ${D}/research.md 의 A·B 등급만 쓰고, 결과를 ${D}/편집/대본.md 로 저장해줘`
+      : `/hook-first-script ${title} — 길이 8~12분, 시청자: ${YT_AUDIENCE}, 말투: 친구에게 말하듯, 자료: ${D}/research.md (A·B 등급만, 나머지는 자료 확인 필요 목록으로). 원본 경기 장면은 몇 초씩만 쓰는 해설 영상이야. 결과를 ${D}/편집/대본.md 로 저장해줘`;
+    case 'plan': return `/edit-plan-sheet ${D} — 대본: 편집/대본.md, 클립: 원본/ (sources.md 참고), 형식: ${sh ? '세로 쇼츠 45초' : '가로 롱폼 10분'}, 분위기: ${sh ? '빠름' : '다큐'}. 결과를 ${D}/편집/편집계획표.md 로 저장해줘`;
+    case 'rough': return `/rough-cut ${dir} 형식:${sh ? '세로' : '가로'}`;
+    case 'upload': return `/upload-pack-maker ${dir} — ${sh ? '쇼츠' : '롱폼'}. 대본: ${D}/편집/대본.md, 시청자: ${YT_AUDIENCE}. 설명란에 ${D}/sources.md 의 원본 채널·영상 제목·URL·사용 구간과 "경기 장면은 해설·분석 목적으로 일부만 사용했습니다"를 넣고, 결과를 ${D}/업로드/업로드팩.md 로 저장해줘`;
+  }
   return '';
 }
-const YT_PIPELINE = [
-  { kind:'research', title:'자료조사', skill:'source-check-research', what:'선수·대회·기록·규정을 찾아 출처 등급(A 원자료 / B 언론 / C 개인)을 붙이고, 핵심 사실은 2곳 이상에서 교차 확인합니다.', out:'research.md · 근거 표와 확인 못 한 것', tools:[], chat:true },
-  { kind:'download', title:'소스 다운로드', skill:'yt-source-download', what:'필요한 장면만 구간으로 받습니다. 한 구간 15초 이하, 출처(채널·제목·URL·구간)는 sources.md에 자동으로 기록됩니다.', out:'원본/ 클립 + sources.md', tools:[['레슬링 소스 채널 11곳', '#ytSources']], inputs:true },
-  { kind:'edit', title:'편집', skill:'shorts-edit-kit', what:'60초 대본 · 자막(SRT) · 컷 리스트 · 세로 9:16 러프컷을 자동으로 만들고, 캡컷에서 내 목소리와 화살표·멈춤 화면으로 마무리합니다.', out:'편집/ 대본.md · 자막.srt · 러프컷_세로.mp4', tools:[['캡컷', 'https://www.capcut.com/'], ['Vrew', 'https://vrew.ai/'], ['Vizard', 'https://vizard.ai/'], ['OpusClip', 'https://www.opus.pro/']] },
-  { kind:'upload', title:'업로드', skill:'yt-upload-pack', what:'제목 3안 · 설명란(원본 출처 포함) · 해시태그 · 고정 댓글을 만들고, 확인 목록을 통과하면 YouTube Studio에 올린 뒤 게시 확인에 링크를 남깁니다.', out:'업로드/ 업로드팩.md', tools:[['YouTube Studio', 'https://studio.youtube.com/']], publish:true },
+// 설치된 스킬 (~/.claude/skills)
+const YT_SKILLS = [
+  { id:'source-check-research', stage:'01 자료조사', by:'sphereai.work', does:'질문 쪼개기 → 한·영 검색 → 출처 등급(A/B/C) → 교차 확인 → 확인 못 한 것 표시', out:'research.md · 결론, 근거 표, 확인 못 한 것', kind:'research', zip:true },
+  { id:'yt-source-download', stage:'02 소스 다운로드', by:'FIELDNOTE', does:'필요한 구간만 yt-dlp로 받고 출처(채널·제목·URL·구간)를 자동 기록', out:'원본/ 클립 + sources.md', kind:'download' },
+  { id:'shorts-blueprint', stage:'03 편집 · 대본(쇼츠)', by:'sphereai.work', does:'15~60초 쇼츠: 1.5초 훅, 컷 하나에 정보 하나, 반복 시청 구조, 세로 안전 영역, 자막 규칙', out:'편집/대본.md · 훅 3안 + 컷 리스트', kind:'script', fmt:'shorts', zip:true },
+  { id:'hook-first-script', stage:'03 편집 · 대본(롱폼)', by:'sphereai.work', does:'3~20분 롱폼: 15초 훅, 약속, 열린 고리 있는 파트, 정리, 컷 메모', out:'편집/대본.md · 제목 3안 + 훅 3안', kind:'script', fmt:'long', zip:true },
+  { id:'edit-plan-sheet', stage:'03 편집 · 계획표', by:'sphereai.work', does:'컷 리스트, 리듬, 자막 규칙, 나레이션·BGM·효과음 계획, 최종 점검표', out:'편집/편집계획표.md', kind:'plan', zip:true },
+  { id:'rough-cut', stage:'03 편집 · 러프컷', by:'FIELDNOTE', does:'계획표대로 원본을 잘라 이어 붙이고 세로(1080×1920)·가로(1920×1080) 러프컷 + 자막 SRT', out:'편집/러프컷_세로|가로.mp4 + 자막.srt', kind:'rough' },
+  { id:'upload-pack-maker', stage:'04 업로드', by:'sphereai.work', does:'제목 후보 10 → 추천 3, 설명란(첫 두 줄·챕터·출처), 태그, 썸네일 3안 + 구글 Flow 썸네일 이미지 절차', out:'업로드/업로드팩.md', kind:'upload', zip:true },
 ];
+const YT_PIPELINE = [
+  { title:'자료조사', what:'선수·대회·기록·규정을 찾아 출처 등급을 붙이고, 핵심 사실은 2곳 이상에서 교차 확인합니다.', out:'research.md', skills:[['자료조사', 'research']], chat:true },
+  { title:'소스 다운로드', what:'필요한 장면만 구간으로 받습니다. 한 구간 15초 이하, 출처는 sources.md에 자동 기록됩니다.', out:'원본/ 클립 + sources.md', skills:[['구간 다운로드', 'download']], inputs:true, links:[['레슬링 소스 채널 11곳', '#ytSources']] },
+  { title:'편집', what:'대본 → 편집 계획표 → 러프컷 순서. 마지막에 캡컷에서 내 목소리 해설과 화살표·멈춤 화면을 얹습니다.', out:'대본.md · 편집계획표.md · 러프컷 · 자막.srt', skills:[['① 대본', 'script'], ['② 편집 계획표', 'plan'], ['③ 러프컷', 'rough']], links:[['캡컷', 'https://www.capcut.com/'], ['Vrew', 'https://vrew.ai/'], ['Vizard', 'https://vizard.ai/', 'long'], ['OpusClip', 'https://www.opus.pro/', 'long']] },
+  { title:'업로드', what:'제목·설명란(출처 포함)·태그·썸네일을 만들고, 확인 후 YouTube Studio에 올린 뒤 게시 확인에 링크를 남깁니다.', out:'업로드팩.md', skills:[['업로드 패키지', 'upload']], links:[['YouTube Studio', 'https://studio.youtube.com/'], ['구글 Flow (썸네일)', 'https://labs.google/fx/tools/flow', 'long']], publish:true },
+];
+function ytSkillOf(kind) { return YT_SKILLS.find(s => s.kind === kind && (!s.fmt || s.fmt === ytPipe.format)); }
 function ytPipeline() {
-  const ideas = db.ideas.filter(i => ideaPlatform(i) === 'YouTube'), cur = ytPipeIdea();
+  const cur = ytPipeIdea(), sh = ytPipe.format !== 'long';
   if (cur && !ytPipe.url) ytPipe.url = ytFirstUrl(cur);
-  const sel = `<label class="yp-topic"><span>작업할 주제</span><select data-yp-idea aria-label="작업할 주제">${ideas.map(i => `<option value="${esc(i.id)}" ${cur && i.id === cur.id ? 'selected' : ''}>${esc(i.title)}</option>`).join('')}</select></label><span class="small">폴더 · ~/Movies/FIELDNOTE/<b data-yp-folder>${esc(ytFolder(cur?.title))}</b></span>`;
+  const fmtBtn = f => `<button class="yp-fmt ${ytPipe.format === f ? 'active' : ''}" data-yp-format="${f}" aria-pressed="${ytPipe.format === f}">${f === 'long' ? '🎬 롱폼' : '📱 쇼츠'} <b>${ytFmtIdeas(f).length}</b></button>`;
+  const sel = `<div class="yp-fmts">${fmtBtn('shorts')}${fmtBtn('long')}</div><label class="yp-topic"><span>작업할 주제</span><select data-yp-idea aria-label="작업할 주제">${ytFmtIdeas(ytPipe.format).map(i => `<option value="${esc(i.id)}" ${cur && i.id === cur.id ? 'selected' : ''}>${esc(i.title)}</option>`).join('')}</select></label><span class="small">폴더 · ~/Movies/FIELDNOTE/<b data-yp-folder>${esc(ytFolder(cur?.title))}</b></span>`;
+  const skillRow = ([label, kind]) => { const sk = ytSkillOf(kind); return `<div class="yp-skill"><span class="yp-skill-name">${esc(label)} · <button class="linkbtn" data-view="ytSkills">/${esc(sk.id)}</button></span><code data-yp-cmd="${kind}">${esc(ytPipeText(kind))}</code><button class="btn primary" data-yp-copy="${kind}">명령 복사</button></div>`; };
   const card = (st, idx) => `<li class="yp-stage"><div class="yp-head"><span class="yp-n">${String(idx + 1).padStart(2, '0')}</span><h3>${esc(st.title)}</h3></div>
     <p class="yp-what">${esc(st.what)}</p><p class="yp-out"><b>결과물</b>${esc(st.out)}</p>
     ${st.inputs ? `<div class="yp-inputs"><label>영상 URL<input class="input" data-yp-field="url" value="${esc(ytPipe.url)}" placeholder="https://www.youtube.com/watch?v=…"></label><label>구간 (쉼표로 여러 개)<input class="input" data-yp-field="ranges" value="${esc(ytPipe.ranges)}" placeholder="0:30-0:45, 1:10-1:20"></label></div>` : ''}
-    <div class="yp-skill"><span class="yp-skill-name">스킬 · ${esc(st.skill)}</span><code data-yp-cmd="${st.kind}">${esc(ytPipeText(st.kind))}</code>
-      <button class="btn primary" data-yp-copy="${st.kind}">Claude Code 명령 복사</button>
-      ${st.chat ? '<button class="btn" data-yp-copy="research-chat">claude.ai 채팅용 복사</button>' : ''}
+    <div class="yp-skills">${st.skills.map(skillRow).join('')}
+      ${st.chat ? '<button class="btn ghost" data-yp-copy="research-chat">claude.ai 채팅용으로 복사</button>' : ''}
       ${st.inputs ? '<details class="yp-term"><summary>터미널 명령으로 직접</summary><code data-yp-cmd="download-term">' + esc(ytPipeText('download-term')) + '</code><button class="btn ghost" data-yp-copy="download-term">터미널 명령 복사</button></details>' : ''}</div>
-    ${st.tools.length || st.publish ? `<div class="yp-tools">${st.tools.map(([l, u]) => u.startsWith('#') ? `<button class="linkbtn" data-yp-jump="${u.slice(1)}">${esc(l)} ↓</button>` : `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(l)} ↗</a>`).join('')}${st.publish ? '<button class="linkbtn" data-view="publish">게시 확인 →</button>' : ''}</div>` : ''}
+    <div class="yp-tools">${(st.links || []).filter(l => !l[2] || l[2] === ytPipe.format).map(([l, u]) => u.startsWith('#') ? `<button class="linkbtn" data-yp-jump="${u.slice(1)}">${esc(l)} ↓</button>` : `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(l)} ↗</a>`).join('')}${st.publish ? '<button class="linkbtn" data-view="publish">게시 확인 →</button>' : ''}</div>
   </li>`;
-  return `<section class="yp" style="--pc:${platformColor('YouTube')}"><div class="yp-top"><h2>제작 라인 <span class="small">자료조사 → 소스 다운로드 → 편집 → 업로드</span></h2>${sel}</div>
+  return `<section class="yp" style="--pc:${platformColor('YouTube')}"><div class="yp-top"><h2>제작 라인 <span class="small">자료조사 → 소스 다운로드 → 편집 → 업로드 · ${sh ? '쇼츠 15~60초 세로' : '롱폼 8~12분 가로'}</span></h2>${sel}</div>
     <ol class="yp-stages">${YT_PIPELINE.map(card).join('')}</ol>
-    <p class="small yp-foot">명령을 복사해 Claude Code 새 대화에 붙여 넣으면 해당 스킬이 그 단계를 실행합니다. 네 단계가 같은 주제 폴더를 이어 씁니다. 원본 경기 장면은 한 번에 몇 초만, 영상의 중심은 내 해설입니다.</p></section>`;
+    <p class="small yp-foot">'명령 복사' → Claude Code 새 대화에 붙여 넣기 → 그 단계 스킬이 실행됩니다. 모든 단계가 같은 주제 폴더를 이어 씁니다. 원본 경기 장면은 한 번에 몇 초만, 중심은 내 해설입니다.</p></section>`;
+}
+function ytSkillsPage() {
+  if (!ytPipeIdea()) ytPipe.format = ytFmtIdeas('shorts').length ? 'shorts' : 'long';
+  const cur = ytPipeIdea();
+  const card = s => { const ex = s.fmt && s.fmt !== ytPipe.format ? null : ytPipeText(s.kind); return `<article class="sk-card"><div class="sk-head"><span class="sk-stage">${esc(s.stage)}</span><span class="sk-by ${s.by === 'FIELDNOTE' ? 'own' : ''}">${esc(s.by)}</span></div>
+    <h3>/${esc(s.id)}</h3><p>${esc(s.does)}</p><p class="yp-out"><b>결과물</b>${esc(s.out)}</p>
+    <p class="sk-where">✅ 설치됨 · ~/.claude/skills/${esc(s.id)}${s.zip ? ' · claude.ai용 ZIP 있음' : ' · Claude Code 전용(내 컴퓨터에서 실행)'}</p>
+    ${ex ? `<code>${esc(ex)}</code><button class="btn primary" data-yp-copy="${s.kind}">이 주제로 명령 복사</button>` : `<p class="small">${s.fmt === 'long' ? '롱폼' : '쇼츠'} 주제를 고르면 명령이 만들어집니다.</p>`}</article>`; };
+  return head('YouTube 스킬', `설치된 스킬 ${YT_SKILLS.length}개 · 제작 라인 단계 순서`, false)
+    + `<div class="sk-top"><span>예시 명령에 쓰는 주제</span><strong>${esc(cur ? cur.title : '없음')}</strong><span class="small">${ytPipe.format === 'long' ? '롱폼' : '쇼츠'} · 작업판에서 바꿀 수 있습니다</span></div>`
+    + `<div class="sk-grid">${YT_SKILLS.map(card).join('')}</div>`
+    + `<section class="panel sk-how"><h2>쓰는 법</h2><ol><li><b>Claude Code</b>: '명령 복사' → 새 대화에 붙여 넣기. 또는 그냥 "하빕 주제 자료조사해줘"처럼 말해도 맞는 스킬이 실행됩니다.</li><li><b>claude.ai / 데스크톱 채팅</b>: 바탕화면 CLAUDE 폴더의 fieldnote-youtube-skills.zip을 풀어 각 폴더를 ZIP으로 설정 → 기능 → 스킬에 업로드. 다운로드·러프컷은 내 컴퓨터 파일을 다뤄서 Claude Code에서만 됩니다.</li><li>스킬 원본: sphereai.work 무료 스킬 5개 + FIELDNOTE용 2개(소스 다운로드, 러프컷).</li></ol></section>`;
 }
 function ytPipeRefresh() { document.querySelectorAll('[data-yp-cmd]').forEach(el => { el.textContent = ytPipeText(el.dataset.ypCmd); }); const f = document.querySelector('[data-yp-folder]'); if (f) f.textContent = ytFolder(ytPipeIdea()?.title); }
+function ytPick(id) { const i = db.ideas.find(x => x.id === id); if (!i) return; ytPipe.format = ytFormatOf(i); ytPipe.ideaId = id; ytPipe.url = ytFirstUrl(i); ytPipe.ranges = ''; }
 document.addEventListener('input', e => { const f = e.target.closest?.('[data-yp-field]'); if (!f) return; ytPipe[f.dataset.ypField] = f.value; ytPipeRefresh(); });
-document.addEventListener('change', e => { const s = e.target.closest?.('select[data-yp-idea]'); if (!s) return; ytPipe.ideaId = s.value; ytPipe.url = ytFirstUrl(ytPipeIdea()); ytPipe.ranges = ''; render(); });
+document.addEventListener('change', e => {
+  const s = e.target.closest?.('select[data-yp-idea]'); if (s) { ytPick(s.value); render(); return; }
+  const f = e.target.closest?.('select[data-yt-format-set]'); if (f) { const i = db.ideas.find(x => x.id === f.dataset.ytFormatSet); if (i) { i.ytFormat = f.value; persist(); render(); } }
+});
 document.addEventListener('click', async e => {
+  const fm = e.target.closest('button[data-yp-format]'); if (fm) { ytPipe.format = fm.dataset.ypFormat; ytPipe.ideaId = ''; ytPipe.url = ''; ytPipe.ranges = ''; render(); return; }
+  const pk = e.target.closest('button[data-yp-pick]'); if (pk) { ytPick(pk.dataset.ypPick); render(); document.querySelector('.yp')?.scrollIntoView({ behavior: 'smooth' }); return; }
   const j = e.target.closest('button[data-yp-jump]'); if (j) { const d = document.getElementById(j.dataset.ypJump); if (d) { d.open = true; d.scrollIntoView({ behavior: 'smooth' }); } return; }
   const b = e.target.closest('button[data-yp-copy]'); if (!b) return;
   const ok = await copyText(ytPipeText(b.dataset.ypCopy));
   toast(ok ? (b.dataset.ypCopy === 'research-chat' ? 'claude.ai 채팅에 붙여 넣으세요.' : b.dataset.ypCopy === 'download-term' ? '터미널에 붙여 넣으세요.' : 'Claude Code 새 대화에 붙여 넣으세요.') : '복사에 실패했어요.');
 });
-
-document.addEventListener('click', e => { const b = e.target.closest('button[data-yp-pick]'); if (!b) return; ytPipe.ideaId = b.dataset.ypPick; ytPipe.url = ytFirstUrl(ytPipeIdea()); ytPipe.ranges = ''; render(); document.querySelector('.yp')?.scrollIntoView({ behavior: 'smooth' }); });
