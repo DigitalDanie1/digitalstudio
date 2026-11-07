@@ -585,6 +585,12 @@ const WRESTLING_SOURCES = [
     note:'저항 밴드 브랜드 채널로, 레슬러·유도 선수의 밴드 보강 훈련 쇼츠를 올립니다(2026.11.07 확인). 훈련 장면과 도입 소재로 참고하되 제품 홍보 채널이므로 광고 문구는 쓰지 않고, 기술 설명은 다른 원본 자료로 확인합니다.',
     candidate:{title:'Practice ends. The grind doesn’t. 🤼‍♂️ #DopaBands',url:'https://www.youtube.com/shorts/M6hQGpI56fk',topic:'yt-wrestling-athletes',angle:'조회수 100만대 레슬러 훈련 쇼츠의 도입·편집 리듬을 참고합니다. 선수가 누구인지와 원본 출처는 추가 확인합니다.'},
   },
+  {
+    id:'coach', name:'레슬링코치', emoji:'🔥', url:'https://www.youtube.com/@Wrestling_coach/shorts',
+    role:'멋있는 기술 시범 · 한국어', topics:['yt-wrestling-technique','yt-wrestling-ufc'],
+    note:'레슬링 기술 시범 한국어 쇼츠 채널. 태클 카운터(약 1,200만 회), 슬라이드바이 풋스윕(약 100만 회), 안다리 안아던지기(약 58만 회)처럼 기술 하나를 짧게 반복해 보여주는 영상이 잘 됩니다(2026.11.07 확인). 기술 선정·반복 편집 참고용이며, 영상을 쓸 때는 몇 초만 쓰고 채널을 표기하거나 직접 시연으로 다시 찍습니다.',
+    candidate:{title:'레슬링 태클 카운터!',url:'https://www.youtube.com/shorts/eNVEKSW8Xgk',topic:'yt-wrestling-technique',angle:'조회수가 가장 높은 기술 쇼츠. 원속도 → 슬로우 → 원속도로 기술을 반복 노출하는 구성을 검토합니다.'},
+  },
 ];
 
 function wrestlingPromptSources(topicId) {
@@ -706,14 +712,29 @@ const YT_PRO_STARTERS = [
   { sid:'yt-l-kazakh', platform:'YouTube', ytFormat:'long', yt:'yt-wrestling-athletes', title:'카자흐스탄 레슬링과 전통 씨름 쿠레스', angle:'올림픽 레슬링과 전통 씨름이 어떻게 이어지는지.', hook:'0~15초 · 쿠레스 장면 → 국제 대회 장면', outline:['약속','파트1 쿠레스','파트2 카자흐 레슬링','파트3 한국 씨름과 비교','정리'], verify:['규칙·역사 출처 [확인 필요]'], sources:'https://www.youtube.com/@QAZSPORTTV' },
 ];
 PLATFORM_STARTERS.push(...YT_PRO_STARTERS);
+// 🔥 멋있는 기술 시리즈 (쇼츠, 기술 3번 반복)
+const YT_MOVE_STARTERS = [
+  { sid:'gt-tackle-counter', platform:'YouTube', ytFormat:'shorts', yt:'yt-wrestling-technique', title:'1,200만 명이 본 태클 카운터, 3번 보면 보인다', angle:'🔥 멋있는 기술 시리즈 · 태클 카운터를 3번 반복해서 보여준다: 원속도 → 슬로우+화살표 → 원속도.', hook:'0~2초 · 태클 카운터 원속도 장면 (설명 없이 기술부터)', outline:['① 0~2초 원속도: 태클 카운터 성공 장면','② 슬로우 0.5배 + 화살표: 상대 머리 위치와 내 엉덩이 빼기','② 슬로우 계속: 눌러서 뒤로 도는 방향','③ 원속도 한 번 더 → 마지막 프레임이 첫 장면으로 이어지게','자막 한 줄: 기술 이름 + "생활체육 스파링에서 쓸 때 주의"'], verify:['기술 정식 명칭','원 채널 표기 또는 직접 시연 재촬영','위험 기술이면 안전 경고 자막'], sources:'https://www.youtube.com/shorts/eNVEKSW8Xgk\nhttps://www.youtube.com/@Wrestling_coach/shorts' },
+  { sid:'gt-slide-foot-sweep', platform:'YouTube', ytFormat:'shorts', yt:'yt-wrestling-technique', title:'슬라이드바이에서 풋스윕까지 한 번에', angle:'🔥 멋있는 기술 시리즈 · 슬라이드바이 → 풋스윕 연결를 3번 반복해서 보여준다: 원속도 → 슬로우+화살표 → 원속도.', hook:'0~2초 · 슬라이드바이 → 풋스윕 연결 원속도 장면 (설명 없이 기술부터)', outline:['① 0~2초 원속도: 슬라이드바이 → 풋스윕 연결 성공 장면','② 슬로우 0.5배 + 화살표: 팔을 끌어 옆으로 빠지는 순간','② 슬로우 계속: 발목을 쓸어내는 타이밍','③ 원속도 한 번 더 → 마지막 프레임이 첫 장면으로 이어지게','자막 한 줄: 기술 이름 + "생활체육 스파링에서 쓸 때 주의"'], verify:['기술 정식 명칭','원 채널 표기 또는 직접 시연 재촬영','위험 기술이면 안전 경고 자막'], sources:'https://www.youtube.com/shorts/w4shWBS1-RM\nhttps://www.youtube.com/@Wrestling_coach/shorts' },
+  { sid:'gt-inner-trip-throw', platform:'YouTube', ytFormat:'shorts', yt:'yt-wrestling-technique', title:'안다리 걸고 안아던지기', angle:'🔥 멋있는 기술 시리즈 · 안다리 안아던지기를 3번 반복해서 보여준다: 원속도 → 슬로우+화살표 → 원속도.', hook:'0~2초 · 안다리 안아던지기 원속도 장면 (설명 없이 기술부터)', outline:['① 0~2초 원속도: 안다리 안아던지기 성공 장면','② 슬로우 0.5배 + 화살표: 다리를 거는 위치','② 슬로우 계속: 허리를 붙이고 넘기는 방향','③ 원속도 한 번 더 → 마지막 프레임이 첫 장면으로 이어지게','자막 한 줄: 기술 이름 + "생활체육 스파링에서 쓸 때 주의"'], verify:['기술 정식 명칭','원 채널 표기 또는 직접 시연 재촬영','위험 기술이면 안전 경고 자막'], sources:'https://www.youtube.com/shorts/d01kOBXyEPQ\nhttps://www.youtube.com/@Wrestling_coach/shorts' },
+  { sid:'gt-makhachev-hip', platform:'YouTube', ytFormat:'shorts', yt:'yt-wrestling-ufc', title:'마카체프가 쓰는 엉치걸이', angle:'🔥 멋있는 기술 시리즈 · 엉치걸이를 3번 반복해서 보여준다: 원속도 → 슬로우+화살표 → 원속도. UFC 장면은 몇 초만, 경기 정보 확인.', hook:'0~2초 · 엉치걸이 원속도 장면 (설명 없이 기술부터)', outline:['① 0~2초 원속도: 엉치걸이 성공 장면','② 슬로우 0.5배 + 화살표: 다리를 거는 각도','② 슬로우 계속: 체중을 싣는 방향','③ 원속도 한 번 더 → 마지막 프레임이 첫 장면으로 이어지게','자막 한 줄: 기술 이름 + "생활체육 스파링에서 쓸 때 주의"'], verify:['기술 정식 명칭','원 채널 표기 또는 직접 시연 재촬영','위험 기술이면 안전 경고 자막'], sources:'https://www.youtube.com/shorts/7iHEi0Jszu8\nhttps://www.youtube.com/@Wrestling_coach/shorts' },
+  { sid:'gt-lateral-drop', platform:'YouTube', ytFormat:'shorts', yt:'yt-wrestling-technique', title:'태클 막고 바로 레터럴 드랍', angle:'🔥 멋있는 기술 시리즈 · 태클 방어 후 레터럴 드랍를 3번 반복해서 보여준다: 원속도 → 슬로우+화살표 → 원속도.', hook:'0~2초 · 태클 방어 후 레터럴 드랍 원속도 장면 (설명 없이 기술부터)', outline:['① 0~2초 원속도: 태클 방어 후 레터럴 드랍 성공 장면','② 슬로우 0.5배 + 화살표: 언더훅·오버훅 잡는 손','② 슬로우 계속: 옆으로 떨어지는 축','③ 원속도 한 번 더 → 마지막 프레임이 첫 장면으로 이어지게','자막 한 줄: 기술 이름 + "생활체육 스파링에서 쓸 때 주의"'], verify:['기술 정식 명칭','원 채널 표기 또는 직접 시연 재촬영','위험 기술이면 안전 경고 자막'], sources:'https://www.youtube.com/shorts/UIvnJmrgBnw\nhttps://www.youtube.com/@Wrestling_coach/shorts' },
+  { sid:'gt-neck-escape', platform:'YouTube', ytFormat:'shorts', yt:'yt-wrestling-technique', title:'목 잡혔을 때 바로 쓰는 반격', angle:'🔥 멋있는 기술 시리즈 · 목 잡혔을 때 반격를 3번 반복해서 보여준다: 원속도 → 슬로우+화살표 → 원속도.', hook:'0~2초 · 목 잡혔을 때 반격 원속도 장면 (설명 없이 기술부터)', outline:['① 0~2초 원속도: 목 잡혔을 때 반격 성공 장면','② 슬로우 0.5배 + 화살표: 손을 떼어내는 방향','② 슬로우 계속: 자세를 뒤집는 순간','③ 원속도 한 번 더 → 마지막 프레임이 첫 장면으로 이어지게','자막 한 줄: 기술 이름 + "생활체육 스파링에서 쓸 때 주의"'], verify:['기술 정식 명칭','원 채널 표기 또는 직접 시연 재촬영','위험 기술이면 안전 경고 자막'], sources:'https://www.youtube.com/shorts/dRi-lzrOkx0\nhttps://www.youtube.com/@Wrestling_coach/shorts' },
+  { sid:'gt-blast-double', platform:'YouTube', ytFormat:'shorts', yt:'yt-wrestling-technique', title:'블라스트 더블렉: 폭발하듯 들어가기', angle:'🔥 멋있는 기술 시리즈 · 블라스트 더블렉를 3번 반복해서 보여준다: 원속도 → 슬로우+화살표 → 원속도.', hook:'0~2초 · 블라스트 더블렉 원속도 장면 (설명 없이 기술부터)', outline:['① 0~2초 원속도: 블라스트 더블렉 성공 장면','② 슬로우 0.5배 + 화살표: 무릎을 내리는 깊이','② 슬로우 계속: 머리와 어깨로 미는 방향','③ 원속도 한 번 더 → 마지막 프레임이 첫 장면으로 이어지게','자막 한 줄: 기술 이름 + "생활체육 스파링에서 쓸 때 주의"'], verify:['기술 정식 명칭','원 채널 표기 또는 직접 시연 재촬영','위험 기술이면 안전 경고 자막'], sources:'https://www.youtube.com/shorts/Fn1HMRQEg6w\nhttps://www.youtube.com/@Wrestling_coach/shorts' },
+  { sid:'gt-seoi-nage', platform:'YouTube', ytFormat:'shorts', yt:'yt-wrestling-athletes', title:'피지컬100 선수의 업어치기', angle:'🔥 멋있는 기술 시리즈 · 업어치기를 3번 반복해서 보여준다: 원속도 → 슬로우+화살표 → 원속도. 출연 선수 이름은 원 영상 기준으로 확인.', hook:'0~2초 · 업어치기 원속도 장면 (설명 없이 기술부터)', outline:['① 0~2초 원속도: 업어치기 성공 장면','② 슬로우 0.5배 + 화살표: 등을 돌려 들어가는 발','② 슬로우 계속: 허리로 띄우는 순간','③ 원속도 한 번 더 → 마지막 프레임이 첫 장면으로 이어지게','자막 한 줄: 기술 이름 + "생활체육 스파링에서 쓸 때 주의"'], verify:['기술 정식 명칭','원 채널 표기 또는 직접 시연 재촬영','위험 기술이면 안전 경고 자막'], sources:'https://www.youtube.com/shorts/ZDIheMXqf6c\nhttps://www.youtube.com/@Wrestling_coach/shorts' },
+  { sid:'gt-hip-toss', platform:'YouTube', ytFormat:'shorts', yt:'yt-wrestling-technique', title:'레슬링 허리후리기', angle:'🔥 멋있는 기술 시리즈 · 허리후리기를 3번 반복해서 보여준다: 원속도 → 슬로우+화살표 → 원속도.', hook:'0~2초 · 허리후리기 원속도 장면 (설명 없이 기술부터)', outline:['① 0~2초 원속도: 허리후리기 성공 장면','② 슬로우 0.5배 + 화살표: 허리를 붙이는 위치','② 슬로우 계속: 돌리는 축','③ 원속도 한 번 더 → 마지막 프레임이 첫 장면으로 이어지게','자막 한 줄: 기술 이름 + "생활체육 스파링에서 쓸 때 주의"'], verify:['기술 정식 명칭','원 채널 표기 또는 직접 시연 재촬영','위험 기술이면 안전 경고 자막'], sources:'https://www.youtube.com/shorts/jV4Ht8r8ywc\nhttps://www.youtube.com/@Wrestling_coach/shorts' },
+  { sid:'gt-greco-suplex', platform:'YouTube', ytFormat:'shorts', yt:'yt-wrestling-highlights', title:'그레코로만 수플렉스: 사람을 뒤로 던지는 기술', angle:'🔥 멋있는 기술 시리즈 · 그레코로만 수플렉스를 3번 반복해서 보여준다: 원속도 → 슬로우+화살표 → 원속도. 공식 대회 장면(UWW) 우선, 위험 기술이라 따라 하지 말라는 자막.', hook:'0~2초 · 그레코로만 수플렉스 원속도 장면 (설명 없이 기술부터)', outline:['① 0~2초 원속도: 그레코로만 수플렉스 성공 장면','② 슬로우 0.5배 + 화살표: 허리를 감는 손','② 슬로우 계속: 뒤로 아치를 그리는 몸','③ 원속도 한 번 더 → 마지막 프레임이 첫 장면으로 이어지게','자막 한 줄: 기술 이름 + "생활체육 스파링에서 쓸 때 주의"'], verify:['기술 정식 명칭','원 채널 표기 또는 직접 시연 재촬영','위험 기술이면 안전 경고 자막'], sources:'https://www.youtube.com/@unitedworldwrestling' },
+];
+PLATFORM_STARTERS.push(...YT_MOVE_STARTERS);
 PLATFORM_STARTERS.push(...YT_MORE_STARTERS);
-const YT_FORMAT_TEXT = { shorts:'쇼츠 15~60초 · 1.5초 훅 → 컷 하나에 정보 하나 → 첫 장면으로 이어지는 마무리', long:'롱폼 8~12분 · 15초 훅 → 약속 → 열린 고리 있는 파트 3~5개 → 정리' };
+const YT_REPEAT = '멋있는 기술 장면은 3번: ① 0~2초 원속도로 먼저 → ② 설명하며 0.5배 슬로우+화살표 → ③ 끝에 원속도로 한 번 더, 마지막 프레임이 첫 장면으로 이어져 다시 보게';
+const YT_FORMAT_TEXT = { shorts:'쇼츠 15~60초 · 멋있는 기술 3번 반복(원속도 → 슬로우+화살표 → 원속도) · 끝이 첫 장면으로 이어지게', long:'롱폼 8~12분 · 15초 훅 → 약속 → 열린 고리 있는 파트 3~5개 → 정리' };
 function ytFormatOf(i) { return i && i.ytFormat === 'long' ? 'long' : 'shorts'; }
-const PLATFORM_SEED_VERSION = 4;
+const PLATFORM_SEED_VERSION = 5;
 let ideaPlatformFilter = 'all';
 
 function platformStarterNote(s) {
-  return `[플랫폼 시작 소재 · ${s.platform}${s.ytFormat ? (s.ytFormat === 'long' ? ' 롱폼' : ' 쇼츠') : ''} · 사실 확인 전 아이디어]\n형식: ${s.ytFormat ? YT_FORMAT_TEXT[s.ytFormat] : PLATFORM_FORMAT[s.platform]}\n각도: ${s.angle}\n훅: ${s.hook}\n\n구성\n${s.outline.map(x => '- ' + x).join('\n')}\n\n확인할 것\n${s.verify.map(x => '- ' + x).join('\n')}`;
+  return `${s.sid && s.sid.startsWith('gt-') ? '[🔥 멋있는 기술 시리즈 · ' + YT_REPEAT + ']\n' : ''}[플랫폼 시작 소재 · ${s.platform}${s.ytFormat ? (s.ytFormat === 'long' ? ' 롱폼' : ' 쇼츠') : ''} · 사실 확인 전 아이디어]\n형식: ${s.ytFormat ? YT_FORMAT_TEXT[s.ytFormat] : PLATFORM_FORMAT[s.platform]}\n각도: ${s.angle}\n훅: ${s.hook}\n\n구성\n${s.outline.map(x => '- ' + x).join('\n')}\n\n확인할 것\n${s.verify.map(x => '- ' + x).join('\n')}`;
 }
 function ensurePlatformStarters() {
   if (!db || !Array.isArray(db.ideas) || (db.platformSeedVersion || 0) >= PLATFORM_SEED_VERSION) return;
@@ -765,7 +786,7 @@ document.addEventListener('change', event => {
 
 // ===== 기획 화면 단순화: 플랫폼 하나 = ① 주제 ② 제작 방법 ③ 잘 만드는 법 =====
 const PLATFORM_PLAYBOOK = {
-  'YouTube': { role:'생활체육인을 위한 레슬링 쇼츠·롱폼', make:['레슬링 소스에서 분석할 장면 3~5개 고르기','🔎 자료조사 프롬프트로 선수·기록·규정 출처 확인','질문 하나·결론 하나로 해설 대본 쓰기','내 목소리로 해설 영상(5~10분) 녹화','Vizard·OpusClip으로 쇼츠 쪼개기 → 캡컷 자막 템플릿','YouTube Studio에 업로드'], good:['첫 3초에 질문이나 결정적 장면','원본 경기는 몇 초만, 중심은 내 해설','자막은 크게, 화면 위쪽 중앙','끝은 다음 영상으로 이어지는 질문'], metric:'시청 지속 시간' },
+  'YouTube': { role:'생활체육인을 위한 레슬링 쇼츠·롱폼', make:['레슬링 소스에서 분석할 장면 3~5개 고르기','🔎 자료조사 프롬프트로 선수·기록·규정 출처 확인','질문 하나·결론 하나로 해설 대본 쓰기','내 목소리로 해설 영상(5~10분) 녹화','Vizard·OpusClip으로 쇼츠 쪼개기 → 캡컷 자막 템플릿','YouTube Studio에 업로드'], good:['멋있는 기술은 3번 반복: 원속도 → 슬로우+화살표 → 원속도','첫 3초에 질문이나 결정적 장면','원본 경기는 몇 초만, 중심은 내 해설','자막은 크게, 화면 위쪽 중앙','끝은 다음 영상으로 이어지는 질문'], metric:'시청 지속 시간' },
   '네이버 블로그': { role:'검색으로 찾아오는 상세 원문', make:['독자가 검색할 질문을 제목으로','FIELDNOTE 블로그 원고: 소제목 3개 + 직접 경험 + 출처','직접 찍은 사진 또는 Canva 설명 이미지','네이버 에디터에 붙이고 카테고리 지정'], good:['제목에 검색어를 그대로','첫 문단에 답부터','직접 찍은 사진 1장 이상','출처와 확인 날짜 표기'], metric:'검색 유입어' },
   'X': { role:'관점과 근거를 빠르게', make:['블로그·영상에서 주장 하나 뽑기','첫 글 주장 → 근거 2~3개 → 출처 순 스레드','필요하면 설명 이미지 한 장','X에서 게시'], good:['첫 글만 읽어도 이해되게','글 하나에 생각 하나','숫자와 출처로 신뢰','마지막 글에 블로그 링크'], metric:'북마크·프로필 방문' },
   'Telegram': { role:'구독자용 정기 요약', make:['이번 주 소재 3개 고르기','제목 + 핵심 3줄 + 내 해석 + 원문 링크','Telegram 데스크톱으로 채널 게시'], good:['매주 같은 요일, 같은 틀','중요한 변화부터','링크는 원문으로','길어지면 블로그로 보내기'], metric:'조회·전달 수' },
@@ -953,8 +974,8 @@ let ytPipe = { ideaId: '', url: '', ranges: '', format: 'shorts' };
 const YT_AUDIENCE = '레슬링·주짓수·MMA를 취미로 하는 생활체육인(20~40대 직장인, 입문~중급)';
 function ytFolder(t) { return String(t || '새 주제').replace(/[\\/:*?"<>|#%&{}$!'`@+=]/g, '').replace(/\s+/g, ' ').trim().slice(0, 40) || '새 주제'; }
 function ytFmtIdeas(f) { return db.ideas.filter(i => ideaPlatform(i) === 'YouTube' && (!f || ytFormatOf(i) === f)).sort((a, b) => ytRank(a) - ytRank(b) || (b.created || 0) - (a.created || 0)); }
-// 순서: 직접 만든 주제 → 생활체육인 주제 → 예전 프로 경기 주제
-function ytRank(i) { const id = String(i.id); return !id.startsWith('pf-starter-') ? 0 : /^pf-starter-g[sl]-/.test(id) ? 1 : 2; }
+// 순서: 직접 만든 주제 → 🔥 멋있는 기술 → 생활체육인 → 프로 경기
+function ytRank(i) { const id = String(i.id); return !id.startsWith('pf-starter-') ? 0 : /^pf-starter-gt-/.test(id) ? 1 : /^pf-starter-g[sl]-/.test(id) ? 2 : 3; }
 function ytPipeIdea() { const list = ytFmtIdeas(ytPipe.format); return list.find(i => i.id === ytPipe.ideaId) || list[0] || null; }
 function ytFirstUrl(i) { const m = String(i?.sources || '').match(/https?:\/\/(?:www\.)?(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)[\w-]+[^\s]*/); return m ? m[0] : ''; }
 function ytRanges() { return ytPipe.ranges.split(/[,\s]+/).map(x => x.trim()).filter(x => /^\d{1,2}(:\d{2}){1,2}-\d{1,2}(:\d{2}){1,2}$/.test(x)); }
@@ -966,10 +987,10 @@ function ytPipeText(kind) {
     case 'download': return `/yt-source-download ${url} ${rg.length ? rg.join(' ') : '<시작-끝 예: 0:30-0:45>'} 주제:${dir}`;
     case 'download-term': return `mkdir -p ${D.replace(dir, `"${dir}"`)}/원본 && yt-dlp -f "bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b" --merge-output-format mp4 ${(rg.length ? rg : ['0:00-0:15']).map(r => `--download-sections "*${r}"`).join(' ')} --force-keyframes-at-cuts -o ${D.replace(dir, `"${dir}"`)}/원본/"%(channel)s_%(id)s_%(section_start)s.%(ext)s" "${url}"`;
     case 'script': return sh
-      ? `/shorts-blueprint ${title} — 길이 45초, 소스: ${D}/원본/ 클립에서 뽑기(sources.md 참고), 시청자: ${YT_AUDIENCE}, 말투: 친구에게 말하듯. 사실은 ${D}/research.md 의 A·B 등급만 쓰고, 결과를 ${D}/편집/대본.md 로 저장해줘`
+      ? `/shorts-blueprint ${title} — 길이 45초, 소스: ${D}/원본/ 클립에서 뽑기(sources.md 참고), 시청자: ${YT_AUDIENCE}, 말투: 친구에게 말하듯. 반복 구조 필수 — ${YT_REPEAT}. 사실은 ${D}/research.md 의 A·B 등급만 쓰고, 결과를 ${D}/편집/대본.md 로 저장해줘`
       : `/hook-first-script ${title} — 길이 8~12분, 시청자: ${YT_AUDIENCE}, 말투: 친구에게 말하듯, 자료: ${D}/research.md (A·B 등급만, 나머지는 자료 확인 필요 목록으로). 원본 경기 장면은 몇 초씩만 쓰는 해설 영상이야. 결과를 ${D}/편집/대본.md 로 저장해줘`;
-    case 'plan': return `/edit-plan-sheet ${D} — 대본: 편집/대본.md, 클립: 원본/ (sources.md 참고), 형식: ${sh ? '세로 쇼츠 45초' : '가로 롱폼 10분'}, 분위기: ${sh ? '빠름' : '다큐'}. 결과를 ${D}/편집/편집계획표.md 로 저장해줘`;
-    case 'rough': return `/rough-cut ${dir} 형식:${sh ? '세로' : '가로'}`;
+    case 'plan': return `/edit-plan-sheet ${D} — 대본: 편집/대본.md, 클립: 원본/ (sources.md 참고), 형식: ${sh ? '세로 쇼츠 45초' : '가로 롱폼 10분'}, 분위기: ${sh ? '빠름' : '다큐'}.${sh ? ' 컷 리스트에 기술 반복 3구간(원속도 → 0.5배 슬로우+화살표 → 원속도)을 표시하고 마지막 컷이 첫 컷으로 이어지게.' : ''} 결과를 ${D}/편집/편집계획표.md 로 저장해줘`;
+    case 'rough': return `/rough-cut ${dir} 형식:${sh ? '세로 반복:3' : '가로'}`;
     case 'upload': return `/upload-pack-maker ${dir} — ${sh ? '쇼츠' : '롱폼'}. 대본: ${D}/편집/대본.md, 시청자: ${YT_AUDIENCE}. 설명란에 ${D}/sources.md 의 원본 채널·영상 제목·URL·사용 구간과 "경기 장면은 해설·분석 목적으로 일부만 사용했습니다"를 넣고, 결과를 ${D}/업로드/업로드팩.md 로 저장해줘`;
   }
   return '';
@@ -986,7 +1007,7 @@ const YT_SKILLS = [
 ];
 const YT_PIPELINE = [
   { title:'자료조사', what:'선수·대회·기록·규정을 찾아 출처 등급을 붙이고, 핵심 사실은 2곳 이상에서 교차 확인합니다.', out:'research.md', skills:[['자료조사', 'research']], chat:true },
-  { title:'소스 다운로드', what:'필요한 장면만 구간으로 받습니다. 한 구간 15초 이하, 출처는 sources.md에 자동 기록됩니다.', out:'원본/ 클립 + sources.md', skills:[['구간 다운로드', 'download']], inputs:true, links:[['레슬링 소스 채널 11곳', '#ytSources']] },
+  { title:'소스 다운로드', what:'필요한 장면만 구간으로 받습니다. 한 구간 15초 이하, 출처는 sources.md에 자동 기록됩니다.', out:'원본/ 클립 + sources.md', skills:[['구간 다운로드', 'download']], inputs:true, links:[['레슬링 소스 채널 ' + WRESTLING_SOURCES.length + '곳', '#ytSources']] },
   { title:'편집', what:'대본 → 편집 계획표 → 러프컷 순서. 마지막에 캡컷에서 내 목소리 해설과 화살표·멈춤 화면을 얹습니다.', out:'대본.md · 편집계획표.md · 러프컷 · 자막.srt', skills:[['① 대본', 'script'], ['② 편집 계획표', 'plan'], ['③ 러프컷', 'rough']], links:[['캡컷', 'https://www.capcut.com/'], ['Vrew', 'https://vrew.ai/'], ['Vizard', 'https://vizard.ai/', 'long'], ['OpusClip', 'https://www.opus.pro/', 'long']] },
   { title:'업로드', what:'제목·설명란(출처 포함)·태그·썸네일을 만들고, 확인 후 YouTube Studio에 올린 뒤 게시 확인에 링크를 남깁니다.', out:'업로드팩.md', skills:[['업로드 패키지', 'upload']], links:[['YouTube Studio', 'https://studio.youtube.com/'], ['구글 Flow (썸네일)', 'https://labs.google/fx/tools/flow', 'long']], publish:true },
 ];
