@@ -610,6 +610,7 @@ function wrestlingSourceLibrary() {
         <details><summary>🎬 검토할 영상</summary><p><a href="${esc(source.candidate.url)}" target="_blank" rel="noopener noreferrer">${esc(source.candidate.title)} ↗</a></p><p class="small">${esc(source.candidate.angle)}</p></details>
         <div class="actions"><a class="btn" href="${esc(source.url)}" target="_blank" rel="noopener noreferrer">채널 열기 ↗</a>
         ${source.wrestlingUrl?`<a class="btn" href="${esc(source.wrestlingUrl)}" target="_blank" rel="noopener noreferrer">🤼 레슬링 영상만 보기</a>`:''}
+        <button class="btn primary" data-yp-src="${esc(source.candidate.url)}">⬇ 제작 라인에서 받기</button>
         <button class="btn" data-wrestling-source="${source.id}" ${registered?'disabled':''}>${registered?'소재함에 등록됨':'검토 소재로 등록'}</button></div></article>`;
     }).join('')}</section>`;
 }
@@ -920,8 +921,7 @@ function platformPage(c) {
     const group = f => { const l = ytFmtIdeas(f); return `<div class="yt-fmt-group ${f}"><h4>${f === 'long' ? '🎬 롱폼' : '📱 쇼츠'} <em>${l.length}</em><span>${esc(YT_FORMAT_TEXT[f])}</span></h4>${l.length ? `<ul class="ps-topics">${l.map(ytTopic).join('')}</ul>` : '<p class="small">아직 없습니다.</p>'}</div>`; };
     board = board.replace(/<div class="ps-col"><h3><span>①<\/span> 주제 <em>\d+<\/em><\/h3>[\s\S]*?<\/div>\s*<div class="ps-col"><h3><span>②/, `<div class="ps-col"><h3><span>①</span> 주제 <em>${ideas.length}</em></h3><div class="yt-fmt-groups">${group('shorts')}${group('long')}</div></div>\n    <div class="ps-col"><h3><span>②`);
     const ytBoard = board.replace(/<div class="ps-col"><h3><span>②<\/span> 제작 방법<\/h3>[\s\S]*?<\/div>\s*<div class="ps-col"><h3><span>③/, '<div class="ps-col"><h3><span>③').replace('<div class="ps-cols">', '<div class="ps-cols ps-cols2">');
-    const src = `<details class="panel pf-extra" id="ytSources"><summary>📚 레슬링 소스 채널 <span class="small">${WRESTLING_SOURCES.length}곳 · 소스 다운로드 단계에서 씀</span></summary>${wrestlingSourceLibrary()}<div class="actions" style="margin-top:12px"><button class="btn ghost" data-workflow="import">쇼츠 백업 가져오기</button></div></details>`;
-    return hero + ytPipeline() + ytBoard + src + drafts + toolSec;
+    return hero + ytPipeline() + ytBoard + drafts + toolSec;
   }
   return hero + board + drafts + toolSec;
 }
@@ -1007,7 +1007,7 @@ const YT_SKILLS = [
 ];
 const YT_PIPELINE = [
   { title:'자료조사', what:'선수·대회·기록·규정을 찾아 출처 등급을 붙이고, 핵심 사실은 2곳 이상에서 교차 확인합니다.', out:'research.md', skills:[['자료조사', 'research']], chat:true },
-  { title:'소스 다운로드', what:'필요한 장면만 구간으로 받습니다. 한 구간 15초 이하, 출처는 sources.md에 자동 기록됩니다.', out:'원본/ 클립 + sources.md', skills:[['구간 다운로드', 'download']], inputs:true, links:[['레슬링 소스 채널 ' + WRESTLING_SOURCES.length + '곳', '#ytSources']] },
+  { title:'소스 다운로드', what:'필요한 장면만 구간으로 받습니다. 한 구간 15초 이하, 출처는 sources.md에 자동 기록됩니다.', out:'원본/ 클립 + sources.md', skills:[['구간 다운로드', 'download']], inputs:true, links:[['레슬링 소스 ' + WRESTLING_SOURCES.length + '곳', '@ytSources']] },
   { title:'편집', what:'대본 → 편집 계획표 → 러프컷 순서. 마지막에 캡컷에서 내 목소리 해설과 화살표·멈춤 화면을 얹습니다.', out:'대본.md · 편집계획표.md · 러프컷 · 자막.srt', skills:[['① 대본', 'script'], ['② 편집 계획표', 'plan'], ['③ 러프컷', 'rough']], links:[['캡컷', 'https://www.capcut.com/'], ['Vrew', 'https://vrew.ai/'], ['Vizard', 'https://vizard.ai/', 'long'], ['OpusClip', 'https://www.opus.pro/', 'long']] },
   { title:'업로드', what:'제목·설명란(출처 포함)·태그·썸네일을 만들고, 확인 후 YouTube Studio에 올린 뒤 게시 확인에 링크를 남깁니다.', out:'업로드팩.md', skills:[['업로드 패키지', 'upload']], links:[['YouTube Studio', 'https://studio.youtube.com/'], ['구글 Flow (썸네일)', 'https://labs.google/fx/tools/flow', 'long']], publish:true },
 ];
@@ -1024,7 +1024,7 @@ function ytPipeline() {
     <div class="yp-skills">${st.skills.map(skillRow).join('')}
       ${st.chat ? '<button class="btn ghost" data-yp-copy="research-chat">claude.ai 채팅용으로 복사</button>' : ''}
       ${st.inputs ? '<details class="yp-term"><summary>터미널 명령으로 직접</summary><code data-yp-cmd="download-term">' + esc(ytPipeText('download-term')) + '</code><button class="btn ghost" data-yp-copy="download-term">터미널 명령 복사</button></details>' : ''}</div>
-    <div class="yp-tools">${(st.links || []).filter(l => !l[2] || l[2] === ytPipe.format).map(([l, u]) => u.startsWith('#') ? `<button class="linkbtn" data-yp-jump="${u.slice(1)}">${esc(l)} ↓</button>` : `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(l)} ↗</a>`).join('')}${st.publish ? '<button class="linkbtn" data-view="publish">게시 확인 →</button>' : ''}</div>
+    <div class="yp-tools">${(st.links || []).filter(l => !l[2] || l[2] === ytPipe.format).map(([l, u]) => u.startsWith('@') ? `<button class="linkbtn" data-view="${u.slice(1)}">${esc(l)} →</button>` : u.startsWith('#') ? `<button class="linkbtn" data-yp-jump="${u.slice(1)}">${esc(l)} ↓</button>` : `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(l)} ↗</a>`).join('')}${st.publish ? '<button class="linkbtn" data-view="publish">게시 확인 →</button>' : ''}</div>
   </li>`;
   return `<section class="yp" style="--pc:${platformColor('YouTube')}"><div class="yp-top"><h2>제작 라인 <span class="small">자료조사 → 소스 다운로드 → 편집 → 업로드 · ${sh ? '쇼츠 15~60초 세로' : '롱폼 8~12분 가로'}</span></h2>${sel}</div>
     <ol class="yp-stages">${YT_PIPELINE.map(card).join('')}</ol>
@@ -1056,4 +1056,17 @@ document.addEventListener('click', async e => {
   const b = e.target.closest('button[data-yp-copy]'); if (!b) return;
   const ok = await copyText(ytPipeText(b.dataset.ypCopy));
   toast(ok ? (b.dataset.ypCopy === 'research-chat' ? 'claude.ai 채팅에 붙여 넣으세요.' : b.dataset.ypCopy === 'download-term' ? '터미널에 붙여 넣으세요.' : 'Claude Code 새 대화에 붙여 넣으세요.') : '복사에 실패했어요.');
+});
+
+// ===== YouTube '소스' 탭: 내가 준 레슬링 소스 채널 전부 =====
+function ytSourcesPage() {
+  return head('YouTube 소스', `레슬링 소스 채널 ${WRESTLING_SOURCES.length}곳 · '⬇ 제작 라인에서 받기'를 누르면 그 영상이 소스 다운로드 칸에 들어갑니다`, false)
+    + wrestlingSourceLibrary()
+    + `<div class="actions" style="margin-top:14px"><button class="btn ghost" data-workflow="import">쇼츠 백업 가져오기</button></div>`;
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('button[data-yp-src]'); if (!b) return;
+  ytPipe.url = b.dataset.ypSrc; ytPipe.ranges = '';
+  navigate('youtube');
+  setTimeout(() => { document.querySelector('[data-yp-field="ranges"]')?.focus(); document.querySelectorAll('.yp-stage')[1]?.scrollIntoView({ behavior: 'smooth', block: 'center' }); toast('소스 다운로드 칸에 영상을 넣었어요. 구간을 적고 명령을 복사하세요.'); }, 50);
 });

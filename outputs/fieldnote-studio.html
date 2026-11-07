@@ -616,13 +616,13 @@ document.addEventListener('click',async e=>{
  }
 });
 
-const TITLES={common:'공통 원리',ytSkills:'YouTube 스킬',dashboard:'공통 원리',review:'검수함',ideas:'경험·소재함',settings:'설정·데이터',analytics:'키워드·주제',research:'공개 조사 결과',reach:'Reach 리서치',topics:'채널별 관심 주제',publish:'게시 확인',blogPlan:'블로그 기획',youtubePlan:'유튜브 기획',...Object.fromEntries(Object.entries(CH).map(([k,v])=>[k,v.name]))};
+const TITLES={common:'공통 원리',ytSkills:'YouTube 스킬',ytSources:'YouTube 소스',dashboard:'공통 원리',review:'검수함',ideas:'경험·소재함',settings:'설정·데이터',analytics:'키워드·주제',research:'공개 조사 결과',reach:'Reach 리서치',topics:'채널별 관심 주제',publish:'게시 확인',blogPlan:'블로그 기획',youtubePlan:'유튜브 기획',...Object.fromEntries(Object.entries(CH).map(([k,v])=>[k,v.name]))};
 const WORK_LINKS={dashboard:'전체 작업',review:'검수함',blog:'네이버 블로그',insta:'인스타그램',youtube:'유튜브'};
 const PLAN_LINKS={ideas:'소재함',blogPlan:'블로그',youtubePlan:'유튜브',topics:'관심 주제',analytics:'키워드·주제',research:'공개 조사',reach:'Reach 리서치'};
 const COMMON_LINKS={common:'공통 원리',topics:'관심 주제',analytics:'키워드·주제',research:'공개 조사',reach:'Reach 리서치'};
-const SUB_LINKS={common:COMMON_LINKS,youtube:{youtube:'작업판',ytSkills:'스킬',youtubePlan:'AI 주제 발굴'},blog:{blog:'작업판',blogPlan:'AI 글감 발굴'}};
+const SUB_LINKS={common:COMMON_LINKS,youtube:{youtube:'작업판',ytSources:'소스',ytSkills:'스킬',youtubePlan:'AI 주제 발굴'},blog:{blog:'작업판',blogPlan:'AI 글감 발굴'}};
 function workspaceSection(route){
-  if(route==='youtubePlan'||route==='ytSkills')return 'youtube';
+  if(route==='youtubePlan'||route==='ytSkills'||route==='ytSources')return 'youtube';
   if(route==='blogPlan')return 'blog';
   if(CH[route]||route==='publish'||route==='settings')return route;
   return 'common';
@@ -632,13 +632,13 @@ function workspaceNav(section){
   if(!links)return '';
   return `<nav class="filters workspace-nav" aria-label="${esc(TITLES[section]||section)} 메뉴">${Object.entries(links).map(([route,label])=>`<button class="filter ${view===route?'active':''}" data-view="${route}" ${view===route?'aria-current="page"':''}>${label}</button>`).join('')}</nav>`;
 }
-const ROUTES=['common','ytSkills','dashboard','review','ideas','analytics','research','reach','topics','publish','blogPlan','youtubePlan','settings',...Object.keys(CH)];
+const ROUTES=['common','ytSkills','ytSources','dashboard','review','ideas','analytics','research','reach','topics','publish','blogPlan','youtubePlan','settings',...Object.keys(CH)];
 function connectedCount(){return Object.keys(CH).filter(isConnected).length}
 /* Hash routing: #<view> or #edit/<postId>. render() keeps location.hash in sync with state. */
 function routeHash(){return editing?'#edit/'+encodeURIComponent(editing):'#'+view}
 function syncHash(replace){const h=routeHash();if(location.hash===h)return;if(replace){try{history.replaceState(null,'',h)}catch(_){location.hash=h}}else location.hash=h}
 function parseHash(h){h=String(h||'').replace(/^#/,'');if(h==='keywords')h='analytics';if(h==='overview')h='dashboard';if(h.startsWith('edit/')){let id=h.slice(5);try{id=decodeURIComponent(id)}catch(_){}const p=db.posts.find(p=>p.id===id);return p?{edit:id,view:p.channel}:{view:'dashboard'}}return {view:ROUTES.includes(h)?h:'dashboard'}}
-function render(){ensurePublish();if(view==='dashboard'||view==='ideas')view='common';const screen=editing?editor():view==='common'?commonPage():view==='ytSkills'?ytSkillsPage():view==='settings'?settings():view==='analytics'?analytics():view==='research'?publicResearch():view==='reach'?reachView():view==='topics'?topicsPage():view==='publish'?publishing():view==='blogPlan'?head('블로그 기획','카테고리별 글감을 발굴하고 초안으로 이어가세요.',false)+genPanel():view==='youtubePlan'?head('유튜브 기획','채널별 영상 주제를 발굴하고 대본으로 이어가세요.',false)+ytTabs()+ytPanel():CH[view]?platformPage(view):postList();const active=editing?(db.posts.find(p=>p.id===editing)?.channel||'common'):workspaceSection(view);document.querySelectorAll('.nav[data-view]').forEach(n=>{const selected=n.dataset.view===active;n.classList.toggle('active',selected);if(selected)n.setAttribute('aria-current','page');else n.removeAttribute('aria-current')});$('#breadcrumb').textContent=editing?'원고 편집':TITLES[view];$('.workspace').firstChild.textContent=db.profile.name;paintStorage();const n=connectedCount();$('#sideConn').textContent=n?`발행 브리지 ${n}/${Object.keys(CH).length} 설정됨`:'외부 계정 · 연결 안 됨';$('#content').innerHTML=(editing?'':workspaceNav(active))+screen+`<footer class="footer"><span>FIELDNOTE STUDIO / LOCAL EDITION</span><span>${view==='publish'&&!editing?'승인은 당신이, 게시 권한은 플랫폼이.':'경험은 당신에게서, 근거는 원문에서.'}</span></footer>`;syncHash(false)}
+function render(){ensurePublish();if(view==='dashboard'||view==='ideas')view='common';const screen=editing?editor():view==='common'?commonPage():view==='ytSkills'?ytSkillsPage():view==='ytSources'?ytSourcesPage():view==='settings'?settings():view==='analytics'?analytics():view==='research'?publicResearch():view==='reach'?reachView():view==='topics'?topicsPage():view==='publish'?publishing():view==='blogPlan'?head('블로그 기획','카테고리별 글감을 발굴하고 초안으로 이어가세요.',false)+genPanel():view==='youtubePlan'?head('유튜브 기획','채널별 영상 주제를 발굴하고 대본으로 이어가세요.',false)+ytTabs()+ytPanel():CH[view]?platformPage(view):postList();const active=editing?(db.posts.find(p=>p.id===editing)?.channel||'common'):workspaceSection(view);document.querySelectorAll('.nav[data-view]').forEach(n=>{const selected=n.dataset.view===active;n.classList.toggle('active',selected);if(selected)n.setAttribute('aria-current','page');else n.removeAttribute('aria-current')});$('#breadcrumb').textContent=editing?'원고 편집':TITLES[view];$('.workspace').firstChild.textContent=db.profile.name;paintStorage();const n=connectedCount();$('#sideConn').textContent=n?`발행 브리지 ${n}/${Object.keys(CH).length} 설정됨`:'외부 계정 · 연결 안 됨';$('#content').innerHTML=(editing?'':workspaceNav(active))+screen+`<footer class="footer"><span>FIELDNOTE STUDIO / LOCAL EDITION</span><span>${view==='publish'&&!editing?'승인은 당신이, 게시 권한은 플랫폼이.':'경험은 당신에게서, 근거는 원문에서.'}</span></footer>`;syncHash(false)}
 function canLeave(){if(!dirty)return true;if(!confirm('저장하지 않은 수정이 있습니다. 버리고 이동할까요?'))return false;if(editing){clearTimeout(draftTimer);draftDel(editing)}return true}
 function closeSidebar(){$('#sidebar').classList.remove('open')}
 function navigate(v){if(!canLeave())return;view=v;editing=null;dirty=false;filter='all';query='';closeSidebar();render();window.scrollTo(0,0)}
