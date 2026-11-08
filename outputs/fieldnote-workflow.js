@@ -591,6 +591,12 @@ const WRESTLING_SOURCES = [
     note:'레슬링 기술 시범 한국어 쇼츠 채널. 태클 카운터(약 1,200만 회), 슬라이드바이 풋스윕(약 100만 회), 안다리 안아던지기(약 58만 회)처럼 기술 하나를 짧게 반복해 보여주는 영상이 잘 됩니다(2026.11.07 확인). 기술 선정·반복 편집 참고용이며, 영상을 쓸 때는 몇 초만 쓰고 채널을 표기하거나 직접 시연으로 다시 찍습니다.',
     candidate:{title:'레슬링 태클 카운터!',url:'https://www.youtube.com/shorts/eNVEKSW8Xgk',topic:'yt-wrestling-technique',angle:'조회수가 가장 높은 기술 쇼츠. 원속도 → 슬로우 → 원속도로 기술을 반복 노출하는 구성을 검토합니다.'},
   },
+  {
+    id:'wrestletown', name:'WrestleTownUSA', emoji:'🏋️', url:'https://www.youtube.com/@WrestletownUSA/shorts',
+    role:'대학 레슬링 훈련·체력·코치 기술', topics:['yt-wrestling-technique','yt-wrestling-athletes'],
+    note:'아이오와 대학 레슬링(Hawkeyes) 연습 현장, 선수 체력 서킷, Terry Brands 코치 기술 세션 쇼츠(2026.11.08 확인). 생활체육인용 체력 루틴·기술 교정 주제의 소스로 좋습니다. 영상은 몇 초만 쓰고 채널을 표기합니다.',
+    candidate:{title:'Terry Brands Breaks Down How to Improve Your Wrestling',url:'https://www.youtube.com/shorts/kzj3qy5EgyM',topic:'yt-wrestling-technique',angle:'코치가 기술을 교정하는 장면. 생활체육인이 바로 가져갈 교정 포인트 하나로 해설합니다. 체력 서킷 영상(T4_aM6F69I4)은 체력 루틴 주제에 씁니다.'},
+  },
 ];
 
 function wrestlingPromptSources(topicId) {
