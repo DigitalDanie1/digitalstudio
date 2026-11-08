@@ -82,6 +82,33 @@
 .sk-head{display:flex;justify-content:space-between;gap:8px;font-size:13px}.sk-stage{color:#ff6b6b;font-weight:700}.sk-by{color:var(--muted)}.sk-by.own{color:var(--lime)}
 .sk-where{font-size:13px!important;color:var(--green)}.sk-card code{display:block;font-size:12.5px;line-height:1.5;background:#0b0d10;border:1px solid var(--line);border-radius:8px;padding:8px 10px;white-space:pre-wrap;word-break:break-all;color:#cfd5de;max-height:130px;overflow:auto;margin-top:auto}
 .sk-how{margin-top:18px}.sk-how ol{margin:0;padding-left:20px}.sk-how li{margin-bottom:8px}
+
+/* ===== 음악 · 음성 가이드 ===== */
+.ya{margin:0 0 18px;border-top:3px solid var(--pc)}
+.ya-start{margin:0 0 14px;padding:10px 14px;border-radius:10px;background:color-mix(in srgb,var(--lime) 8%,var(--panel2));font-size:15px}.ya-start b{color:var(--lime);margin-right:10px}
+.ya-cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.ya-col{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:14px}.ya-col h3{margin:0 0 4px;font-size:18px}.ya-col ul{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:10px}
+.ya-col li{border-top:1px solid var(--line);padding-top:8px}.ya-col li.ya-top{border-top:0;padding:8px 10px;border-radius:8px;background:color-mix(in srgb,var(--pc) 9%,transparent)}
+.ya-name{display:flex;justify-content:space-between;gap:8px;align-items:baseline}.ya-name a{color:var(--text);font-weight:650}.ya-col li p{margin:4px 0 0;font-size:14px;color:#c4c9d2}
+.ya-bottom{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px}.ya-bottom h3{margin:0 0 8px;font-size:17px}
+.ya-tl{list-style:none;margin:0;padding:0;display:grid;gap:6px}.ya-tl li{display:flex;gap:12px;padding:8px 12px;border-left:3px solid var(--pc);background:var(--panel2);border-radius:0 8px 8px 0;font-size:15px}.ya-tl b{min-width:78px;color:var(--pc)}
+.ya-rules{margin:0;padding-left:20px;font-size:15px}.ya-rules li{margin-bottom:6px}
+@media(max-width:1000px){.ya-cols,.ya-bottom{grid-template-columns:1fr}}
+
+/* ===== 도구 로고 배지 ===== */
+.tlg{display:inline-flex;align-items:center;gap:5px;padding:2px 8px 2px 2px;border:1px solid var(--line);border-radius:999px;background:var(--panel2);font-size:12.5px;font-weight:600;white-space:nowrap}.tl-svg{display:block;flex:none}
+.tl-stage{display:grid;gap:7px;padding:10px;border-radius:10px;background:#0f1216;border:1px solid var(--line)}
+.tl-layer{display:grid;gap:4px}.tl-label{font-size:12px;letter-spacing:.06em;color:var(--muted)}.tl-row{display:flex;flex-wrap:wrap;gap:5px;align-items:center}.tl-join{color:var(--pc,var(--lime));font-weight:800;font-size:13px}
+.tl-orch{display:flex;flex-wrap:wrap;gap:10px 22px;align-items:end;margin:0 0 12px;padding:10px 14px;border:1px dashed color-mix(in srgb,var(--pc) 40%,var(--line));border-radius:10px}.tl-orch .tl-layer{grid-auto-flow:row}
+
+/* ===== GitHub 모음집 ===== */
+.gh-jump{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 18px}.gh-jump .filter{border-left:3px solid var(--gc)}.gh-jump b{font-weight:500;color:var(--muted);margin-left:4px}
+.gh-group{margin:0 0 22px;scroll-margin-top:70px}.gh-group-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;border-bottom:2px solid var(--gc);padding-bottom:6px;margin-bottom:12px}.gh-group-head h2{margin:0;color:var(--gc)}.gh-stage{font-size:13px;color:var(--muted)}
+.gh-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px}
+.gh-card{display:flex;flex-direction:column;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}.gh-card p{margin:0;font-size:15px}
+.gh-head{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center}.gh-head h3{margin:0;font-size:17px}.gh-head a{font-size:13px;color:var(--gc);font-family:ui-monospace,Menlo,monospace}
+.gh-stars{font-size:13px;color:#f2c94c;white-space:nowrap}.gh-tip{padding:8px 10px;border-radius:8px;background:color-mix(in srgb,var(--gc) 9%,transparent);font-size:14px!important}
+.gh-extra{font-size:14px;color:var(--gc)}.gh-copy{align-self:flex-start;margin-top:auto}
 </style></head><body><div class="app"><aside class="sidebar" id="sidebar"><div class="brand"><span class="brandmark">f/</span> FIELDNOTE</div><div class="workspace">싱가포르에서, 한국을 보다<small>개인 콘텐츠 워크스페이스</small></div><nav aria-label="워크스페이스 탭"><button class="nav" data-view="common"><span class="navicon">◎</span>공통 원리</button><div class="nav-label">플랫폼</div><button class="nav pf-nav" data-view="youtube" style="--pc:#ff6b6b"><span class="navicon"><i class="pf-dot"></i></span>YouTube</button><button class="nav pf-nav" data-view="blog" style="--pc:#3ddc84"><span class="navicon"><i class="pf-dot"></i></span>네이버 블로그</button><button class="nav pf-nav" data-view="x" style="--pc:#f2c94c"><span class="navicon"><i class="pf-dot"></i></span>X</button><button class="nav pf-nav" data-view="telegram" style="--pc:#4fb3ff"><span class="navicon"><i class="pf-dot"></i></span>Telegram</button><button class="nav pf-nav" data-view="insta" style="--pc:#ff7ac8"><span class="navicon"><i class="pf-dot"></i></span>Instagram</button><button class="nav pf-nav" data-view="threads" style="--pc:#b9a1f5"><span class="navicon"><i class="pf-dot"></i></span>Threads</button></nav><div class="sidebottom"><button class="nav" data-view="publish"><span class="navicon">✓</span>게시 확인</button><button class="nav" data-view="settings"><span class="navicon">⚙</span>설정·데이터</button><div class="local"><span class="dot"></span><span id="storageState">이 브라우저에 저장</span><div id="sideConn" style="margin:5px 0 0 13px;color:#626c78">외부 계정 · 연결 안 됨</div></div><button class="nav" id="logoutBtn" hidden><span class="navicon">⇥</span>로그아웃</button></div></aside><div class="sidebar-backdrop" id="sidebarBackdrop"></div><main><header class="topbar"><div><button class="menu" id="mobileMenu" aria-label="메뉴 열기">☰</button>워크스페이스 <span style="margin:0 12px;color:#454d59">/</span><b id="breadcrumb">작업</b></div><div class="topmeta"><span id="date"></span><span>LOCAL EDITION</span><div class="avatar">FN</div></div></header><div class="content" id="content"></div></main></div><div id="modalRoot"></div><div class="toasts" id="toasts" role="status" aria-live="polite"></div><input type="file" accept="application/json,.json" id="importFile" hidden><input type="file" accept="application/json,.json" id="shortsImportFile" hidden>
 <script src="./fieldnote-workflow.js"></script>
 <script src="./fieldnote-manual-ai.js"></script>
@@ -616,13 +643,13 @@ document.addEventListener('click',async e=>{
  }
 });
 
-const TITLES={common:'공통 원리',ytSkills:'YouTube 스킬',ytSources:'YouTube 소스',dashboard:'공통 원리',review:'검수함',ideas:'경험·소재함',settings:'설정·데이터',analytics:'키워드·주제',research:'공개 조사 결과',reach:'Reach 리서치',topics:'채널별 관심 주제',publish:'게시 확인',blogPlan:'블로그 기획',youtubePlan:'유튜브 기획',...Object.fromEntries(Object.entries(CH).map(([k,v])=>[k,v.name]))};
+const TITLES={common:'공통 원리',ytSkills:'YouTube 스킬',ytSources:'YouTube 소스',ytGithub:'GitHub 모음집',dashboard:'공통 원리',review:'검수함',ideas:'경험·소재함',settings:'설정·데이터',analytics:'키워드·주제',research:'공개 조사 결과',reach:'Reach 리서치',topics:'채널별 관심 주제',publish:'게시 확인',blogPlan:'블로그 기획',youtubePlan:'유튜브 기획',...Object.fromEntries(Object.entries(CH).map(([k,v])=>[k,v.name]))};
 const WORK_LINKS={dashboard:'전체 작업',review:'검수함',blog:'네이버 블로그',insta:'인스타그램',youtube:'유튜브'};
 const PLAN_LINKS={ideas:'소재함',blogPlan:'블로그',youtubePlan:'유튜브',topics:'관심 주제',analytics:'키워드·주제',research:'공개 조사',reach:'Reach 리서치'};
 const COMMON_LINKS={common:'공통 원리',topics:'관심 주제',analytics:'키워드·주제',research:'공개 조사',reach:'Reach 리서치'};
-const SUB_LINKS={common:COMMON_LINKS,youtube:{youtube:'작업판',ytSources:'소스',ytSkills:'스킬',youtubePlan:'AI 주제 발굴'},blog:{blog:'작업판',blogPlan:'AI 글감 발굴'}};
+const SUB_LINKS={common:COMMON_LINKS,youtube:{youtube:'작업판',ytSources:'소스',ytSkills:'스킬',ytGithub:'GitHub 모음집',youtubePlan:'AI 주제 발굴'},blog:{blog:'작업판',blogPlan:'AI 글감 발굴'}};
 function workspaceSection(route){
-  if(route==='youtubePlan'||route==='ytSkills'||route==='ytSources')return 'youtube';
+  if(route==='youtubePlan'||route==='ytSkills'||route==='ytSources'||route==='ytGithub')return 'youtube';
   if(route==='blogPlan')return 'blog';
   if(CH[route]||route==='publish'||route==='settings')return route;
   return 'common';
@@ -632,13 +659,13 @@ function workspaceNav(section){
   if(!links)return '';
   return `<nav class="filters workspace-nav" aria-label="${esc(TITLES[section]||section)} 메뉴">${Object.entries(links).map(([route,label])=>`<button class="filter ${view===route?'active':''}" data-view="${route}" ${view===route?'aria-current="page"':''}>${label}</button>`).join('')}</nav>`;
 }
-const ROUTES=['common','ytSkills','ytSources','dashboard','review','ideas','analytics','research','reach','topics','publish','blogPlan','youtubePlan','settings',...Object.keys(CH)];
+const ROUTES=['common','ytSkills','ytSources','ytGithub','dashboard','review','ideas','analytics','research','reach','topics','publish','blogPlan','youtubePlan','settings',...Object.keys(CH)];
 function connectedCount(){return Object.keys(CH).filter(isConnected).length}
 /* Hash routing: #<view> or #edit/<postId>. render() keeps location.hash in sync with state. */
 function routeHash(){return editing?'#edit/'+encodeURIComponent(editing):'#'+view}
 function syncHash(replace){const h=routeHash();if(location.hash===h)return;if(replace){try{history.replaceState(null,'',h)}catch(_){location.hash=h}}else location.hash=h}
 function parseHash(h){h=String(h||'').replace(/^#/,'');if(h==='keywords')h='analytics';if(h==='overview')h='dashboard';if(h.startsWith('edit/')){let id=h.slice(5);try{id=decodeURIComponent(id)}catch(_){}const p=db.posts.find(p=>p.id===id);return p?{edit:id,view:p.channel}:{view:'dashboard'}}return {view:ROUTES.includes(h)?h:'dashboard'}}
-function render(){ensurePublish();if(view==='dashboard'||view==='ideas')view='common';const screen=editing?editor():view==='common'?commonPage():view==='ytSkills'?ytSkillsPage():view==='ytSources'?ytSourcesPage():view==='settings'?settings():view==='analytics'?analytics():view==='research'?publicResearch():view==='reach'?reachView():view==='topics'?topicsPage():view==='publish'?publishing():view==='blogPlan'?head('블로그 기획','카테고리별 글감을 발굴하고 초안으로 이어가세요.',false)+genPanel():view==='youtubePlan'?head('유튜브 기획','채널별 영상 주제를 발굴하고 대본으로 이어가세요.',false)+ytTabs()+ytPanel():CH[view]?platformPage(view):postList();const active=editing?(db.posts.find(p=>p.id===editing)?.channel||'common'):workspaceSection(view);document.querySelectorAll('.nav[data-view]').forEach(n=>{const selected=n.dataset.view===active;n.classList.toggle('active',selected);if(selected)n.setAttribute('aria-current','page');else n.removeAttribute('aria-current')});$('#breadcrumb').textContent=editing?'원고 편집':TITLES[view];$('.workspace').firstChild.textContent=db.profile.name;paintStorage();const n=connectedCount();$('#sideConn').textContent=n?`발행 브리지 ${n}/${Object.keys(CH).length} 설정됨`:'외부 계정 · 연결 안 됨';$('#content').innerHTML=(editing?'':workspaceNav(active))+screen+`<footer class="footer"><span>FIELDNOTE STUDIO / LOCAL EDITION</span><span>${view==='publish'&&!editing?'승인은 당신이, 게시 권한은 플랫폼이.':'경험은 당신에게서, 근거는 원문에서.'}</span></footer>`;syncHash(false)}
+function render(){ensurePublish();if(view==='dashboard'||view==='ideas')view='common';const screen=editing?editor():view==='common'?commonPage():view==='ytSkills'?ytSkillsPage():view==='ytSources'?ytSourcesPage():view==='ytGithub'?ytGithubPage():view==='settings'?settings():view==='analytics'?analytics():view==='research'?publicResearch():view==='reach'?reachView():view==='topics'?topicsPage():view==='publish'?publishing():view==='blogPlan'?head('블로그 기획','카테고리별 글감을 발굴하고 초안으로 이어가세요.',false)+genPanel():view==='youtubePlan'?head('유튜브 기획','채널별 영상 주제를 발굴하고 대본으로 이어가세요.',false)+ytTabs()+ytPanel():CH[view]?platformPage(view):postList();const active=editing?(db.posts.find(p=>p.id===editing)?.channel||'common'):workspaceSection(view);document.querySelectorAll('.nav[data-view]').forEach(n=>{const selected=n.dataset.view===active;n.classList.toggle('active',selected);if(selected)n.setAttribute('aria-current','page');else n.removeAttribute('aria-current')});$('#breadcrumb').textContent=editing?'원고 편집':TITLES[view];$('.workspace').firstChild.textContent=db.profile.name;paintStorage();const n=connectedCount();$('#sideConn').textContent=n?`발행 브리지 ${n}/${Object.keys(CH).length} 설정됨`:'외부 계정 · 연결 안 됨';$('#content').innerHTML=(editing?'':workspaceNav(active))+screen+`<footer class="footer"><span>FIELDNOTE STUDIO / LOCAL EDITION</span><span>${view==='publish'&&!editing?'승인은 당신이, 게시 권한은 플랫폼이.':'경험은 당신에게서, 근거는 원문에서.'}</span></footer>`;syncHash(false)}
 function canLeave(){if(!dirty)return true;if(!confirm('저장하지 않은 수정이 있습니다. 버리고 이동할까요?'))return false;if(editing){clearTimeout(draftTimer);draftDel(editing)}return true}
 function closeSidebar(){$('#sidebar').classList.remove('open')}
 function navigate(v){if(!canLeave())return;view=v;editing=null;dirty=false;filter='all';query='';closeSidebar();render();window.scrollTo(0,0)}

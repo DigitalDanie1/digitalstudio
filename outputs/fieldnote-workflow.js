@@ -921,7 +921,7 @@ function platformPage(c) {
     const group = f => { const l = ytFmtIdeas(f); return `<div class="yt-fmt-group ${f}"><h4>${f === 'long' ? '🎬 롱폼' : '📱 쇼츠'} <em>${l.length}</em><span>${esc(YT_FORMAT_TEXT[f])}</span></h4>${l.length ? `<ul class="ps-topics">${l.map(ytTopic).join('')}</ul>` : '<p class="small">아직 없습니다.</p>'}</div>`; };
     board = board.replace(/<div class="ps-col"><h3><span>①<\/span> 주제 <em>\d+<\/em><\/h3>[\s\S]*?<\/div>\s*<div class="ps-col"><h3><span>②/, `<div class="ps-col"><h3><span>①</span> 주제 <em>${ideas.length}</em></h3><div class="yt-fmt-groups">${group('shorts')}${group('long')}</div></div>\n    <div class="ps-col"><h3><span>②`);
     const ytBoard = board.replace(/<div class="ps-col"><h3><span>②<\/span> 제작 방법<\/h3>[\s\S]*?<\/div>\s*<div class="ps-col"><h3><span>③/, '<div class="ps-col"><h3><span>③').replace('<div class="ps-cols">', '<div class="ps-cols ps-cols2">');
-    return hero + ytPipeline() + ytBoard + drafts + toolSec;
+    return hero + ytPipeline() + ytAudioGuide() + ytBoard + drafts + toolSec;
   }
   return hero + board + drafts + toolSec;
 }
@@ -989,9 +989,9 @@ function ytPipeText(kind) {
     case 'script': return sh
       ? `/shorts-blueprint ${title} — 길이 45초, 소스: ${D}/원본/ 클립에서 뽑기(sources.md 참고), 시청자: ${YT_AUDIENCE}, 말투: 친구에게 말하듯. 반복 구조 필수 — ${YT_REPEAT}. 사실은 ${D}/research.md 의 A·B 등급만 쓰고, 결과를 ${D}/편집/대본.md 로 저장해줘`
       : `/hook-first-script ${title} — 길이 8~12분, 시청자: ${YT_AUDIENCE}, 말투: 친구에게 말하듯, 자료: ${D}/research.md (A·B 등급만, 나머지는 자료 확인 필요 목록으로). 원본 경기 장면은 몇 초씩만 쓰는 해설 영상이야. 결과를 ${D}/편집/대본.md 로 저장해줘`;
-    case 'plan': return `/edit-plan-sheet ${D} — 대본: 편집/대본.md, 클립: 원본/ (sources.md 참고), 형식: ${sh ? '세로 쇼츠 45초' : '가로 롱폼 10분'}, 분위기: ${sh ? '빠름' : '다큐'}.${sh ? ' 컷 리스트에 기술 반복 3구간(원속도 → 0.5배 슬로우+화살표 → 원속도)을 표시하고 마지막 컷이 첫 컷으로 이어지게.' : ''} 결과를 ${D}/편집/편집계획표.md 로 저장해줘`;
+    case 'plan': return `/edit-plan-sheet ${D} — 대본: 편집/대본.md, 클립: 원본/ (sources.md 참고), 형식: ${sh ? '세로 쇼츠 45초' : '가로 롱폼 10분'}, 분위기: ${sh ? '빠름' : '다큐'}. 소리: 나레이션은 내 목소리(Adobe Podcast로 잡음 정리), BGM·효과음은 YouTube 오디오 보관함·캡컷 상업용만, 원본 경기 소리는 끔, BGM은 나레이션보다 15~20dB 낮게.${sh ? ' 기술 반복 소리: 원속도 구간에 임팩트 효과음, 슬로우 구간은 BGM 낮추고 해설.' : ''}${sh ? ' 컷 리스트에 기술 반복 3구간(원속도 → 0.5배 슬로우+화살표 → 원속도)을 표시하고 마지막 컷이 첫 컷으로 이어지게.' : ''} 결과를 ${D}/편집/편집계획표.md 로 저장해줘`;
     case 'rough': return `/rough-cut ${dir} 형식:${sh ? '세로 반복:3' : '가로'}`;
-    case 'upload': return `/upload-pack-maker ${dir} — ${sh ? '쇼츠' : '롱폼'}. 대본: ${D}/편집/대본.md, 시청자: ${YT_AUDIENCE}. 설명란에 ${D}/sources.md 의 원본 채널·영상 제목·URL·사용 구간과 "경기 장면은 해설·분석 목적으로 일부만 사용했습니다"를 넣고, 결과를 ${D}/업로드/업로드팩.md 로 저장해줘`;
+    case 'upload': return `/upload-pack-maker ${dir} — ${sh ? '쇼츠' : '롱폼'}. 대본: ${D}/편집/대본.md, 시청자: ${YT_AUDIENCE}. 설명란에 ${D}/sources.md 의 원본 채널·영상 제목·URL·사용 구간, 사용한 음악·효과음 출처, "경기 장면은 해설·분석 목적으로 일부만 사용했습니다"를 넣고, 결과를 ${D}/업로드/업로드팩.md 로 저장해줘`;
   }
   return '';
 }
@@ -1008,7 +1008,7 @@ const YT_SKILLS = [
 const YT_PIPELINE = [
   { title:'자료조사', what:'선수·대회·기록·규정을 찾아 출처 등급을 붙이고, 핵심 사실은 2곳 이상에서 교차 확인합니다.', out:'research.md', skills:[['자료조사', 'research']], chat:true },
   { title:'소스 다운로드', what:'필요한 장면만 구간으로 받습니다. 한 구간 15초 이하, 출처는 sources.md에 자동 기록됩니다.', out:'원본/ 클립 + sources.md', skills:[['구간 다운로드', 'download']], inputs:true, links:[['레슬링 소스 ' + WRESTLING_SOURCES.length + '곳', '@ytSources']] },
-  { title:'편집', what:'대본 → 편집 계획표 → 러프컷 순서. 마지막에 캡컷에서 내 목소리 해설과 화살표·멈춤 화면을 얹습니다.', out:'대본.md · 편집계획표.md · 러프컷 · 자막.srt', skills:[['① 대본', 'script'], ['② 편집 계획표', 'plan'], ['③ 러프컷', 'rough']], links:[['캡컷', 'https://www.capcut.com/'], ['Vrew', 'https://vrew.ai/'], ['Vizard', 'https://vizard.ai/', 'long'], ['OpusClip', 'https://www.opus.pro/', 'long']] },
+  { title:'편집', what:'대본 → 편집 계획표 → 러프컷 순서. 마지막에 캡컷에서 내 목소리 해설과 화살표·멈춤 화면을 얹습니다.', out:'대본.md · 편집계획표.md · 러프컷 · 자막.srt', skills:[['① 대본', 'script'], ['② 편집 계획표', 'plan'], ['③ 러프컷', 'rough']], links:[['🎧 음악·음성 고르기', '#ytAudio'], ['캡컷', 'https://www.capcut.com/'], ['Vrew', 'https://vrew.ai/'], ['Vizard', 'https://vizard.ai/', 'long'], ['OpusClip', 'https://www.opus.pro/', 'long']] },
   { title:'업로드', what:'제목·설명란(출처 포함)·태그·썸네일을 만들고, 확인 후 YouTube Studio에 올린 뒤 게시 확인에 링크를 남깁니다.', out:'업로드팩.md', skills:[['업로드 패키지', 'upload']], links:[['YouTube Studio', 'https://studio.youtube.com/'], ['구글 Flow (썸네일)', 'https://labs.google/fx/tools/flow', 'long']], publish:true },
 ];
 function ytSkillOf(kind) { return YT_SKILLS.find(s => s.kind === kind && (!s.fmt || s.fmt === ytPipe.format)); }
@@ -1019,7 +1019,7 @@ function ytPipeline() {
   const sel = `<div class="yp-fmts">${fmtBtn('shorts')}${fmtBtn('long')}</div><label class="yp-topic"><span>작업할 주제</span><select data-yp-idea aria-label="작업할 주제">${ytFmtIdeas(ytPipe.format).map(i => `<option value="${esc(i.id)}" ${cur && i.id === cur.id ? 'selected' : ''}>${esc(i.title)}</option>`).join('')}</select></label><span class="small">폴더 · ~/Movies/FIELDNOTE/<b data-yp-folder>${esc(ytFolder(cur?.title))}</b></span>`;
   const skillRow = ([label, kind]) => { const sk = ytSkillOf(kind); return `<div class="yp-skill"><span class="yp-skill-name">${esc(label)} · <button class="linkbtn" data-view="ytSkills">/${esc(sk.id)}</button></span><code data-yp-cmd="${kind}">${esc(ytPipeText(kind))}</code><button class="btn primary" data-yp-copy="${kind}">명령 복사</button></div>`; };
   const card = (st, idx) => `<li class="yp-stage"><div class="yp-head"><span class="yp-n">${String(idx + 1).padStart(2, '0')}</span><h3>${esc(st.title)}</h3></div>
-    <p class="yp-what">${esc(st.what)}</p><p class="yp-out"><b>결과물</b>${esc(st.out)}</p>
+    <p class="yp-what">${esc(st.what)}</p>${ytStageTools(idx)}<p class="yp-out"><b>결과물</b>${esc(st.out)}</p>
     ${st.inputs ? `<div class="yp-inputs"><label>영상 URL<input class="input" data-yp-field="url" value="${esc(ytPipe.url)}" placeholder="https://www.youtube.com/watch?v=…"></label><label>구간 (쉼표로 여러 개)<input class="input" data-yp-field="ranges" value="${esc(ytPipe.ranges)}" placeholder="0:30-0:45, 1:10-1:20"></label></div>` : ''}
     <div class="yp-skills">${st.skills.map(skillRow).join('')}
       ${st.chat ? '<button class="btn ghost" data-yp-copy="research-chat">claude.ai 채팅용으로 복사</button>' : ''}
@@ -1027,7 +1027,7 @@ function ytPipeline() {
     <div class="yp-tools">${(st.links || []).filter(l => !l[2] || l[2] === ytPipe.format).map(([l, u]) => u.startsWith('@') ? `<button class="linkbtn" data-view="${u.slice(1)}">${esc(l)} →</button>` : u.startsWith('#') ? `<button class="linkbtn" data-yp-jump="${u.slice(1)}">${esc(l)} ↓</button>` : `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(l)} ↗</a>`).join('')}${st.publish ? '<button class="linkbtn" data-view="publish">게시 확인 →</button>' : ''}</div>
   </li>`;
   return `<section class="yp" style="--pc:${platformColor('YouTube')}"><div class="yp-top"><h2>제작 라인 <span class="small">자료조사 → 소스 다운로드 → 편집 → 업로드 · ${sh ? '쇼츠 15~60초 세로' : '롱폼 8~12분 가로'}</span></h2>${sel}</div>
-    <ol class="yp-stages">${YT_PIPELINE.map(card).join('')}</ol>
+    ${ytOrchestration()}<ol class="yp-stages">${YT_PIPELINE.map(card).join('')}</ol>
     <p class="small yp-foot">'명령 복사' → Claude Code 새 대화에 붙여 넣기 → 그 단계 스킬이 실행됩니다. 모든 단계가 같은 주제 폴더를 이어 씁니다. 원본 경기 장면은 한 번에 몇 초만, 중심은 내 해설입니다.</p></section>`;
 }
 function ytSkillsPage() {
@@ -1070,3 +1070,142 @@ document.addEventListener('click', e => {
   navigate('youtube');
   setTimeout(() => { document.querySelector('[data-yp-field="ranges"]')?.focus(); document.querySelectorAll('.yp-stage')[1]?.scrollIntoView({ behavior: 'smooth', block: 'center' }); toast('소스 다운로드 칸에 영상을 넣었어요. 구간을 적고 명령을 복사하세요.'); }, 50);
 });
+
+// ===== YouTube 음악 · 음성 가이드 =====
+const YT_AUDIO = [
+  { key:'voice', icon:'🎙', title:'음성 (나레이션)', lead:'기본은 내 목소리. 채널의 얼굴이 되고, 재사용 콘텐츠 판정도 피합니다.', items:[
+    ['내 목소리 녹음', 'QuickTime 또는 캡컷 녹음. 조용한 방, 입과 마이크 한 뼘. 이어폰 마이크로 시작해도 됩니다.', '무료', ''],
+    ['Adobe Podcast Enhance', '녹음 파일의 잡음·울림을 지워 스튜디오처럼 만들어 줍니다.', '무료(한도)', 'https://podcast.adobe.com/enhance'],
+    ['캡컷 음성 향상·노이즈 감소', '편집하면서 바로 잡음 정리.', '부분 유료', 'https://www.capcut.com/'],
+    ['ElevenLabs', '목소리를 안 낼 때만. 한국어 AI 목소리가 가장 자연스러운 편. 상업 이용은 유료 플랜 조건 확인.', '부분 유료', 'https://elevenlabs.io/text-to-speech'],
+    ['Vrew AI 목소리 · 클로바더빙', '한국어 TTS 대안. 수익 채널에 쓰기 전 상업 이용 조건 확인.', '부분 유료', 'https://clovadubbing.naver.com/'],
+  ]},
+  { key:'music', icon:'🎵', title:'배경음악 (BGM)', lead:'수익 창출 채널은 저작권이 깨끗한 곳에서만 고릅니다.', items:[
+    ['YouTube 오디오 보관함', '1순위. 무료이고 유튜브 수익화에 안전. Studio → 오디오 보관함에서 장르·분위기로 검색.', '무료', 'https://www.youtube.com/audiolibrary'],
+    ['Epidemic Sound', '곡이 많고 운동·격투 분위기 곡이 풍부. 채널을 등록하면 저작권 클레임이 해제됩니다.', '유료 구독', 'https://www.epidemicsound.com/'],
+    ['Artlist', 'Epidemic 대안. 둘 중 하나만.', '유료 구독', 'https://artlist.io/'],
+    ['캡컷 음악', "'상업용' 표시된 곡만. 표시 없는 인기곡은 유튜브에서 클레임이 걸릴 수 있습니다.", '부분 유료', 'https://www.capcut.com/'],
+    ['Pixabay 음악', '무료 대안. 가끔 클레임이 오니 이의 제기용으로 다운로드 페이지를 저장해 둡니다.', '무료', 'https://pixabay.com/music/'],
+  ]},
+  { key:'sfx', icon:'💥', title:'효과음', lead:'기술이 들어가는 순간에만. 이유 없는 효과음은 빼기.', items:[
+    ['캡컷 효과음', '임팩트(쿵)·휙(whoosh)·슬로우모션 효과음을 바로 끌어다 씁니다.', '부분 유료', 'https://www.capcut.com/'],
+    ['YouTube 오디오 보관함 효과음', '무료, 수익화 안전.', '무료', 'https://www.youtube.com/audiolibrary'],
+    ['Pixabay 효과음', '무료 효과음 대안.', '무료', 'https://pixabay.com/sound-effects/'],
+  ]},
+];
+const YT_AUDIO_SHORTS = [
+  ['① 원속도', '기술 들어가는 순간 임팩트(쿵) 효과음 + 빠른 비트 BGM'],
+  ['② 슬로우', 'BGM을 15~20dB 낮추고 슬로우 효과음(우웅) + 내 해설'],
+  ['③ 원속도', '같은 임팩트 효과음 + BGM 다시 크게 → 첫 장면으로 이어짐'],
+];
+const YT_AUDIO_LONG = [
+  ['해설 구간', '차분한 BGM을 아주 낮게, 또는 BGM 없이'],
+  ['파트 전환', '짧은 휙 효과음 하나'],
+  ['경기 장면 강조', '그 몇 초만 효과음, 해설은 장면이 끝난 뒤'],
+];
+const YT_AUDIO_RULES = [
+  '원본 경기 영상의 소리(중계 해설·경기장 음악)는 끕니다. 저작권 클레임 원인 1순위입니다.',
+  '인기곡·K-pop은 쓰지 않습니다. 수익이 원곡자에게 가거나 영상이 막힐 수 있습니다.',
+  '나레이션이 주인공. BGM은 나레이션보다 15~20dB 낮게 시작해 귀로 맞춥니다.',
+  '쓴 음악·효과음의 출처(사이트·곡 이름)를 sources.md에 함께 적어 둡니다.',
+  'AI 목소리를 쓰면 각 서비스의 상업 이용 조건과 유튜브 표기 정책을 확인합니다.',
+];
+function ytAudioGuide() {
+  const sh = ytPipe.format !== 'long';
+  const col = g => `<div class="ya-col"><h3>${g.icon} ${esc(g.title)}</h3><p class="small">${esc(g.lead)}</p><ul>${g.items.map(([n, d, price, url], k) => `<li class="${k === 0 ? 'ya-top' : ''}"><div class="ya-name">${url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(n)} ↗</a>` : `<b>${esc(n)}</b>`}<span class="tc-price ${priceClass(price.startsWith('무료') ? '무료' : price === '유료 구독' ? '유료' : '부분 유료')}">${esc(price)}</span></div><p>${esc(d)}</p></li>`).join('')}</ul></div>`;
+  const tl = (sh ? YT_AUDIO_SHORTS : YT_AUDIO_LONG).map(([a, b]) => `<li><b>${esc(a)}</b><span>${esc(b)}</span></li>`).join('');
+  return `<section class="panel ya" id="ytAudio" style="--pc:${platformColor('YouTube')}"><div class="sectionhead" style="margin-top:0"><h2>🎧 음악 · 음성</h2><span class="small">무엇을 쓰고, 어디에 붙이는지 · 지금 ${sh ? '쇼츠' : '롱폼'} 기준</span></div>
+    <div class="ya-start"><b>처음 구성</b>내 목소리 + Adobe Podcast로 잡음 정리 · BGM과 효과음은 YouTube 오디오 보관함 + 캡컷 효과음 → 전부 무료. 영상이 쌓이면 Epidemic Sound 하나만 추가.</div>
+    <div class="ya-cols">${YT_AUDIO.map(col).join('')}</div>
+    <div class="ya-bottom"><div><h3>${sh ? '쇼츠 · 기술 3번 반복에 소리 붙이기' : '롱폼 · 소리 배치'}</h3><ol class="ya-tl">${tl}</ol></div>
+    <div><h3>지킬 것</h3><ul class="ya-rules">${YT_AUDIO_RULES.map(r => `<li>${esc(r)}</li>`).join('')}</ul></div></div></section>`;
+}
+
+// ===== 도구 로고 배지 (스택 표 기준) — 대표색 + 이니셜로 직접 만든 배지 =====
+const TOOL_LOGOS = {
+  claudecode: { name:'Claude Code', bg:'#2a1a14', fg:'#e8875f', mark:'>_' },
+  codex:      { name:'Codex CLI', bg:'#0d2a22', fg:'#3fd1a0', mark:'Cx' },
+  grok:       { name:'Grok', bg:'#0b0b0b', fg:'#f2f2f2', mark:'G', ring:'#f2f2f2' },
+  deepseek:   { name:'DeepSeek API', bg:'#1b2a6b', fg:'#9db1ff', mark:'DS' },
+  claude:     { name:'Claude', bg:'#d97757', fg:'#fff4ec', mark:'C' },
+  ytdlp:      { name:'yt-dlp', bg:'#3a0d0d', fg:'#ff5a5a', mark:'↓' },
+  score:      { name:'채점 스크립트', bg:'#2a3a12', fg:'#c4f27b', mark:'✓' },
+  gptimage:   { name:'GPT Image', bg:'#10372c', fg:'#7ee0bd', mark:'GI' },
+  html2png:   { name:'HTML→PNG', bg:'#3d1a10', fg:'#ff8a5c', mark:'</>' },
+  muse:       { name:'Muse', bg:'#2c1650', fg:'#c5a3ff', mark:'M' },
+  kling:      { name:'Kling i2v', bg:'#0f2f2b', fg:'#5ef0d0', mark:'K' },
+  eleven:     { name:'ElevenLabs PVC', bg:'#121212', fg:'#ffffff', mark:'II' },
+  whisper:    { name:'Whisper', bg:'#13302a', fg:'#8ce3c6', mark:'W' },
+  playwright: { name:'Playwright', bg:'#123a1a', fg:'#6fd47b', mark:'PW' },
+  ffmpeg:     { name:'FFmpeg', bg:'#0c2a0c', fg:'#4cc94c', mark:'FF' },
+  frame:      { name:'프레임 감사', bg:'#2a2a12', fg:'#f2c94c', mark:'▦' },
+  spec:       { name:'규격 검사', bg:'#2a2412', fg:'#f5b560', mark:'⛶' },
+  lufs:       { name:'음량 정규화', bg:'#2a1a12', fg:'#ffa26b', mark:'dB' },
+  cdp:        { name:'Chrome CDP', bg:'#102545', fg:'#7fb0ff', mark:'CDP' },
+  ytstudio:   { name:'YouTube Studio', bg:'#3a0d0d', fg:'#ff6b6b', mark:'▶' },
+  cron:       { name:'cron', bg:'#2d2410', fg:'#f5c46a', mark:'⏱' },
+  sqlite:     { name:'SQLite', bg:'#0e2a3d', fg:'#6cc3f5', mark:'SQ' },
+  capcut:     { name:'캡컷', bg:'#f2f2f2', fg:'#111111', mark:'CC' },
+};
+function toolLogoSvg(id, size = 26) {
+  const t = TOOL_LOGOS[id]; if (!t) return '';
+  const fs = t.mark.length >= 3 ? 8.5 : t.mark.length === 2 ? 10.5 : 14;
+  return `<svg class="tl-svg" width="${size}" height="${size}" viewBox="0 0 26 26" aria-hidden="true"><rect x="0.5" y="0.5" width="25" height="25" rx="7" fill="${t.bg}" stroke="${t.ring || 'rgba(255,255,255,.14)'}"/><text x="13" y="13.5" text-anchor="middle" dominant-baseline="central" font-family="ui-monospace,Menlo,monospace" font-weight="800" font-size="${fs}" fill="${t.fg}">${esc(t.mark)}</text></svg>`;
+}
+function toolLogo(id) { const t = TOOL_LOGOS[id]; return t ? `<span class="tlg" title="${esc(t.name)}">${toolLogoSvg(id, 22)}<span>${esc(t.name)}</span></span>` : ''; }
+function toolLayer(label, ids, joiner = '') { return `<div class="tl-layer"><span class="tl-label">${esc(label)}</span><span class="tl-row">${ids.map(toolLogo).join(joiner ? `<span class="tl-join">${joiner}</span>` : '')}</span></div>`; }
+const YT_STAGE_TOOLS = [
+  [['리서치', ['grok', 'deepseek']], ['정리·출처', ['claude']]],
+  [['리서치', ['ytdlp']]],
+  [['원고', ['claude', 'score'], '+'], ['이미지', ['gptimage', 'html2png']], ['영상 생성', ['muse', 'kling'], '→'], ['음성', ['eleven', 'whisper']], ['렌더', ['playwright', 'ffmpeg'], '+'], ['품질 검사', ['frame', 'spec', 'lufs']], ['마무리 편집', ['capcut']]],
+  [['게시', ['cdp', 'ytstudio']], ['지표', ['cron', 'sqlite'], '+']],
+];
+function ytStageTools(idx) { return `<div class="tl-stage">${(YT_STAGE_TOOLS[idx] || []).map(([l, ids, j]) => toolLayer(l, ids, j)).join('')}</div>`; }
+function ytOrchestration() { return `<div class="tl-orch">${toolLayer('오케스트레이션', ['claudecode'])}${toolLayer('대량 작업', ['codex'])}<span class="small">모든 단계를 지휘하고 반복 작업을 돌립니다</span></div>`; }
+
+// ===== YouTube 'GitHub 모음집' 탭 (별 수는 2026.11.08 GitHub API 기준) =====
+const GH_GROUPS = [
+  { icon:'🔍', title:'소재·트렌드 찾기', stage:'01 자료조사', color:'#4fb3ff', items:[
+    { star:true, name:'Agent-Reach', repo:'Panniantong/Agent-Reach', stars:110055, desc:'레딧·유튜브·X 글을 AI가 모아 정리. "요즘 이 주제로 뭐가 뜨냐"를 실제 글로 확인할 때 가장 많이 씀.', tip:'한 번에 너무 많이 긁으면 IP가 막힘(1시간 차단 경험). 조금씩.' },
+    { star:true, name:'agbrowse', repo:'lidge-jun/agbrowse', stars:233, desc:'AI가 로그인해 둔 크롬을 직접 조작. 일반 수집이 안 되는 사이트 글 읽기, 웹 ChatGPT로 이미지 뽑기·질문(토큰 절약).' },
+  ]},
+  { icon:'✍️', title:'대본·윤문', stage:'03 편집 · 대본', color:'#c4f27b', items:[
+    { star:false, name:'휴먼라이즈 코리안 (im-not-ai)', repo:'epoko77-ai/im-not-ai', stars:6443, desc:'AI 글 특유의 번역투·딱딱한 나열을 한국인 말투로. 내용은 그대로, 말투만.', tip:'대본 쓸 때 "조사한 내용(Agent-Reach 결과)에 있는 것만 써"라고 박아 두면 헛소리가 확 줄어듦. 윤문 후 디테일은 직접.' },
+  ]},
+  { icon:'🎙', title:'목소리', stage:'03 편집 · 음성', color:'#ff7ac8', items:[
+    { star:true, name:'Voicebox', repo:'jamiepine/voicebox', stars:60023, desc:'내 목소리 몇 개 녹음 → 클로닝하는 AI 보이스 스튜디오. 내 컴퓨터에서 돌아가 무료·무제한, API로 문장마다 자동 생성.', tip:'시드 고정 + "숨소리 없이 첫 음절부터 바로" 지시를 넣으면 톤이 일정해짐.' },
+    { star:false, name:'Qwen3-TTS', repo:'QwenLM/Qwen3-TTS', stars:14279, desc:'Voicebox 안에서 실제로 목소리를 만드는 모델. 원리가 궁금할 때.' },
+    { star:false, name:'edge-tts', repo:'rany2/edge-tts', stars:12484, desc:'API 키 없는 무료 TTS. 영어 원문·댓글을 다른 목소리로 구분해 읽힐 때.' },
+  ]},
+  { icon:'🖼', title:'영상 소스·이미지', stage:'02 소스 다운로드', color:'#ff6b6b', items:[
+    { star:true, name:'yt-dlp', repo:'yt-dlp/yt-dlp', stars:206063, desc:'원하는 구간만 잘라 받기. 공식 클립에서 몇 초만 따올 때. 이 컴퓨터에 설치됨, /yt-source-download 스킬이 사용.' },
+  ]},
+  { icon:'🎬', title:'편집·렌더', stage:'03 편집 · 렌더', color:'#b9a1f5', items:[
+    { star:true, name:'Remotion', repo:'remotion-dev/remotion', stars:71554, desc:'코드로 영상 만들기. 자막·레이아웃 템플릿을 한 번 만들면 대본·목소리·이미지만 갈아 끼워 계속 렌더.', tip:'AI가 Remotion을 잘 다루게 하는 공식 스킬: remotion-dev/skills', extra:['Remotion 공식 스킬', 'remotion-dev/skills'] },
+    { star:false, name:'HyperFrames', repo:'heygen-com/hyperframes', stars:80666, desc:'HTML로 모션그래픽. 인트로·타이틀 같은 짧은 장면. Claude Code에 스킬로 설치되어 있음.' },
+    { star:false, name:'video-use', repo:'browser-use/video-use', stars:30713, desc:'"앞부분 자르고 자막 넣어 줘"처럼 말로 시키는 편집 스킬. 찍어 둔 영상 다듬기.' },
+  ]},
+  { icon:'✅', title:'검수', stage:'03 편집 · 품질 검사', color:'#f5b560', items:[
+    { star:false, name:'mlx-whisper', repo:'ml-explore/mlx-examples', path:'/tree/main/whisper', stars:9059, desc:'맥에서 돌아가는 받아쓰기. 만든 목소리를 다시 받아써 대본과 비교 → 발음이 이상하면 다시 생성. 일일이 안 들어도 됨.' },
+    { star:false, name:'watch (claude-video)', repo:'bradautomates/claude-video', stars:20168, desc:'AI가 영상을 직접 보게 하는 스킬. 잘되는 채널 영상 분석, 완성본 최종 확인.' },
+  ]},
+  { icon:'🧰', title:'올인원·작업 보조', stage:'전체', color:'#8b929e', items:[
+    { star:false, name:'OpenMontage', repo:'OpenMontageInc/OpenMontage', stars:78368, desc:'조사→대본→목소리→편집을 한 번에 하는 영상 제작 에이전트. 바로 쓰기보다 구조 참고용.' },
+    { star:false, name:'caveman', repo:'JuliusBrussee/caveman', stars:118197, desc:'AI 답변을 짧게 핵심만. 작업이 길어질수록 토큰 차이가 큼.' },
+  ]},
+];
+function ghStars(n) { return n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + 'k' : String(n); }
+function ghBadge(name, color) { const m = name.replace(/[^A-Za-z가-힣0-9]/g, '').slice(0, 2); return `<svg class="tl-svg" width="34" height="34" viewBox="0 0 26 26" aria-hidden="true"><rect x="0.5" y="0.5" width="25" height="25" rx="7" fill="#0f1216" stroke="${color}"/><text x="13" y="13.5" text-anchor="middle" dominant-baseline="central" font-family="ui-monospace,Menlo,monospace" font-weight="800" font-size="10" fill="${color}">${esc(m)}</text></svg>`; }
+function ytGithubPage() {
+  const total = GH_GROUPS.reduce((a, g) => a + g.items.length, 0);
+  const card = (g, it) => { const url = `https://github.com/${it.repo}${it.path || ''}`; return `<article class="gh-card" style="--gc:${g.color}">
+    <div class="gh-head">${ghBadge(it.name, g.color)}<div><h3>${it.star ? '⭐️ ' : '➕ '}${esc(it.name)}</h3><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(it.repo)} ↗</a></div><span class="gh-stars">★ ${ghStars(it.stars)}</span></div>
+    <p>${esc(it.desc)}</p>${it.tip ? `<p class="gh-tip">💡 ${esc(it.tip)}</p>` : ''}
+    ${it.extra ? `<a class="gh-extra" href="https://github.com/${esc(it.extra[1])}" target="_blank" rel="noopener noreferrer">${esc(it.extra[0])} ↗</a>` : ''}
+    <button class="btn ghost gh-copy" data-gh-copy="https://github.com/${esc(it.repo)}.git">git clone 주소 복사</button></article>`; };
+  return head('GitHub 모음집', `영상 제작에 쓰는 오픈소스 ${total}개 · ⭐️ 주력 / ➕ 보조 · 제작 라인 단계 순서`, false)
+    + `<nav class="gh-jump">${GH_GROUPS.map((g, i) => `<button class="filter" style="--gc:${g.color}" data-yp-jump="gh-${i}">${g.icon} ${esc(g.title)} <b>${g.items.length}</b></button>`).join('')}</nav>`
+    + GH_GROUPS.map((g, i) => `<section class="gh-group" id="gh-${i}" style="--gc:${g.color}"><div class="gh-group-head"><h2>${g.icon} ${i + 1}. ${esc(g.title)}</h2><span class="gh-stage">제작 라인 · ${esc(g.stage)}</span></div><div class="gh-grid">${g.items.map(it => card(g, it)).join('')}</div></section>`).join('')
+    + `<p class="small" style="margin-top:16px">별 수는 2026년 11월 8일 GitHub 기준입니다. 설치 전 각 저장소의 README와 라이선스를 확인하세요.</p>`;
+}
+document.addEventListener('click', async e => { const b = e.target.closest('button[data-gh-copy]'); if (!b) return; const ok = await copyText('git clone ' + b.dataset.ghCopy); toast(ok ? 'git clone 명령을 복사했어요.' : '복사에 실패했어요.'); });
