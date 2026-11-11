@@ -667,6 +667,48 @@ const CHRISTIAN_SOURCES = [
     note:'기독교인과 히브리 이스라엘파 등 다른 신앙 집단이 맞붙는 토론 쇼 "The Bridge"를 진행합니다. 이단 주장 소개 소재로 쓰되, 해당 집단에 대한 교단 공식 판단과 당사자 설명을 구분합니다.',
     candidate:{title:'Christian vs Hebrew Israelite Women | The Bridge',url:'https://www.youtube.com/watch?v=5T86DonC1Yo',topic:'heresy',angle:'상대 집단의 핵심 주장 하나와 그에 대한 반론을 골라, 무엇이 정통 교리와 다른지 쉽게 설명합니다.'},
   },
+  {
+    id:'michael-knowles', name:'Michael Knowles', emoji:'🎩', url:'https://www.youtube.com/@MichaelKnowles',
+    role:'보수 논평 · 성경 쟁점 토론', topics:['debate','faith'],
+    note:'보수 논평가 Michael Knowles의 채널입니다. "Pulpit & Politics" 같은 공개 토론에서 성경 해석 쟁점(LGBTQ 등)을 다룹니다. 1시간 넘는 롱폼이라 핵심 구간만 잘라 쓰고, 양측 주장을 함께 소개합니다.',
+    candidate:{title:'HEATED Debate: LGBTQ In the Bible? Michael Knowles Pulpit & Politics',url:'https://www.youtube.com/watch?v=_sVp-7f-mx0&t=3297s',topic:'debate',angle:'54:57 부근 구간부터 검토합니다. 쟁점 구절 하나를 두고 양측 해석이 갈리는 지점을 정리합니다.'},
+  },
+  {
+    id:'bryce-crawford-podcast', name:'Bryce Crawford Podcast', emoji:'🎧', url:'https://www.youtube.com/@BryceCrawfordPodcast',
+    role:'신앙 인터뷰 팟캐스트', topics:['yt-faith-life','faith'],
+    note:'Bryce Crawford의 팟캐스트 채널입니다. 전도자·간증자 인터뷰가 중심이라 간증 쇼츠 소재로 씁니다. 캠퍼스 토론은 본 채널(@thebrycecrawford)에 있습니다.',
+    candidate:{title:'The Johnny Chang Interview (EP 87)',url:'https://www.youtube.com/watch?v=3L7yE57RUfg',topic:'yt-faith-life',angle:'인터뷰에서 삶이 바뀐 계기를 말하는 구간 하나를 골라 간증 쇼츠로 구성합니다.'},
+  },
+  {
+    id:'george-janko', name:'George Janko', emoji:'🔥', url:'https://www.youtube.com/@GeorgeJanko',
+    role:'간증 인터뷰 · 대형 크리에이터', topics:['yt-faith-life','faith'],
+    note:'구독자가 많은 크리에이터의 신앙 인터뷰 채널입니다. 전직 갱단원 간증 같은 극적인 회심 이야기가 많아 도입 훅 소재로 좋습니다. 간증 내용 중 사실관계(전과·사건)는 단정하지 않습니다.',
+    candidate:{title:'Johnny Chang - Ex Gang Member Confronted By God | EP. 84',url:'https://www.youtube.com/watch?v=DND5JF9ioRw',topic:'yt-faith-life',angle:'회심 직전 장면을 말하는 구간을 골라 0~3초 훅으로 쓰고, 간증의 핵심 메시지 한 줄로 마무리합니다.'},
+  },
+  {
+    id:'johnny-chang', name:'Johnny Chang', emoji:'✝️', url:'https://www.youtube.com/@johnnychanglive',
+    role:'전도자 본인 채널 · 거리 전도', topics:['yt-faith-life','faith','debate'],
+    note:'전직 갱단원 출신 전도자 Johnny Chang의 본인 채널입니다. 거리 전도·짧은 설교 영상이 있어 쇼츠 문답 소재로 씁니다. 다른 채널 인터뷰(George Janko, Bryce Crawford Podcast)와 함께 보면 인물 소개가 쉽습니다.',
+    candidate:{title:'Why Does God Bless Evil People?',url:'https://www.youtube.com/watch?v=U_Tdv3XQvcc',topic:'faith',angle:'질문 하나에 답하는 구조 그대로, 성경 근거 구절을 화면에 띄워 짧게 해설합니다.'},
+  },
+  {
+    id:'daily-dose-wisdom', name:'Daily Dose Of Wisdom', emoji:'💡', url:'https://www.youtube.com/@Daily_Dose_Of_Wisdom',
+    role:'변증 논증 클립 모음', topics:['faith','debate'],
+    note:'변증가들의 논증 장면을 잘라 올리는 클립 채널입니다. "외워 둘 논증" 같은 저장형 포맷 참고용입니다. 재업로드 성격이므로 원 발언자·원본 영상을 확인한 뒤 씁니다.',
+    candidate:{title:'Every Christian Needs To MEMORIZE This Argument!',url:'https://www.youtube.com/watch?v=VWS2T5rLaPM',topic:'faith',angle:'논증을 3단계로 쪼개 화면 위 숫자로 보여주는 저장형 쇼츠로 구성합니다.'},
+  },
+  {
+    id:'oscar-navarro', name:'Oscar Navarro', emoji:'🧭', url:'https://www.youtube.com/@ItsOscarNavarro',
+    role:'전 무신론자의 신 존재 논증', topics:['faith','debate'],
+    note:'전 무신론자 출신으로 신 존재 논증과 무신론자와의 대화를 다루는 채널입니다. Living Waters 팟캐스트 진행자입니다. 차분한 대화형이라 "논증 하나" 설명 쇼츠의 근거 자료로 씁니다.',
+    candidate:{title:'Proving God’s Existence Differently Than Most Christians (as a former atheist)',url:'https://www.youtube.com/watch?v=MaI8H7364eQ',topic:'faith',angle:'일반적인 논증과 다른 접근 하나를 골라, 전 무신론자의 관점에서 왜 설득됐는지 쉽게 풀어 설명합니다.'},
+  },
+  {
+    id:'digital-social-hour', name:'Digital Social Hour', emoji:'🎤', url:'https://www.youtube.com/@DigitalSocialHour',
+    role:'토론 팟캐스트 · 기독교 vs 무신론·몰몬', topics:['debate','heresy','faith'],
+    note:'Sean Kelly의 종합 팟캐스트입니다. 기독교 vs 무신론, 몰몬교(Joseph Smith) 교리 토론 같은 에피소드가 있어 토론 하이라이트 소재로 씁니다. 정치·연예 에피소드가 섞여 있으니 신앙 주제만 골라 씁니다.',
+    candidate:{title:'Did Joseph Smith Get God WRONG? Vocab Malone Challenges Jacob Hansen!',url:'https://www.youtube.com/watch?v=SEUDGJRE8m8',topic:'heresy',angle:'몰몬교와 정통 기독교의 신관 차이가 드러나는 구간을 골라, 교단 공식 입장과 당사자 설명을 구분해 해설합니다. (Are Humans Just Apes? X6StZdYwQZQ 은 무신론 토론 소재)'},
+  },
 ];
 
 // 유튜브 3개 채널별 소스 묶음 — 탭으로 골라 박스 그리드로 본다
