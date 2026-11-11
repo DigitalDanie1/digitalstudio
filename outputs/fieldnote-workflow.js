@@ -605,20 +605,30 @@ function wrestlingPromptSources(topicId) {
   }));
 }
 
-function wrestlingSourceLibrary() {
-  return `<section class="panel wrestling-sources"><div class="sectionhead"><h2>📚 레슬링 소스 채널</h2><span class="small">${WRESTLING_SOURCES.length}개 채널 · 채널 화면 확인 2026.11.07</span></div>
-    <p class="small">채널 설명과 노출된 영상 제목을 바탕으로 분류했습니다. 후보 영상은 원문·구간 확인을 위한 검토 단계입니다.</p>
-    ${WRESTLING_SOURCES.map(source=>{
-      const registered=db.ideas.some(idea=>idea.id==='wrestling-source-'+source.id);
-      return `<article class="wrestling-source"><div class="actions"><h3>${source.emoji} ${esc(source.name)}</h3><span class="statuspill">${esc(source.role)}</span></div>
-        <div class="source-topics">${source.topics.map(id=>`<span class="small">${esc(YT_BY_ID[id].name)}</span>`).join('')}</div>
-        <p class="small">${esc(source.note)}</p>
-        <details><summary>🎬 검토할 영상</summary><p><a href="${esc(source.candidate.url)}" target="_blank" rel="noopener noreferrer">${esc(source.candidate.title)} ↗</a></p><p class="small">${esc(source.candidate.angle)}</p></details>
-        <div class="actions"><a class="btn" href="${esc(source.url)}" target="_blank" rel="noopener noreferrer">채널 열기 ↗</a>
-        ${source.wrestlingUrl?`<a class="btn" href="${esc(source.wrestlingUrl)}" target="_blank" rel="noopener noreferrer">🤼 레슬링 영상만 보기</a>`:''}
-        <button class="btn primary" data-yp-src="${esc(source.candidate.url)}">⬇ 제작 라인에서 받기</button>
-        <button class="btn" data-wrestling-source="${source.id}" ${registered?'disabled':''}>${registered?'소재함에 등록됨':'검토 소재로 등록'}</button></div></article>`;
-    }).join('')}</section>`;
+// 유튜브 3개 채널별 소스 묶음 — 탭으로 골라 박스 그리드로 본다
+const YT_SOURCE_CHANNELS = [
+  { id:'yt-wrestling', tab:'레슬링 소스 채널', emoji:'🤼', sources:WRESTLING_SOURCES },
+  { id:'yt-christian', tab:'기독교 소스 채널', emoji:'🙏', sources:[] },
+  { id:'yt-indochina', tab:'중국 및 인도 소스 채널', emoji:'🌏', sources:[] },
+];
+let ytSrcTab = 'yt-wrestling';
+
+function wrestlingSourceLibrary(list) {
+  list = list || WRESTLING_SOURCES;
+  const btn = 'padding:5px 9px;font-size:11px';
+  return `<div class="source-box-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">${list.map(source=>{
+    const registered=db.ideas.some(idea=>idea.id==='wrestling-source-'+source.id);
+    return `<article class="source-box" style="border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:12px 13px;display:flex;flex-direction:column;gap:7px;min-width:0">
+      <div style="display:flex;align-items:center;gap:8px;min-width:0"><span style="font-size:20px;line-height:1">${source.emoji}</span><h3 style="font-size:14px;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(source.name)}</h3></div>
+      <span class="statuspill" style="align-self:flex-start;font-size:10px">${esc(source.role)}</span>
+      <div style="display:flex;flex-wrap:wrap;gap:4px">${source.topics.map(id=>`<span style="font-size:10px;color:var(--muted);border:1px solid var(--line);border-radius:5px;padding:1px 6px">${esc(YT_BY_ID[id]?.name||id)}</span>`).join('')}</div>
+      <p class="small" title="${esc(source.note)}" style="margin:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(source.note)}</p>
+      <details style="font-size:11px"><summary>🎬 검토할 영상</summary><p style="margin:6px 0 2px"><a href="${esc(source.candidate.url)}" target="_blank" rel="noopener noreferrer">${esc(source.candidate.title)} ↗</a></p><p class="small" style="margin:0">${esc(source.candidate.angle)}</p></details>
+      <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:auto"><a class="btn" style="${btn}" href="${esc(source.url)}" target="_blank" rel="noopener noreferrer">채널 ↗</a>
+      ${source.wrestlingUrl?`<a class="btn" style="${btn}" href="${esc(source.wrestlingUrl)}" target="_blank" rel="noopener noreferrer">🤼 레슬링만</a>`:''}
+      <button class="btn primary" style="${btn}" data-yp-src="${esc(source.candidate.url)}">⬇ 제작 라인</button>
+      <button class="btn" style="${btn}" data-wrestling-source="${source.id}" ${registered?'disabled':''}>${registered?'등록됨':'소재 등록'}</button></div></article>`;
+  }).join('')}</div>`;
 }
 
 document.addEventListener('click',event=>{
@@ -1066,10 +1076,21 @@ document.addEventListener('click', async e => {
 
 // ===== YouTube '소스' 탭: 내가 준 레슬링 소스 채널 전부 =====
 function ytSourcesPage() {
-  return head('YouTube 소스', `레슬링 소스 채널 ${WRESTLING_SOURCES.length}곳 · '⬇ 제작 라인에서 받기'를 누르면 그 영상이 소스 다운로드 칸에 들어갑니다`, false)
-    + wrestlingSourceLibrary()
+  const cur = YT_SOURCE_CHANNELS.find(c => c.id === ytSrcTab) || YT_SOURCE_CHANNELS[0];
+  const total = YT_SOURCE_CHANNELS.reduce((n, c) => n + c.sources.length, 0);
+  const tabs = `<div class="yp-fmts" style="margin-bottom:14px">${YT_SOURCE_CHANNELS.map(c => `<button class="yp-fmt ${c.id === cur.id ? 'active' : ''}" data-src-ch="${c.id}" aria-pressed="${c.id === cur.id}">${c.emoji} ${esc(c.tab)} <b>${c.sources.length}</b></button>`).join('')}</div>`;
+  const body = cur.sources.length
+    ? wrestlingSourceLibrary(cur.sources)
+    : `<div class="empty" style="border:1px dashed var(--line);border-radius:10px">${cur.emoji} <b>${esc(cur.tab)}</b>가 아직 비어 있습니다.<br><span class="small">참고할 유튜브 채널을 알려주면 이 탭에 박스로 추가됩니다.</span></div>`;
+  return head('YouTube 소스', `3개 채널 · 소스 ${total}곳 · 탭으로 채널을 고르세요. '⬇ 제작 라인'을 누르면 그 영상이 소스 다운로드 칸에 들어갑니다`, false)
+    + tabs
+    + `<section class="panel"><div class="sectionhead" style="margin-top:0"><h2>${cur.emoji} ${esc(cur.tab)}</h2><span class="small">${cur.sources.length}개 채널</span></div>${body}</section>`
     + `<div class="actions" style="margin-top:14px"><button class="btn ghost" data-workflow="import">쇼츠 백업 가져오기</button></div>`;
 }
+document.addEventListener('click', e => {
+  const t = e.target.closest('button[data-src-ch]'); if (!t) return;
+  ytSrcTab = t.dataset.srcCh; render();
+});
 document.addEventListener('click', e => {
   const b = e.target.closest('button[data-yp-src]'); if (!b) return;
   ytPipe.url = b.dataset.ypSrc; ytPipe.ranges = '';
