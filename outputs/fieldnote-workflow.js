@@ -631,6 +631,42 @@ const CHRISTIAN_SOURCES = [
     note:'기독교 변증 채널로, 무슬림과의 거리 토론·논쟁 현장을 다룹니다. 토론 장면을 하이라이트 소재로 쓰되 전후 발언을 확인하고, 사람이 아니라 주장과 논리를 다룹니다.',
     candidate:{title:'Muslims CALL THE COPS To KICK US OUT From Debate...',url:'https://www.youtube.com/watch?v=eaAXUMiUl4s',topic:'debate',angle:'토론이 중단된 경위와 오간 핵심 주장 한두 개를 골라, 논리 구조를 해설합니다. 특정 종교인 전체를 일반화하지 않습니다.'},
   },
+  {
+    id:'jesus-and-whatnot', name:'Jesus and Whatnot', emoji:'🎙️', url:'https://www.youtube.com/@Jesus.andwhatnot',
+    role:'무신론자와의 온라인 토론', topics:['debate','faith'],
+    note:'기독교 변증가가 무신론자와 온라인으로 토론하는 채널입니다. 상대가 막히거나 무너지는 순간이 쇼츠 하이라이트 소재가 됩니다. 제목이 자극적이니 실제 발언 전후 맥락을 확인하고 씁니다.',
+    candidate:{title:"Atheist Crashes Out After Being Caught Using ChatGPT (JAW vs 'ZipZop')",url:'https://www.youtube.com/watch?v=acyZTJ50u2k',topic:'debate',angle:'토론에서 결정적으로 흐름이 바뀐 장면 하나를 골라, 어떤 논리가 통했는지 한국어로 짧게 해설합니다.'},
+  },
+  {
+    id:'bible-faith', name:'Bible Faith', emoji:'📖', url:'https://www.youtube.com/@BibleFaith936',
+    role:'변증가 명장면 클립 모음', topics:['debate','faith'],
+    note:'Cliffe Knechtle 등 변증가의 대학 캠퍼스 문답 장면을 잘라 올리는 클립 채널입니다. 재업로드 성격이므로 원본 채널(Give Me An Answer 등)과 날짜를 확인한 뒤 원본을 소스로 씁니다.',
+    candidate:{title:'When Cliffe Turned The Biggest Atheist Into a Believer',url:'https://www.youtube.com/watch?v=M5ldIijFrd0',topic:'debate',angle:'질문 → 답변 → 반응 구조의 문답 하나를 골라 핵심 논증을 풀어 설명합니다. "개종시켰다"는 제목 주장은 확인 전까지 쓰지 않습니다.'},
+  },
+  {
+    id:'reformation-red-pill', name:'Joshua Haymes [RRP]', emoji:'🏫', url:'https://www.youtube.com/@ReformationRedPill',
+    role:'대학 캠퍼스 토론', topics:['debate','faith'],
+    note:'Reformation Red Pill 채널. 대학 캠퍼스에서 학생들과 신앙·사회 이슈로 토론하는 영상입니다. 현장에서 사실을 바로 확인시키는 장면이 많아 "팩트 확인" 포맷 참고용입니다. 정치 인물 관련 주장은 원문 발언을 따로 확인합니다.',
+    candidate:{title:'College Student LIES About Charlie Kirk, So I Forced Him To Look It Up In Front Of Everyone',url:'https://www.youtube.com/watch?v=SQz0rcAvB0s',topic:'debate',angle:'잘못된 주장 → 현장 확인 → 반응 흐름을 그대로 살려, 확인한 원문을 화면에 띄우는 구성을 검토합니다.'},
+  },
+  {
+    id:'bryce-crawford', name:'Bryce Crawford', emoji:'🗣️', url:'https://www.youtube.com/@thebrycecrawford',
+    role:'캠퍼스 거리 토론 · 윤리 쟁점', topics:['debate','faith'],
+    note:'캠퍼스에서 학생과 기독교 윤리 쟁점(동성애 등)을 두고 토론하는 채널입니다. 민감한 주제이므로 주장과 논리를 다루고, 상대 개인을 조롱하는 편집은 하지 않습니다.',
+    candidate:{title:'Pro Gay Student Challenges Christian on Homosexuality',url:'https://www.youtube.com/watch?v=R6ZIcXUvCgU',topic:'debate',angle:'양측의 가장 강한 주장 하나씩을 공정하게 소개한 뒤, 성경 해석 쟁점을 정리합니다.'},
+  },
+  {
+    id:'sam-shamoun', name:'More Sam Shamoun', emoji:'⚔️', url:'https://www.youtube.com/@moresamshamoun',
+    role:'변증가 Sam Shamoun 클립 · 이슬람·유대교 논쟁', topics:['debate','yt-islam-critique','faith'],
+    note:'변증가 Sam Shamoun의 토론 클립 채널입니다. 이슬람·유대교·이스라엘 관련 신학 논쟁이 많습니다. 발언이 거친 편이라 논증 부분만 골라 쓰고, 인용 구절(성경·코란)은 원문으로 확인합니다.',
+    candidate:{title:"She Thought ISRAEL Was God's Chosen Nation—Until Sam Shamoun Showed Her THIS",url:'https://www.youtube.com/watch?v=CYiZT-FvlBY',topic:'debate',angle:'인용된 성경 구절을 화면에 띄워 논증 흐름을 정리합니다. 신학적 해석이 갈리는 부분은 다른 견해도 한 줄 소개합니다.'},
+  },
+  {
+    id:'dr-daf', name:'Dr. Daf Show', emoji:'🌉', url:'https://www.youtube.com/@drdafshow',
+    role:'토론 쇼 "The Bridge" · 이단·타 종교 대담', topics:['debate','heresy','faith'],
+    note:'기독교인과 히브리 이스라엘파 등 다른 신앙 집단이 맞붙는 토론 쇼 "The Bridge"를 진행합니다. 이단 주장 소개 소재로 쓰되, 해당 집단에 대한 교단 공식 판단과 당사자 설명을 구분합니다.',
+    candidate:{title:'Christian vs Hebrew Israelite Women | The Bridge',url:'https://www.youtube.com/watch?v=5T86DonC1Yo',topic:'heresy',angle:'상대 집단의 핵심 주장 하나와 그에 대한 반론을 골라, 무엇이 정통 교리와 다른지 쉽게 설명합니다.'},
+  },
 ];
 
 // 유튜브 3개 채널별 소스 묶음 — 탭으로 골라 박스 그리드로 본다
