@@ -605,10 +605,38 @@ function wrestlingPromptSources(topicId) {
   }));
 }
 
+// 기독교 소스 채널 — 사용자가 준 영상 4개의 채널(2026.11.11 추가)
+const CHRISTIAN_SOURCES = [
+  {
+    id:'liberty-hangout', name:'Liberty Hangout', emoji:'🗽', url:'https://www.youtube.com/@LibertyHangout',
+    role:'보수 논평 · 기독교 vs 샤리아 논쟁', topics:['debate','yt-islam-critique','faith'],
+    note:'보수 성향 논평·거리 인터뷰 채널입니다. "기독교가 샤리아법보다 위험한가" 같은 도발형 제목으로 논쟁을 다룹니다. 주장 자체를 해설 소재로 쓰고, 인용하는 사실·통계는 원문에서 따로 확인합니다.',
+    candidate:{title:'CHRISTIANITY More Dangerous Than SHARIA LAW?!',url:'https://www.youtube.com/watch?v=RfjVJXC3lP8',topic:'debate',angle:'영상 속 양측 주장을 정리하고, 교리 비교에 필요한 근거(성경·샤리아 원문)를 확인한 뒤 반론 구조로 해설합니다.'},
+  },
+  {
+    id:'abolitionists-rising', name:'Abolitionists Rising', emoji:'📢', url:'https://www.youtube.com/@AbolitionistsRising',
+    role:'거리 전도 · 현장 충돌 영상', topics:['debate','faith'],
+    note:'낙태 폐지 운동·거리 전도 현장을 촬영하는 채널입니다. 축제·행사장에서 경찰과 마주치는 현장 영상이 있어 도입 장면 소재로 씁니다. 촬영자 측 시점이므로 상대 측 설명과 사건 경위는 따로 확인합니다.',
+    candidate:{title:'The Cops Made Us Leave the Pagan Pride Fest',url:'https://www.youtube.com/watch?v=ec3mvvMTiAY',topic:'debate',angle:'현장에서 무슨 일이 있었는지 시간순으로 정리하고, 표현의 자유·행사 규정 쟁점을 사실과 의견으로 나눠 해설합니다.'},
+  },
+  {
+    id:'lakepointe', name:'Lakepointe Church', emoji:'⛪', url:'https://www.youtube.com/@LakepointeChurch',
+    role:'목회자 성경 해설 · 반론', topics:['faith','yt-faith-life','debate'],
+    note:'텍사스 대형교회 채널입니다. Josh Howerton 목사의 "Live Free" 시리즈에서 정치인·인플루언서의 성경 해석 주장에 반론하는 영상을 확인했습니다. 교리 해설의 근거 자료로 쓰고, 상대 주장의 원문 발언을 함께 확인합니다.',
+    candidate:{title:"Megachurch Pastor Responds to James Talarico's *DANGEROUS* Bible Claims | Live Free w Josh Howerton",url:'https://www.youtube.com/watch?v=Yfu7BgYxXms',topic:'faith',angle:'상대(James Talarico)의 원 발언과 목사의 반론을 나란히 놓고, 쟁점이 된 성경 구절을 한국어로 쉽게 풀어 설명합니다.'},
+  },
+  {
+    id:'godlogic', name:'GodLogic Apologetics', emoji:'🧩', url:'https://www.youtube.com/@GodLogicApologetics',
+    role:'변증 · 무슬림과의 거리 토론', topics:['debate','yt-islam-critique','faith'],
+    note:'기독교 변증 채널로, 무슬림과의 거리 토론·논쟁 현장을 다룹니다. 토론 장면을 하이라이트 소재로 쓰되 전후 발언을 확인하고, 사람이 아니라 주장과 논리를 다룹니다.',
+    candidate:{title:'Muslims CALL THE COPS To KICK US OUT From Debate...',url:'https://www.youtube.com/watch?v=eaAXUMiUl4s',topic:'debate',angle:'토론이 중단된 경위와 오간 핵심 주장 한두 개를 골라, 논리 구조를 해설합니다. 특정 종교인 전체를 일반화하지 않습니다.'},
+  },
+];
+
 // 유튜브 3개 채널별 소스 묶음 — 탭으로 골라 박스 그리드로 본다
 const YT_SOURCE_CHANNELS = [
   { id:'yt-wrestling', tab:'레슬링 소스 채널', emoji:'🤼', sources:WRESTLING_SOURCES },
-  { id:'yt-christian', tab:'기독교 소스 채널', emoji:'🙏', sources:[] },
+  { id:'yt-christian', tab:'기독교 소스 채널', emoji:'🙏', sources:CHRISTIAN_SOURCES },
   { id:'yt-indochina', tab:'중국 및 인도 소스 채널', emoji:'🌏', sources:[] },
 ];
 let ytSrcTab = 'yt-wrestling';
@@ -634,16 +662,17 @@ function wrestlingSourceLibrary(list) {
 document.addEventListener('click',event=>{
   const button=event.target.closest('button[data-wrestling-source]');
   if(!button)return;
-  const source=WRESTLING_SOURCES.find(item=>item.id===button.dataset.wrestlingSource);
+  const group=YT_SOURCE_CHANNELS.find(g=>g.sources.some(item=>item.id===button.dataset.wrestlingSource));
+  const source=group&&group.sources.find(item=>item.id===button.dataset.wrestlingSource);
   if(!source||db.ideas.some(idea=>idea.id==='wrestling-source-'+source.id))return;
   const video=source.candidate;
   db.ideas.unshift({
     id:'wrestling-source-'+source.id,title:video.title,
     note:`소스 · ${source.name}\n역할 · ${source.role}\n\n기획 방향\n${video.angle}\n\n확인 메모\n${source.note}\n\n검토 단계 · 원문·편집 구간·기술명·선수 정보 확인 전`,
-    sources:video.url+'\n'+source.url,preferredChannel:'youtube',ytChannel:'yt-wrestling',topicId:video.topic,
+    sources:video.url+'\n'+source.url,preferredChannel:'youtube',ytChannel:group.id,topicId:video.topic,
     sample:false,created:Date.now(),
   });
-  log('레슬링 검토 소재 등록: '+source.name);
+  log(group.tab.replace(' 소스 채널','')+' 검토 소재 등록: '+source.name);
   persist();render();toast('검토 소재를 기획 소재함에 등록했습니다.');
 });
 
