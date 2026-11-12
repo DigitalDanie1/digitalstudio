@@ -14,6 +14,7 @@
 | --- | --- | --- |
 | `STUDIO_PASSWORD` | 필수 | 로그인 비밀번호. 비어 있으면 사이트 전체가 차단됩니다. 바꾸면 모든 기기가 로그아웃됩니다. |
 | `ANTHROPIC_API_KEY` | AI 생성에 필요 | 주제·초안 생성에만 사용합니다. 호출마다 유료 요금이 발생합니다. |
+| `FIELDNOTE_PAID_AI_ENABLED` | AI 자동 생성에 필요 | `true`로 설정하면 소재에서 Claude 1차 원고·대본을 바로 생성합니다. 비용 방지를 위해 기본값은 꺼짐입니다. |
 | `FIELDNOTE_MODEL` | 선택 | 기본 `claude-opus-5-5`. 비용을 줄이려면 `claude-sonnet-5-5`. |
 
 4. 환경변수를 추가·변경했다면 **Redeploy** 합니다.
