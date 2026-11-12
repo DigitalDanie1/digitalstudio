@@ -35,6 +35,28 @@ function manualIdeaDraft(id) {
   });
 }
 
+function manualEditorDraft() {
+  const post = db.posts.find(item => item.id === editing);
+  const channel = $('#postChannel')?.value;
+  if (!post || !['blog', 'youtube'].includes(channel)) {
+    toast('블로그 또는 유튜브 원고에서만 AI 초안을 만들 수 있습니다.');
+    return;
+  }
+  const title = $('#postTitle').value.trim();
+  if (!title) { toast('먼저 제목을 입력하세요.'); return; }
+  const idea = post.ideaId && db.ideas.find(item => item.id === post.ideaId);
+  const category = channel === 'blog'
+    ? $('#postNaverCategory')?.value
+    : (idea?.topicId ? ytDef(idea.topicId)?.name : '');
+  if (!category) { toast(channel === 'blog' ? '먼저 네이버 카테고리를 선택하세요.' : '연결된 유튜브 주제를 찾지 못했습니다.'); return; }
+  manualAIModal({
+    kind: 'editorDraft', postId: post.id, channel, title, category,
+    note: $('#postMemo').value.trim() || post.memo || '', sources: $('#postSources').value.trim() || post.sources,
+    voice: channel === 'blog' ? db.profile.blogVoice || db.profile.tone : ytChVoice($('#postYtChannel')?.value || post.ytChannel || ytTab()),
+    format: idea?.format || ytFormat(),
+  });
+}
+
 function manualAIPrompt(context) {
   const format = context.channel === 'youtube'
     ? context.format === 'long' ? '유튜브 8~10분 롱폼' : '유튜브 60초 쇼츠'
@@ -114,6 +136,15 @@ function saveManualAIResponse(text, context) {
     closeModal();
     render();
     toast('소재 ' + items.length + '개를 저장했습니다.');
+    return;
+  }
+  if (context.kind === 'editorDraft') {
+    const post = db.posts.find(item => item.id === context.postId);
+    if (!post) throw Error('현재 원고를 찾지 못했습니다. 다시 열어 주세요.');
+    Object.assign(post, { title: data.title.trim(), body: data.body.trim(), sources: data.sources || post.sources, status: 'draft', aiDraft: true, checks: [false, false, false], updated: now });
+    log('AI 채팅 초안 반영: ' + post.title);
+    persist(); closeModal(); dirty = false; editing = post.id; view = context.channel; render();
+    toast('현재 원고에 AI 초안을 넣었습니다. 사실과 출처를 검수하세요.');
     return;
   }
   const idea = db.ideas.find(item => item.id === context.ideaId);
