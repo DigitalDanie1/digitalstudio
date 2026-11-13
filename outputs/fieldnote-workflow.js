@@ -1558,3 +1558,29 @@ const PLATFORM_THEMES = {
   'Threads': '트레이딩 · 직업 · 싱가포르',
 };
 function platformThemesBlock() { return `<section class="panel cp-block cp-themes"><h2>플랫폼별 다루는 주제</h2><ul class="cp-theme-list">${IDEA_PLATFORMS.map(p => `<li style="--pc:${platformColor(p)}"><b>${esc(p)}</b><span>${esc(PLATFORM_THEMES[p])}</span></li>`).join('')}</ul><p class="small">싱가포르 이야기는 X · Instagram · Threads에서만 다룹니다.</p></section>`; }
+
+// ===== 네이버 블로그 '스킬' 탭 (sphereai.work 블로그 자동화 v2, 12개 · ~/.claude/skills 설치됨) =====
+const BLOG_SKILLS = [
+  { step:'시작', id:'naver-blog-start-here-v2', name:'시작 안내 v2', does:'내 상황을 묻고 어떤 스킬을 어떤 순서로 쓸지 짚어 줌', aside:false, cmd:'/naver-blog-start-here-v2 내 블로그는 중독·투자 심리·도박 설계·매크로를 다뤄. 첫 글 하나를 같이 준비하자' },
+  { step:'1a', id:'naver-homefeed-trend', name:'홈판 오늘의 흐름', does:'별도 읽기 전용 계정으로 홈판(지식·추천)에서 내 주제 카드만 모아 주제 아이디어로', aside:true, cmd:'/naver-homefeed-trend 주제어: 중독, 도박, 코인, 주식, 투자, 도파민, 금리' },
+  { step:'1b', id:'naver-blog-topic-picker-v2', name:'주제 고르기 v2', does:'홈판 → 최근 48시간 뉴스 → 자동완성 검색어 → 내 인기 글 새 형식 순서로 주제 결정, 겹치는 글 확인', aside:false, cmd:'/naver-blog-topic-picker-v2 씨앗 단어: 코인 중독. 카테고리는 FIELDNOTE 블로그 카테고리 기준' },
+  { step:'2', id:'naver-blog-strategy', name:'운영 전략', does:'카테고리 · 허브 글 구조 · 발행 리듬 · 내부 링크 · 주간 점검표 계획서', aside:false, cmd:'/naver-blog-strategy 독자: 투자·코인으로 마음이 흔들리는 20~40대. 주 2회 발행 가능' },
+  { step:'3', id:'naver-ai-briefing-writing', name:'AI 브리핑 글쓰기', does:'요약 → 질문형 소제목 → FAQ → 출처 구조로 한 편 작성, 태그 10개 이상', aside:false, cmd:'/naver-ai-briefing-writing 위에서 고른 주제로 글 써줘. 숫자·날짜는 출처 확인, 경험은 지어내지 말고 [직접 경험]으로 비워 둬' },
+  { step:'4', id:'flow-nano-banana-images', name:'Flow 무료 이미지', does:'구글 Flow 나노바나나로 0크레딧 확인 후 이미지 생성·다운로드', aside:true, cmd:'/flow-nano-banana-images 이 글에 맞는 이미지 3장 (사람·글자·로고 없이)' },
+  { step:'5', id:'blog-title-card', name:'제목 카드', does:'배경 한 장 + 제목 두 줄로 1080×1080 대표 이미지, 크롬으로 무료 렌더', aside:false, cmd:'/blog-title-card 배경은 이미지 1번, 제목은 글 제목 그대로' },
+  { step:'6', id:'naver-editor-assembly', name:'에디터 조립', does:'네이버 에디터에 제목·본문·이미지·캡션·AI 표시를 넣고 확인 (발행은 안 함)', aside:true, cmd:'/naver-editor-assembly 완성한 글과 이미지를 에디터에 조립해줘. 발행은 하지 마' },
+  { step:'7', id:'naver-blog-scheduling', name:'예약 발행', does:'카테고리·태그·날짜를 넣고 다시 읽어 보여 준 뒤, 내가 "예"라고 해야 예약', aside:true, cmd:'/naver-blog-scheduling 다음 빈 슬롯(오전 9시)으로 예약 준비. 확정 전에 꼭 보여줘' },
+  { step:'8', id:'naver-blog-measurement', name:'통계 읽기', does:'조회수·인기 글·유입 경로·검색어를 읽기만 하고 다음 글 3개 추천', aside:true, cmd:'/naver-blog-measurement 어제 기준 통계 정리하고 다음 글 3개 골라줘' },
+];
+const BLOG_SKILLS_OLD = ['naver-blog-start-here', 'naver-blog-topic-picker'];
+function blogSkillsPage() {
+  const pc = platformColor('네이버 블로그');
+  const row = s => `<li class="bs-row ${s.aside ? 'aside' : ''}"><span class="bs-step">${esc(s.step)}</span>
+    <div class="bs-main"><div class="bs-head"><h3>${esc(s.name)}</h3><code>/${esc(s.id)}</code>${s.aside ? '<span class="bs-need">Aside 필요 · 미설치</span>' : '<span class="bs-ok">바로 사용 가능</span>'}</div>
+    <p>${esc(s.does)}</p><div class="bs-cmd"><code>${esc(s.cmd)}</code><button class="btn ${s.aside ? 'ghost' : 'primary'}" data-bs-copy="${esc(s.id)}">명령 복사</button></div></div></li>`;
+  return head('네이버 블로그 스킬', `설치된 스킬 ${BLOG_SKILLS.length + BLOG_SKILLS_OLD.length}개 · sphereai.work 블로그 자동화 v2 · 순서대로 쓰면 됩니다`, false)
+    + `<div class="bs-note" style="--pc:${pc}"><b>지금 바로 되는 것</b> 시작 안내 · 주제 고르기 · 운영 전략 · 글쓰기 · 제목 카드 <span class="small">— 나머지(홈판 읽기, 이미지, 에디터 조립, 예약, 통계)는 브라우저 자동화 프로그램 <b>Aside</b>를 설치하고 네이버에 로그인한 프로필이 있어야 합니다. 발행은 항상 내가 확인한 뒤에만 됩니다.</span></div>`
+    + `<ol class="bs-list" style="--pc:${pc}">${BLOG_SKILLS.map(row).join('')}</ol>`
+    + `<p class="small" style="margin-top:12px">이전 버전 스킬(${BLOG_SKILLS_OLD.map(x => '/' + x).join(' · ')})도 함께 설치되어 있습니다. 블로그 주제는 싱가포르를 다루지 않습니다.</p>`;
+}
+document.addEventListener('click', async e => { const b = e.target.closest('button[data-bs-copy]'); if (!b) return; const s = BLOG_SKILLS.find(x => x.id === b.dataset.bsCopy); if (!s) return; const ok = await copyText(s.cmd); toast(ok ? (s.aside ? '복사했어요. 이 단계는 Aside가 있어야 실행됩니다.' : 'Claude Code 새 대화에 붙여 넣으세요.') : '복사하지 못했어요.'); });
