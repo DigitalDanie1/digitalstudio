@@ -6,7 +6,12 @@
   const PAGE = 5;
   let sw = { pf: '', ideaId: '', sent: false, postId: '' };
   try { sw = { ...sw, ...JSON.parse(localStorage.getItem(SW_KEY) || '{}') }; } catch (_) {}
-  let swAnswer = '', swCustom = '', swPage = 0, swError = '', swCopied = null;
+  let swAnswer = '', swCustom = '', swPage = 0, swError = '', swCopied = null, swPostCopied = null, swUrl = '', swUrlError = '', swSeen = false;
+  // 플랫폼 글쓰기 화면
+  const WRITE_URL = { blog:'https://blog.naver.com/PostWriteForm.naver', x:'https://x.com/compose/post', telegram:'https://web.telegram.org/', insta:'https://www.instagram.com/', threads:'https://www.threads.com/', youtube:'https://studio.youtube.com/' };
+  const TOTAL = 6;
+  // 원고 안에 남은 빈칸 표시
+  const marks = body => ({ check: (String(body).match(/\[확인 필요[^\]]*\]/g) || []).length, mine: (String(body).match(/\[(?:내|직접) 경험[^\]]*\]/g) || []).length });
   const save = () => { try { localStorage.setItem(SW_KEY, JSON.stringify(sw)); } catch (_) {} };
 
   const swIdea = () => db.ideas.find(i => i.id === sw.ideaId) || null;
@@ -19,14 +24,18 @@
     if (!IDEA_PLATFORMS.includes(sw.pf)) return 1;
     if (!swIdea()) return 2;
     if (!sw.sent) return 3;
-    if (!swPost()) return 4;
-    return 5;
+    const p = swPost();
+    if (!p) return 4;
+    if (p.status !== 'approved') return 5;
+    if (!p.publicationCheck) return 6;
+    return 7;
   }
   function resetFrom(n) {
     if (n <= 1) sw.pf = '';
     if (n <= 2) { sw.ideaId = ''; swPage = 0; swCustom = ''; }
     if (n <= 3) { sw.sent = false; swCopied = null; }
     if (n <= 4) { sw.postId = ''; swAnswer = ''; swError = ''; }
+    if (n <= 6) { swPostCopied = null; swUrl = ''; swUrlError = ''; swSeen = false; }
     save();
   }
 
@@ -66,11 +75,11 @@
     return { title, body, sources: '' };
   }
 
-  const done = (n, label, value) => `<li class="sw-step sw-done"><span class="sw-n" aria-hidden="true">✓</span><div class="sw-done-text"><span>${n}. ${esc(label)}</span><b>${esc(value)}</b></div><button class="sw-change" data-sw-back="${n}">바꾸기</button></li>`;
+  const done = (n, label, value, btn = '바꾸기') => `<li class="sw-step sw-done"><span class="sw-n" aria-hidden="true">✓</span><div class="sw-done-text"><span>${n}. ${esc(label)}</span><b>${esc(value)}</b></div>${btn ? `<button class="sw-change" data-sw-back="${n}">${btn}</button>` : ''}</li>`;
   const todo = (n, label) => `<li class="sw-step sw-todo"><span class="sw-n">${n}</span><span>${esc(label)}</span></li>`;
   const now = (n, label, help, inner) => `<li class="sw-step sw-now" id="swNow"><div class="sw-now-head"><span class="sw-n">${n}</span><h3>${esc(label)}</h3></div><p class="sw-help">${help}</p>${inner}</li>`;
 
-  const LABELS = ['어디에 올릴까요?', '무엇에 대해 쓸까요?', 'Claude에게 부탁하기', 'Claude의 답 붙여 넣기'];
+  const LABELS = ['어디에 올릴까요?', '무엇에 대해 쓸까요?', 'Claude에게 부탁하기', 'Claude의 답 붙여 넣기', '확인하고 승인하기', '올리고 주소 남기기'];
 
   function stepsBlock() {
     const cur = current(), i = swIdea(), p = swPost();
@@ -106,12 +115,39 @@
     else if (cur > 4) rows.push(done(4, LABELS[3], '원고 저장: ' + p.title));
     else rows.push(todo(4, LABELS[3]));
 
-    const finish = cur === 5 ? `<div class="sw-finish" id="swNow"><h3>원고가 만들어졌어요 🎉</h3><p class="sw-help">이제 원고를 열어 <b>[확인 필요]</b>와 <b>[내 경험]</b> 자리를 직접 채우세요. 다 고치면 아래쪽 검수 3가지를 체크합니다.</p>
-      <div class="sw-actions"><button class="sw-big primary" data-sw-openpost>원고 열기</button><button class="sw-big ghost" data-sw-restart>새 글 시작하기</button></div></div>` : '';
-    const stepNo = Math.min(cur, 4);
+    // 5
+    if (cur === 5) {
+      const m = marks(p.body), left = m.check + m.mine, all = p.checks.every(Boolean);
+      rows.push(now(5, LABELS[4], left ? '원고에 아직 직접 채울 빈칸이 있어요. 원고를 열어 고친 뒤, 왼쪽 메뉴 <b>공통 원리</b>를 눌러 여기로 돌아오세요.' : '빈칸은 다 채웠어요. 아래 3가지를 읽고 맞으면 하나씩 체크하세요.',
+        `${left ? `<div class="sw-left"><span>남은 빈칸</span>${m.check ? `<b>[확인 필요] ${m.check}개</b>` : ''}${m.mine ? `<b>[내 경험] ${m.mine}개</b>` : ''}</div>` : '<p class="sw-ok">✓ 빈칸 없음</p>'}
+        <div class="sw-actions"><button class="sw-big ${left ? 'primary' : 'ghost'}" data-sw-openpost>원고 열어서 고치기</button></div>
+        <div class="sw-checks">${checks.map((c, k) => `<label class="sw-check"><input type="checkbox" data-sw-check="${k}" ${p.checks[k] ? 'checked' : ''}><span>${esc(c)}</span></label>`).join('')}</div>
+        ${swError ? `<p class="sw-error" role="alert">${esc(swError)}</p>` : ''}
+        <div class="sw-actions"><button class="sw-big primary" data-sw-approve ${all && !left ? '' : 'aria-disabled="true"'}>승인하기</button></div>`));
+    } else if (cur > 5) rows.push(done(5, LABELS[4], '승인 완료', '승인 취소'));
+    else rows.push(todo(5, LABELS[4]));
+    // 6
+    if (cur === 6) {
+      const c = p.channel, name = (CH[c] && CH[c].name) || sw.pf;
+      rows.push(now(6, LABELS[5], `${esc(name)}에 직접 올린 뒤, 올린 글의 주소를 남기세요.`,
+        `<ol class="sw-sub">
+          <li><span class="sw-subn">①</span><button class="sw-big primary" data-sw-copypost>글 복사하기</button>${swPostCopied === true ? '<span class="sw-ok">✓ 복사됐어요</span>' : swPostCopied === false ? '<span class="sw-error-inline">복사가 안 됐어요. 원고를 열어 직접 복사해 주세요.</span>' : ''}</li>
+          <li><span class="sw-subn">②</span><a class="sw-big" href="${WRITE_URL[c] || '#'}" target="_blank" rel="noopener noreferrer">${esc(name)} 열기 ↗</a><span class="sw-subhelp">붙여 넣고 올리기</span></li>
+          <li class="sw-sub-wide"><span class="sw-subn">③</span><form class="sw-urlform" data-sw-url novalidate><label for="swUrl">올린 글 주소 <span class="sw-subhelp">(올린 글 화면 맨 위 주소창을 복사)</span></label>
+            <input id="swUrl" class="sw-input" type="url" inputmode="url" placeholder="https://" value="${esc(swUrl)}">
+            <label class="sw-check"><input type="checkbox" data-sw-seen ${swSeen ? 'checked' : ''}><span>올린 글을 열어 제목·내용·공개 상태를 확인했어요</span></label>
+            ${swUrlError ? `<p class="sw-error" role="alert">${esc(swUrlError)}</p>` : ''}
+            <button class="sw-big primary" type="submit">기록하기</button></form></li>
+        </ol>`));
+    } else if (cur > 6) rows.push(done(6, LABELS[5], '올림 · ' + p.publicationCheck.url, ''));
+    else rows.push(todo(6, LABELS[5]));
+
+    const finish = cur === 7 ? `<div class="sw-finish" id="swNow"><h3>오늘 글 하나 완성 🎉</h3><p class="sw-help">올린 뒤 볼 숫자: <b>${esc(PLATFORM_PLAYBOOK[sw.pf]?.metric || '반응')}</b>. 며칠 뒤 확인해 보세요.</p>
+      <div class="sw-actions"><a class="sw-big ghost" href="${esc(p.publicationCheck.url)}" target="_blank" rel="noopener noreferrer">올린 글 보기 ↗</a><button class="sw-big primary" data-sw-restart>새 글 시작하기</button></div></div>` : '';
+    const stepNo = Math.min(cur, TOTAL);
     return `<section class="sw" style="--pc:${sw.pf ? platformColor(sw.pf) : 'var(--lime)'}" aria-label="오늘 글 하나 쓰기">
-      <div class="sw-top"><h2>오늘 글 하나 쓰기</h2><span class="sw-progress">${cur === 5 ? '4단계 모두 끝' : `${stepNo} / 4 단계`}</span></div>
-      <div class="sw-bar" aria-hidden="true"><i style="width:${(Math.min(cur - 1, 4) / 4) * 100}%"></i></div>
+      <div class="sw-top"><h2>오늘 글 하나 쓰기</h2><span class="sw-progress">${cur > TOTAL ? '모든 단계 끝' : `${stepNo} / ${TOTAL} 단계`}</span></div>
+      <div class="sw-bar" aria-hidden="true"><i style="width:${(Math.min(cur - 1, TOTAL) / TOTAL) * 100}%"></i></div>
       <ol class="sw-steps">${rows.join('')}</ol>${finish}</section>`;
   }
 
@@ -140,31 +176,66 @@
   }
 
   document.addEventListener('click', async e => {
-    const t = e.target.closest('[data-sw-pf],[data-sw-idea],[data-sw-more],[data-sw-back],[data-sw-copy],[data-sw-sent],[data-sw-openpost],[data-sw-restart]');
+    const t = e.target.closest('[data-sw-pf],[data-sw-idea],[data-sw-more],[data-sw-back],[data-sw-copy],[data-sw-sent],[data-sw-openpost],[data-sw-restart],[data-sw-approve],[data-sw-copypost]');
     if (!t || !t.closest('.sw')) return;
     if (t.dataset.swPf) { resetFrom(2); sw.pf = t.dataset.swPf; save(); rerender(); return; }
     if (t.dataset.swIdea) { resetFrom(3); sw.ideaId = t.dataset.swIdea; save(); rerender(); return; }
     if (t.hasAttribute('data-sw-more')) { swPage++; rerender(); return; }
+    if (t.dataset.swBack === '5') { const p = swPost(); if (p) { p.status = 'review'; p.updated = Date.now(); log('승인 취소: ' + p.title); persist(); } rerender(); return; }
     if (t.dataset.swBack) { resetFrom(+t.dataset.swBack); rerender(); return; }
+    if (t.hasAttribute('data-sw-approve')) {
+      const p = swPost(); if (!p) return;
+      const m = marks(p.body);
+      if (m.check + m.mine) swError = `아직 빈칸이 ${m.check + m.mine}개 남았어요. 원고를 열어 먼저 채워 주세요.`;
+      else if (!p.checks.every(Boolean)) swError = '3가지를 모두 체크해야 승인할 수 있어요.';
+      else { swError = ''; p.status = 'approved'; p.updated = Date.now(); log('승인: ' + p.title); persist(); toast('승인했어요. 이제 올릴 차례예요.'); }
+      rerender(); return;
+    }
+    if (t.hasAttribute('data-sw-copypost')) {
+      const p = swPost(); if (!p) return;
+      swPostCopied = await copyText(p.title + '\n\n' + p.body);
+      toast(swPostCopied ? '글을 복사했어요. 올릴 곳에 붙여 넣으세요.' : '복사하지 못했어요.');
+      rerender(); return;
+    }
     if (t.hasAttribute('data-sw-copy')) {
       swCopied = await copyAsk();
       if (current() === 3) rerender();
       return;
     }
     if (t.hasAttribute('data-sw-sent')) { sw.sent = true; save(); rerender('#swAnswer'); return; }
-    if (t.hasAttribute('data-sw-openpost')) { const p = swPost(); if (!p || !canLeave()) return; editing = p.id; view = p.channel; render(); window.scrollTo(0, 0); return; }
+    if (t.hasAttribute('data-sw-openpost')) { swError = ''; const p = swPost(); if (!p || !canLeave()) return; editing = p.id; view = p.channel; render(); window.scrollTo(0, 0); return; }
     if (t.hasAttribute('data-sw-restart')) { resetFrom(1); rerender(); }
   });
 
   document.addEventListener('input', e => {
     if (e.target.id === 'swAnswer') swAnswer = e.target.value;
     if (e.target.id === 'swCustom') swCustom = e.target.value;
+    if (e.target.id === 'swUrl') swUrl = e.target.value;
+  });
+
+  document.addEventListener('change', e => {
+    if (!e.target.closest || !e.target.closest('.sw')) return;
+    if (e.target.dataset.swCheck !== undefined) {
+      const p = swPost(); if (!p) return;
+      p.checks[+e.target.dataset.swCheck] = e.target.checked; p.updated = Date.now(); persist();
+      swError = ''; rerender();
+    }
+    if (e.target.hasAttribute('data-sw-seen')) swSeen = e.target.checked;
   });
 
   document.addEventListener('submit', e => {
-    const own = e.target.closest('[data-sw-own]'), form = e.target.closest('[data-sw-save]');
-    if (!own && !form) return;
+    const own = e.target.closest('[data-sw-own]'), form = e.target.closest('[data-sw-save]'), urlForm = e.target.closest('[data-sw-url]');
+    if (!own && !form && !urlForm) return;
     e.preventDefault();
+    if (urlForm) {
+      const raw = swUrl.trim(), p = swPost(), url = raw && workflowURL(/^https?:\/\//i.test(raw) ? raw : 'https://' + raw);
+      if (!p) return;
+      if (!url) swUrlError = '주소는 https:// 로 시작해야 해요. 올린 글을 열고 맨 위 주소창을 복사해 붙여 넣으세요.';
+      else if (!swSeen) swUrlError = '올린 글을 열어 확인했는지 체크해 주세요.';
+      else { swUrlError = ''; p.publicationCheck = { url, note: '', at: Date.now() }; log('게시 확인 완료: ' + p.title); persist(); toast('기록했어요. 오늘 글 하나 완성!'); }
+      rerender(swUrlError ? '#swUrl' : '');
+      return;
+    }
     if (own) {
       const title = swCustom.trim();
       if (!title) { toast('주제를 먼저 적어 주세요.'); document.getElementById('swCustom')?.focus(); return; }
@@ -248,6 +319,18 @@
 .sw-tip kbd{border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:1px 7px;font-family:inherit;background:var(--panel2)}
 .sw-answer{width:100%;min-height:220px;padding:14px 16px;font-size:17px;line-height:1.6;border-radius:12px;border:2px solid var(--line);background:#0f1216;color:var(--text);resize:vertical;font-family:inherit}
 .sw-error{color:#ffb4b4;background:#3a1f22;border:1px solid #6b3237;border-radius:10px;padding:10px 14px;margin:10px 0 0;font-size:17px}
+.sw-left{display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:17px;margin:0 0 12px}
+.sw-left b{background:#3a2a14;border:1px solid #6b4f22;color:#ffd79a;border-radius:8px;padding:4px 12px}
+.sw-checks{display:grid;gap:10px;margin:18px 0 6px}
+.sw-check{display:flex;gap:14px;align-items:center;min-height:56px;padding:10px 16px;border-radius:12px;border:2px solid var(--line);background:var(--panel2);font-size:18px;cursor:pointer}
+.sw-check input{width:26px;height:26px;flex:none;accent-color:var(--pc)}
+.sw-check:has(input:checked){border-color:var(--pc)}
+.sw-big[aria-disabled="true"]{opacity:.45}
+.sw-sub-wide{align-items:flex-start!important}
+.sw-urlform{flex:1 1 280px;display:grid;gap:10px}
+.sw-urlform>label{font-size:18px;font-weight:700}
+.sw-urlform .sw-big{justify-self:start}
+.sw-error-inline{color:#ffb4b4;font-size:16px}
 .sw-finish{margin-top:12px;border:2px solid var(--pc);border-radius:12px;padding:18px;background:#171b21}
 @media (max-width:640px){.sw{padding:16px}.sw-top h2{font-size:22px}.sw-big{width:100%}.sw-change{padding:0 12px}}
 `;
