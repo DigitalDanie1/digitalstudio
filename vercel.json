@@ -11,6 +11,18 @@
       "destination": "/outputs/fieldnote-workflow.js"
     },
     {
+      "source": "/instatoon.js",
+      "destination": "/outputs/instatoon.js"
+    },
+    {
+      "source": "/instatoon.css",
+      "destination": "/outputs/instatoon.css"
+    },
+    {
+      "source": "/assets/singbubu-logo.png",
+      "destination": "/outputs/assets/singbubu-logo.png"
+    },
+    {
       "source": "/",
       "destination": "/outputs/fieldnote-studio.html"
     }
