@@ -773,11 +773,11 @@ const PLATFORM_STARTERS = [
   { sid:'x-fomo-proof', platform:'X', title:'수익 인증 타임라인이 착시인 이유 3가지', angle:'생존자 편향을 코인 커뮤니티 장면으로 짧게 설명한다.', hook:'첫 글 · "내 타임라인에 손실 인증이 없는 이유"', outline:['첫 글: 착시라는 주장','후속 1~3: 생존자 편향 · 선택적 공유 · FOMO','마지막 글: 출처 + '+HELP_LINE], verify:['생존자 편향 설명 출처','상담처 운영 정보 최신 여부'] },
   { sid:'x-rate-priced-in', platform:'X', title:'금리 인하 "선반영"을 스레드 3개로', angle:'기대가 먼저 가격에 반영되는 구조를 한 장 이미지와 함께 설명한다.', hook:'첫 글 · "발표 날 시장이 반대로 움직이는 이유"', outline:['첫 글: 선반영 한 문장 정의','후속: 실제 사례 한 개 [확인 필요: 날짜와 수치]','마지막 글: 전망 아님 + 출처'], verify:['사례 날짜·정책 금리·시장 반응 수치'] },
   { sid:'tg-weekly-macro', platform:'Telegram', title:'이번 주 코인 시장을 흔든 매크로 3줄', angle:'금리·달러·주식 중 코인 가격에 실제로 영향을 준 것만 3줄로. 중요한 변화부터.', hook:'제목 · [11월 2주] 코인에 영향 준 것 3가지', outline:['• 매크로 변화 1 (지표·발표 + 날짜) → 코인 반응','• 변화 2','• 변화 3','내 해석 두 줄','원문 링크 + "투자 권유 아님"'], verify:['모든 수치의 날짜·출처','인과를 단정하지 않았는지'] },
-  { sid:'tg-sg-casino-levy', platform:'네이버 블로그', title:'싱가포르 카지노 내국인 입장료, 3줄 정리', angle:'블로그 원문을 구독자용 요약으로 줄인다.', hook:'제목 · 싱가포르 사람은 카지노에 들어갈 때 돈을 낸다', outline:['• 제도 개요 [확인 필요: 현재 금액·대상]','• 도입 목적','• 직접 본 장면 한 줄','블로그 원문 링크'], verify:['입장료 금액과 시행 기관 공식 자료'] },
-  { sid:'tg-wrestling-week', platform:'X', title:'이번 주 볼 만한 레슬링·UFC 경기 3개', angle:'레슬링 소스 채널에서 고른 영상 링크 큐레이션. 유튜브 쇼츠로 이어지는 예고편 역할.', hook:'제목 · 이번 주 레슬링 볼거리 3', outline:['• 경기 1 + 한 줄 이유 + 링크','• 경기 2','• 경기 3','다음 쇼츠 예고 한 줄'], verify:['링크가 공식 채널 원본인지','선수·대회 표기'] },
+  { sid:'tg-sg-casino-levy', platform:'X', title:'싱가포르 카지노 내국인 입장료, 3줄 정리', angle:'블로그 원문을 구독자용 요약으로 줄인다.', hook:'제목 · 싱가포르 사람은 카지노에 들어갈 때 돈을 낸다', outline:['• 제도 개요 [확인 필요: 현재 금액·대상]','• 도입 목적','• 직접 본 장면 한 줄','블로그 원문 링크'], verify:['입장료 금액과 시행 기관 공식 자료'] },
+  { sid:'tg-wrestling-week', platform:'YouTube', ytFormat:'shorts', title:'이번 주 볼 만한 레슬링·UFC 경기 3개', angle:'레슬링 소스 채널에서 고른 영상 링크 큐레이션. 유튜브 쇼츠로 이어지는 예고편 역할.', hook:'제목 · 이번 주 레슬링 볼거리 3', outline:['• 경기 1 + 한 줄 이유 + 링크','• 경기 2','• 경기 3','다음 쇼츠 예고 한 줄'], verify:['링크가 공식 채널 원본인지','선수·대회 표기'] },
   { sid:'ig-loss-card', platform:'Instagram', title:'같은 10만 원, 잃을 때 더 아픈 이유 (카드 6장)', angle:'손실 회피를 저장하고 싶은 카드로 만든다.', hook:'1장 · "10만 원 얻기 vs 10만 원 잃기, 뭐가 더 셀까?"', outline:['1장 질문','2장 일상 예시','3장 연구 한 줄 [확인 필요: 출처]','4장 투자에서 보이는 행동','5장 한계','6장 질문 + "투자 권유 아님"'], verify:['카드 글자 잘림','출처 표기 위치'] },
   { sid:'ig-app-habit', platform:'Instagram', title:'주식 앱을 끄기 어려운 이유 5가지 (카드 7장)', angle:'실시간 시세·색·알림 같은 화면 요소를 카드 하나씩.', hook:'1장 · "확인만 하려고 연 앱, 오늘 몇 번 열었나요?"', outline:['1장 질문','2~6장 요소 하나씩(시세·색·알림·순위·커뮤니티)','7장 알림 점검 질문 + '+HELP_LINE], verify:['행동 연구 출처','상담처 정보 최신 여부'] },
-  { sid:'ig-women-wrestler-reel', platform:'Instagram', title:'여자 레슬러 한 명 30초 소개 (릴스)', angle:'UWW 공식 경기 장면 몇 초 + 내 내레이션으로 선수 한 명의 강점을 소개한다.', hook:'0~3초 · "남자 선수도 피하는 그립"', outline:['훅 장면 몇 초','강점 한 가지와 기록 한 줄 [확인 필요: 메달·대회]','결론 + 다음 선수 질문'], verify:['선수 기록 공식 출처','원본 장면 사용 길이'], sources:'https://www.youtube.com/@unitedworldwrestling' },
+  { sid:'ig-women-wrestler-reel', platform:'YouTube', ytFormat:'shorts', title:'여자 레슬러 한 명 30초 소개 (릴스)', angle:'UWW 공식 경기 장면 몇 초 + 내 내레이션으로 선수 한 명의 강점을 소개한다.', hook:'0~3초 · "남자 선수도 피하는 그립"', outline:['훅 장면 몇 초','강점 한 가지와 기록 한 줄 [확인 필요: 메달·대회]','결론 + 다음 선수 질문'], verify:['선수 기록 공식 출처','원본 장면 사용 길이'], sources:'https://www.youtube.com/@unitedworldwrestling' },
   { sid:'th-sg-lunch-money', platform:'Threads', title:'싱가포르 점심시간에 들은 돈 이야기', angle:'직접 들은 대화 한 장면으로 시작하고 일반화하지 않는다.', hook:'"오늘 점심에 동료가 한 말이 계속 생각난다"', outline:['[직접 경험: 들은 말과 장소]','처음 든 생각 → 바뀐 생각','질문: "여러분 회사에서는 돈 얘기 하시나요?"','긴 근거는 답글로'], verify:['개인 경험을 나라 전체로 일반화하지 않았는지'] },
   { sid:'th-break-even', platform:'Threads', title:'"본전만 오면 판다"고 말했던 날', angle:'본전 심리를 내 경험(또는 각색 사례라고 밝힌 이야기)으로 짧게.', hook:'"본전만 오면 판다. 그 말을 몇 번 했더라"', outline:['[직접 경험 또는 각색 사례 — 각색이면 밝히기]','그때 몰랐던 것 한 줄','질문: "여러분은 멈추는 기준이 있나요?"','답글에 '+HELP_LINE], verify:['매매 방법으로 읽히지 않는지','상담처 정보 최신 여부'] },
   { sid:'th-fx-feel', platform:'Threads', title:'해외 살면서 환율 볼 때마다 드는 생각', angle:'같은 월급이 환율에 따라 다르게 느껴지는 체감을 질문으로 연다.', hook:'"월급은 그대로인데 이번 달은 왜 가난한 느낌일까"', outline:['[직접 경험: 환율을 체감한 장면]','내 생각 한 줄','질문: "해외 사는 분들은 어떻게 관리하세요?"'], verify:['환율 수치를 쓰면 날짜·출처'] },
@@ -860,7 +860,7 @@ const TG_MORE_STARTERS = [
   { sid:'tg-monday-calendar', platform:'Telegram', title:'[월요일] 이번 주 코인 트레이더가 볼 일정 5개', angle:'FOMC·CPI 같은 지표, 토큰 언락, 거래소 상장·업그레이드를 날짜순으로, 왜 중요한지 한 줄씩.', hook:'제목 · 이번 주 캘린더 (11/17~11/21)', outline:['• 날짜 · 일정 · 왜 중요한지 한 줄 ×5','내 관전 포인트 두 줄','"투자 권유 아님"'], verify:['일정 날짜·시간(한국/싱가포르 시간 표기)','언락 물량은 공식 자료'] },
   { sid:'tg-friday-wrap', platform:'Telegram', title:'[금요일] 이번 주 매매 복기: 예상과 실제', angle:'월요일에 짚은 것과 실제 시장, 내 매매를 맞춰 보는 회고. 틀린 것도 그대로.', hook:'제목 · 이번 주 복기 — 맞은 것 2, 틀린 것 1', outline:['• 맞은 것','• 틀린 것과 이유','• 내 매매 한 줄 (진입·손절·결과)','다음 주 볼 것 한 줄'], verify:['수치·결과의 날짜와 출처','실제 매매 기록만'] },
   { sid:'tg-new-post-alert', platform:'Telegram', title:'새 트레이딩 글 알림 + 3줄 요약', angle:'투자 심리·코인 블로그 글을 텔레그램 구독자에게 요약으로. 요약만 읽어도 핵심이 남게.', hook:'제목 · 새 글: [블로그 제목]', outline:['• 요약 1','• 요약 2','• 요약 3','원문 링크'], verify:['블로그 링크 작동','요약이 원문과 일치'] },
-  { sid:'tg-shorts-behind', platform:'X', title:'이번 쇼츠 비하인드: 기술 하나 더 자세히', angle:'유튜브 쇼츠 공개 알림 + 영상에 못 넣은 설명 하나. 구독자만 보는 보너스.', hook:'제목 · 쇼츠에 못 넣은 이야기', outline:['쇼츠 링크','못 넣은 포인트 하나','다음 영상 예고'], verify:['영상 링크','기술 명칭'] },
+  { sid:'tg-shorts-behind', platform:'YouTube', ytFormat:'shorts', title:'이번 쇼츠 비하인드: 기술 하나 더 자세히', angle:'유튜브 쇼츠 공개 알림 + 영상에 못 넣은 설명 하나. 구독자만 보는 보너스.', hook:'제목 · 쇼츠에 못 넣은 이야기', outline:['쇼츠 링크','못 넣은 포인트 하나','다음 영상 예고'], verify:['영상 링크','기술 명칭'] },
   { sid:'tg-poll-next', platform:'Telegram', title:'[투표] 이번 주 비트코인, 여러분 체감은?', angle:'텔레그램 투표로 공포·중립·탐욕 3지선다. 다음 날 결과와 실제 시장을 같이 공유.', hook:'투표 · 지금 시장 체감은?', outline:['보기 3개','마감 시간','다음 날 결과 + 실제 가격 비교'], verify:['결과를 매매 신호처럼 쓰지 않기'] },
   { sid:'tg-qna', platform:'Telegram', title:'구독자 트레이딩 질문 3개에 답합니다', angle:'손절·포지션 크기·멘탈 관련 질문을 익명으로 골라 짧게 답변. 종목 추천은 하지 않음.', hook:'제목 · 받은 질문 3개', outline:['Q1 → 답','Q2 → 답','Q3 → 답','다음 질문 받는 방법'], verify:['질문자 익명 처리','개인 투자 조언으로 읽히지 않는지'] },
   { sid:'tg-term-one', platform:'Telegram', title:'1분 트레이딩 용어: 이번 주는 "청산"', angle:'매주 용어 하나(청산·펀딩비·미결제약정·레버리지·슬리피지)를 비유 하나로.', hook:'제목 · 1분 용어: 청산', outline:['한 줄 정의','일상 비유','실제로 조심할 점','관련 블로그 글 링크'], verify:['정의의 정확성','"투자 권유 아님"'] },
@@ -883,7 +883,26 @@ PLATFORM_STARTERS.push(...TG_TRADING_STARTERS);
 // v7: 텔레그램 범위 밖 주제는 지우지 않고 맞는 플랫폼으로 이동, 재구성한 주제는 손대지 않은 경우만 새 제목으로
 const TG_MOVED = { 'tg-sg-casino-levy':'네이버 블로그', 'tg-wrestling-week':'X', 'tg-shorts-behind':'X', 'tg-sg-life':'Threads' };
 const TG_RETITLED = { 'tg-weekly-macro':'이번 주 매크로 3줄 요약', 'tg-monday-calendar':'[월요일] 이번 주 꼭 볼 일정 5개', 'tg-friday-wrap':'[금요일] 이번 주 정리: 예상과 실제', 'tg-new-post-alert':'새 블로그 글 알림 + 3줄 요약', 'tg-poll-next':'[투표] 다음 영상·글 주제 골라 주세요', 'tg-qna':'구독자 질문 3개에 답합니다', 'tg-term-one':'용어 하나 쉽게: 이번 주는 \"청산\"', 'tg-help-pin':'[고정 공지] 도박·투자로 힘들 때 연락할 곳' };
-const PLATFORM_SEED_VERSION = 7;
+
+// v8: 트레이딩 · 직업 · 싱가포르 = X · Instagram · Threads, 레슬링 = YouTube
+const JOB_STARTERS = [
+  { sid:'x-job-crypto-work', platform:'X', title:'크립토 회사에서 일하면 실제로 하는 일 5가지', angle:'회사·동료를 특정하지 않고 업무 종류와 오해/실제를 스레드로.', hook:'첫 글 · "코인 회사 다닌다고 하면 다들 차트만 보는 줄 안다"', outline:['첫 글: 오해 한 줄','후속 1~5: 실제 업무 하나씩','마지막 글: 이 일에 맞는 사람'], verify:['회사 기밀·동료 정보 없는지'] },
+  { sid:'ig-job-day', platform:'Instagram', title:'싱가포르 크립토 직장인의 하루 (캐러셀 6장)', angle:'출근부터 퇴근까지 사진 6장. 회사 정보는 가리고 재미있는 장면 위주.', hook:'1장 · "싱가포르에서 코인 회사 다니면 하루가 이렇다"', outline:['1장 표지','2~5장 시간대별 장면','6장 질문: "여러분의 하루는?"'], verify:['사진 속 회사·동료 정보 가림'] },
+  { sid:'th-job-colleague', platform:'Threads', title:'싱가포르 동료가 한 말이 계속 생각난다', angle:'일하다 들은 말 한마디로 시작하는 짧은 글. 동료 특정 금지.', hook:'"오늘 회의에서 들은 말"', outline:['[직접 경험] 들은 말','처음 든 생각 → 바뀐 생각','질문: "여러분 회사에서는?"'], verify:['동료·회사 특정 안 되는지'] },
+];
+PLATFORM_STARTERS.push(...JOB_STARTERS);
+const V8_MOVES = [
+  // [id, 지금 플랫폼(이때만 이동), 새 플랫폼]
+  ['starter-sg-1', '네이버 블로그', 'X'],
+  ['starter-sg-2', '네이버 블로그', 'Threads'],
+  ['starter-sg-3', '네이버 블로그', 'Instagram'],
+  ['pf-starter-tg-sg-casino-levy', '네이버 블로그', 'X'],
+  ['sample-idea', '미분류', 'Threads'],
+  ['pf-starter-tg-wrestling-week', 'X', 'YouTube'],
+  ['pf-starter-tg-shorts-behind', 'X', 'YouTube'],
+  ['pf-starter-ig-women-wrestler-reel', 'Instagram', 'YouTube'],
+];
+const PLATFORM_SEED_VERSION = 8;
 let ideaPlatformFilter = 'all';
 
 function platformStarterNote(s) {
@@ -891,6 +910,11 @@ function platformStarterNote(s) {
 }
 function ensurePlatformStarters() {
   if (!db || !Array.isArray(db.ideas) || (db.platformSeedVersion || 0) >= PLATFORM_SEED_VERSION) return;
+  if ((db.platformSeedVersion || 0) < 8) for (const [id, from, to] of V8_MOVES) {
+    const i = db.ideas.find(x => x.id === id); if (!i || ideaPlatform(i) !== from) continue;
+    i.platform = to;
+    if (to === 'YouTube') { i.preferredChannel = 'youtube'; i.ytFormat = 'shorts'; } else if (i.preferredChannel === 'blog') delete i.preferredChannel;
+  }
   if ((db.platformSeedVersion || 0) < 7) for (const i of db.ideas) {
     const sid = String(i.id).replace('pf-starter-', '');
     if (TG_MOVED[sid] && i.platform === 'Telegram') { i.platform = TG_MOVED[sid]; if (TG_MOVED[sid] === '네이버 블로그') i.preferredChannel = 'blog'; }
@@ -1054,7 +1078,7 @@ function platformPage(c) {
   const topic = i => `<li class="ps-topic"><details><summary><span class="ps-topic-title">${esc(i.title)}</span>${i.sample ? '<span class="sampletag">예시</span>' : ''}</summary>
     <p class="ps-note">${esc(i.note)}</p>${ideaPlatformPicker(i)}
     <div class="actions"><button class="btn primary" data-create="${esc(i.id)}">원고 만들기</button>${c === 'youtube' ? `<button class="btn" data-yp-pick="${esc(i.id)}">▶ 제작 라인에서 작업</button>` : ''}<button class="btn ghost" data-idea-edit="${esc(i.id)}">수정</button><button class="btn ghost danger" data-idea-delete="${esc(i.id)}" aria-label="소재 삭제">×</button></div></details></li>`;
-  const hero = `<section class="pf-hero" style="--pc:${pc}"><div class="pf-hero-main"><div class="eyebrow">PLATFORM</div><h1>${esc(platformLabel(p))}</h1><p>${esc(book.role)}</p></div>
+  const hero = `<section class="pf-hero" style="--pc:${pc}"><div class="pf-hero-main"><div class="eyebrow">PLATFORM</div><h1>${esc(platformLabel(p))}</h1><p>${esc(book.role)}</p><p class="pf-themes">다루는 주제 · ${esc(PLATFORM_THEMES[p] || '')}</p></div>
     <dl class="pf-stats">${c === 'youtube' ? `<div><dt>쇼츠</dt><dd>${ideas.filter(i => ytFormatOf(i) === 'shorts').length}</dd></div><div><dt>롱폼</dt><dd>${ideas.filter(i => ytFormatOf(i) === 'long').length}</dd></div>` : `<div><dt>주제</dt><dd>${ideas.length}</dd></div>`}<div><dt>작성 중</dt><dd>${n('draft')}</dd></div><div><dt>검수 대기</dt><dd class="orange">${n('review')}</dd></div><div><dt>승인</dt><dd class="green">${n('approved')}</dd></div></dl>
     <div class="pf-hero-actions"><button class="btn ${ideaGenOpen[c] ? 'active' : ''}" data-idea-gen="${c}" aria-expanded="${!!ideaGenOpen[c]}">💡 아이디어 생성</button><button class="btn primary" data-action="newIdea">＋ 새 주제</button></div></section>${ideaGenOpen[c] ? ideaGenPanel(c) : ''}`;
   let board = `<section class="ps-board" style="--pc:${pc}"><div class="ps-cols">
@@ -1112,7 +1136,7 @@ function commonPage() {
   return head('공통 원리', '모든 플랫폼에 똑같이 적용되는 것만 모았습니다. 플랫폼별 작업은 왼쪽 메뉴에서 하세요.')
     + `<div class="cp-pfs">${cards}</div>`
     + (unsorted.length ? `<details class="panel cp-unsorted"><summary>플랫폼 미지정 주제 ${unsorted.length}개 · 플랫폼을 정해 주세요</summary><ul class="ps-topics">${unsorted.map(i => `<li class="ps-topic cp-unsorted-row"><span class="ps-topic-title">${esc(i.title)}</span>${ideaPlatformPicker(i)}</li>`).join('')}</ul></details>` : '')
-    + `<div class="cp-grid">
+    + platformThemesBlock() + `<div class="cp-grid">
       <section class="panel cp-block"><h2>작업 순서 <span class="small">모든 플랫폼 동일</span></h2><ol class="cp-flow">${COMMON_FLOW.map(([t, d]) => `<li><b>${esc(t)}</b><span>${esc(d)}</span></li>`).join('')}</ol></section>
       <section class="panel cp-block"><h2>공통 원칙</h2><ul class="cp-rules">${COMMON_RULES.map(r => `<li>${esc(r)}</li>`).join('')}</ul></section>
       <section class="panel cp-block"><h2>발행 전 검수 3가지</h2><ol class="cp-checks">${checks.map(t => `<li>${esc(t)}</li>`).join('')}</ol><p class="small">원고 편집 화면에서 세 개를 모두 체크해야 승인됩니다.</p></section>
@@ -1396,21 +1420,23 @@ const IDEA_BANK = {
     { t:'개념 설명', title:'도파민 디톡스는 진짜 효과가 있을까: 연구로 본 사실과 과장', note:'검색량 많은 키워드. 연구 근거(A·B 등급)와 마케팅 주장을 구분.' },
     { t:'실제 사례', title:'코인 단타로 1년 보낸 사람들의 공통점 (공개 후기 분석)', note:'공개된 후기만, 개인 특정 금지. 패턴 3개로 정리.' },
     { t:'체크리스트', title:'내가 주식 앱에 중독됐는지 확인하는 질문 10개', note:'공인 선별 척도가 있으면 출처 표기, 진단이 아님을 밝히기 + 도움 받을 곳.' },
-    { t:'싱가포르 관찰', title:'싱가포르 사람들은 왜 복권 줄을 설까: 4D·토토 이야기', note:'직접 본 장면 + 제도 설명(공식 출처).' },
     { t:'데이터 읽기', title:'금리 발표 날 내 계좌가 흔들리는 이유, 그래프 3개로', note:'실제 차트와 날짜. 전망은 하지 않기.' },
     { t:'게임·도박 설계', title:'가챠 확률표를 읽는 법: 0.6%는 몇 번 뽑아야 나올까', note:'확률 계산을 쉽게, 공시 확률 출처.' },
-    { t:'비교', title:'한국과 싱가포르 카지노 규제 비교표', note:'입장료·대상·운영 시간. 날짜 표기.' },
     { t:'후기', title:'한 달 동안 투자 앱 알림을 끄고 달라진 것', note:'직접 실험 기록. 개인 경험임을 밝히기.' },
   ],
   'X': [
-    { t:'숫자 하나', title:'오늘의 숫자 하나 스레드 (예: 청산 금액)', note:'첫 글에 숫자, 다음 글에 의미, 마지막 글에 출처. 매일 같은 틀.' },
-    { t:'반론', title:'"주식은 장기 투자가 정답" — 맞는 말인데 빠진 것 3가지', note:'흔한 주장을 존중하며 빈틈 짚기. 투자 권유 아님.' },
-    { t:'블로그 요약', title:'블로그 새 글을 스레드 5개로', note:'원문으로 보내는 요약. 마지막 글에 링크.' },
-    { t:'용어 하나', title:'펀딩비를 모르면 생기는 일, 스레드 3개', note:'정의 → 예시 → 주의.' },
-    { t:'관찰', title:'오늘 타임라인에서 본 착시 하나', note:'생존자 편향·확증 편향 같은 개념 하나로 설명. 특정인 저격 금지.' },
-    { t:'레슬링', title:'UFC 경기에서 오늘 나온 레슬링 장면 한 컷 해설', note:'영상 링크(공식) + 한 줄 포인트. 유튜브 쇼츠로 연결.' },
-    { t:'질문', title:'팔로워에게 묻기: "손절 기준 있으세요?"', note:'답글을 모아 다음 블로그 글 재료로.' },
-    { t:'체크리스트', title:'포지션 열기 전 스스로에게 묻는 5가지', note:'짧은 목록형, 저장·북마크 유도.' },
+    { t:'트레이딩', title:'오늘의 숫자 하나 스레드 (예: 어제 청산 금액)', note:'첫 글 숫자 → 의미 → 출처. 매일 같은 틀.' },
+    { t:'트레이딩', title:'"장기 투자가 정답" — 맞는 말인데 빠진 것 3가지', note:'흔한 주장을 존중하며 빈틈 짚기. 투자 권유 아님.' },
+    { t:'트레이딩', title:'펀딩비를 모르면 생기는 일, 스레드 3개', note:'정의 → 예시 → 주의.' },
+    { t:'트레이딩', title:'포지션 열기 전 스스로에게 묻는 5가지', note:'짧은 목록형, 북마크 유도.' },
+    { t:'트레이딩', title:'내 손절 기준 공개 스레드', note:'실제 규칙 3개와 어긴 날 하나. 투자 권유 아님.' },
+    { t:'직업', title:'크립토 회사에서 일하면 실제로 하는 일 5가지', note:'회사·동료 특정 없이 업무 종류만. 오해와 실제 비교.' },
+    { t:'직업', title:'해외 취업 이력서에서 바꾼 3가지', note:'직접 경험. 무엇을 빼고 무엇을 숫자로 바꿨는지.' },
+    { t:'직업', title:'내 업무용 AI 도구 스택 공개', note:'리서치·원고·영상·검수 단계별 도구 한 줄씩. 광고면 표기.' },
+    { t:'직업', title:'리서치를 빠르게 하는 내 방법 (출처 등급 A·B·C)', note:'자료조사 스킬 방식을 스레드로.' },
+    { t:'싱가포르', title:'싱가포르에서 놀란 규칙 5가지', note:'벌금·제도 등 재미있는 규칙. 공식 출처와 날짜.' },
+    { t:'싱가포르', title:'싱가포르 물가, 숫자 3개로 체감하기', note:'호커 한 끼·지하철·커피 가격(확인한 날짜).' },
+    { t:'싱가포르', title:'싱가포르 사람들이 돈 이야기하는 방식', note:'직접 들은 장면 위주, 일반화하지 않기.' },
   ],
   'Telegram': [
     { t:'시장 데이터', title:'[매일 아침] 밤사이 코인 시장 3줄', note:'BTC·ETH 가격 변화, 큰 뉴스 하나, 청산 규모. 사실만, 출처와 시각.' },
@@ -1426,34 +1452,45 @@ const IDEA_BANK = {
     { t:'회복', title:'큰 손실 뒤 다시 시작한 구독자 이야기', note:'익명 사연 + 도움 받을 곳 안내.' },
   ],
   'Instagram': [
-    { t:'카드뉴스', title:'오해 vs 사실: 도파민에 대한 흔한 오해 5개', note:'카드 7장: 표지 질문 → 오해/사실 5쌍 → 저장 유도.' },
-    { t:'카드뉴스', title:'숫자 카드: 한 장에 숫자 하나 (도박 확률)', note:'큰 숫자 + 한 줄 설명, 출처 표기 위치 고정.' },
-    { t:'체크리스트', title:'투자 전 체크리스트 카드 (저장용)', note:'카드 5장, 마지막 장 "저장해 두세요".' },
-    { t:'릴스', title:'레슬링 기술 3번 반복 릴스 (유튜브 쇼츠 재활용)', note:'같은 영상을 인스타 안전 영역에 맞게 자막 위치 조정.' },
+    { t:'트레이딩', title:'오해 vs 사실: 레버리지에 대한 흔한 오해 5개', note:'카드 7장: 표지 질문 → 오해/사실 5쌍 → 저장 유도.' },
+    { t:'트레이딩', title:'투자 전 체크리스트 카드 (저장용)', note:'카드 5장, 마지막 장 "저장해 두세요".' },
+    { t:'트레이딩', title:'이 중 가장 위험한 투자 습관은? (퀴즈 카드)', note:'1장 질문, 2장 보기, 3장 정답·이유. 댓글 참여.' },
+    { t:'트레이딩', title:'숫자 카드: 10배 레버리지는 몇 % 하락에 청산될까', note:'큰 숫자 + 한 줄 설명. 투자 권유 아님.' },
+    { t:'직업', title:'크립토 직장인의 하루 (캐러셀 6장)', note:'출근 → 리서치 → 회의 → 퇴근. 회사 정보는 가리기.' },
+    { t:'직업', title:'내 책상과 업무 도구 소개', note:'사진 5장 + 도구별 한 줄. 협찬이면 표기.' },
+    { t:'직업', title:'해외 취업 Q&A 카드', note:'자주 받는 질문 5개에 짧게 답. 직접 경험 기준.' },
     { t:'싱가포르', title:'싱가포르 일상 사진 5장 + 한 줄 관찰', note:'캐러셀. 장소·날짜 표기.' },
-    { t:'퀴즈', title:'이 중 가장 위험한 투자 습관은? (퀴즈 카드)', note:'1장 질문, 2장 보기, 3장 정답·이유. 댓글 참여.' },
-    { t:'비교', title:'한국 vs 싱가포르: 돈 문화 비교 카드', note:'항목 4개, 출처 있는 것만.' },
+    { t:'싱가포르', title:'한국 vs 싱가포르: 돈 문화 비교 카드', note:'항목 4개, 출처 있는 것만.' },
+    { t:'싱가포르', title:'호커센터 한 끼, 얼마일까? (가격 맞히기 릴스)', note:'메뉴 보여주고 가격 퀴즈 → 정답. 확인한 날짜 표기.' },
+    { t:'싱가포르', title:'싱가포르에서 처음 놀란 것 TOP 5 (릴스)', note:'짧은 컷 5개 + 자막. 재미 위주, 일반화 금지.' },
   ],
   'Threads': [
-    { t:'경험', title:'오늘 체육관에서 들은 말 한마디', note:'장면 → 내 생각 → 질문. 200~400자.' },
-    { t:'고백', title:'내가 처음 코인으로 잃었던 날', note:'직접 경험 또는 각색임을 밝히기. 교훈 하나 + 도움 받을 곳.' },
-    { t:'질문', title:'"돈 얘기, 친구랑 하세요?"', note:'짧은 질문 하나로 답글 유도. 답글이 다음 글 재료.' },
-    { t:'관찰', title:'싱가포르 지하철에서 본 장면 하나', note:'한 장면만, 일반화하지 않기.' },
-    { t:'의견', title:'운동하면서 투자 습관이 바뀐 점', note:'레슬링과 투자를 잇는 개인 관점. 결론보다 질문으로 끝내기.' },
-    { t:'연재', title:'월요일마다 쓰는 "이번 주 다짐" 한 줄', note:'짧은 연재. 금요일에 지켰는지 답글.' },
-    { t:'질문', title:'"여러분의 멈추는 기준은?"', note:'손절·운동·SNS 사용 등 무엇이든. 답글 모아 블로그로.' },
+    { t:'트레이딩', title:'내가 처음 코인으로 잃었던 날', note:'직접 경험 또는 각색임을 밝히기. 교훈 하나 + 도움 받을 곳.' },
+    { t:'트레이딩', title:'"여러분의 멈추는 기준은?"', note:'손절 기준을 묻는 질문 하나. 답글 모아 블로그 재료로.' },
+    { t:'트레이딩', title:'손절하고 나서 드는 생각 한 줄', note:'감정 그대로, 결론보다 질문으로 끝내기.' },
+    { t:'트레이딩', title:'"돈 얘기, 친구랑 하세요?"', note:'짧은 질문 하나로 답글 유도.' },
+    { t:'직업', title:'퇴근길에 든 생각 하나', note:'오늘 일에서 배운 것 한 장면. 회사 특정 금지.' },
+    { t:'직업', title:'싱가포르 직장 동료가 한 말 한마디', note:'장면 → 내 생각 → 질문. 동료 특정 금지.' },
+    { t:'직업', title:'이직 고민, 여러분은 뭘 기준으로 정하세요?', note:'내 기준 두 줄 + 질문.' },
+    { t:'직업', title:'월요일마다 쓰는 "이번 주 업무 다짐" 한 줄', note:'짧은 연재. 금요일에 지켰는지 답글.' },
+    { t:'싱가포르', title:'싱가포르 지하철에서 본 장면 하나', note:'한 장면만, 일반화하지 않기.' },
+    { t:'싱가포르', title:'싱가포르 날씨에 적응하는 법 (우산 이야기)', note:'가벼운 재미 글. 사진 한 장.' },
+    { t:'싱가포르', title:'해외 살면서 제일 그리운 한국 음식', note:'질문형으로 끝내기. 답글 유도.' },
   ],
 };
-let ideaGenOpen = {}, ideaGenSeed = {};
+let ideaGenOpen = {}, ideaGenSeed = {}, ideaGenShown = {}, ideaGenShownNow = {};
 function ideaGenPick(p) {
   const bank = IDEA_BANK[p] || [], have = new Set(db.ideas.map(i => normTitle(i.title)));
   const typeCount = {}; db.ideas.filter(i => ideaPlatform(i) === p && i.ideaType).forEach(i => { typeCount[i.ideaType] = (typeCount[i.ideaType] || 0) + 1; });
-  const seed = ideaGenSeed[p] || 0, rnd = k => { const x = Math.sin((k + 1) * 9301 + seed * 49297) * 233280; return x - Math.floor(x); };
-  return bank.map((b, k) => ({ ...b, k, used: have.has(normTitle(b.title)), score: (typeCount[b.t] || 0) + rnd(k) }))
+  const c = PF_KEY[p], seed = ideaGenSeed[c] || 0, last = ideaGenShown[c] || [], rnd = k => { const x = Math.sin((k + 1) * 9301 + seed * 49297) * 233280; return x - Math.floor(x); };
+  // 방금 본 카드는 뒤로 보내고, 아직 적은 유형 → 무작위 순
+  const picks = bank.map((b, k) => ({ ...b, k, used: have.has(normTitle(b.title)), score: (last.includes(k) ? 100 : 0) + (typeCount[b.t] || 0) * 0.6 + rnd(k) }))
     .filter(b => !b.used).sort((a, b) => a.score - b.score).slice(0, 6);
+  return picks;
 }
 function ideaGenPanel(c) {
   const p = PF_NAME[c], pc = platformColor(p), picks = ideaGenPick(p), bank = IDEA_BANK[p] || [];
+  ideaGenShownNow[c] = picks.map(b => b.k);
   const types = [...new Set(bank.map(b => b.t))];
   const counts = Object.fromEntries(types.map(t => [t, db.ideas.filter(i => ideaPlatform(i) === p && i.ideaType === t).length]));
   return `<section class="panel ig" style="--pc:${pc}"><div class="sectionhead" style="margin-top:0"><h2>💡 아이디어 생성 <span class="small">${esc(p)}에서 더 쓰면 좋을 글</span></h2><button class="btn ghost" data-idea-gen-reroll="${c}">🔄 다른 아이디어</button></div>
@@ -1504,9 +1541,20 @@ function ideaGenSave(text, c) {
 }
 document.addEventListener('click', async e => {
   const t = e.target.closest('button[data-idea-gen]'); if (t) { const c = t.dataset.ideaGen; ideaGenOpen[c] = !ideaGenOpen[c]; render(); if (ideaGenOpen[c]) document.querySelector('.ig')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); return; }
-  const r = e.target.closest('button[data-idea-gen-reroll]'); if (r) { const c = r.dataset.ideaGenReroll; ideaGenSeed[c] = (ideaGenSeed[c] || 0) + 1; render(); return; }
+  const r = e.target.closest('button[data-idea-gen-reroll]'); if (r) { const c = r.dataset.ideaGenReroll; ideaGenShown[c] = ideaGenShownNow[c] || []; ideaGenSeed[c] = (ideaGenSeed[c] || 0) + 1; render(); const left = (IDEA_BANK[PF_NAME[c]] || []).filter(b => !db.ideas.some(i => normTitle(i.title) === normTitle(b.title))).length; toast(left > 6 ? '새 아이디어로 바꿨어요.' : '준비된 아이디어가 적어요. AI로 더 받기를 써 보세요.'); return; }
   const a = e.target.closest('button[data-idea-gen-add]'); if (a) { const [c, k] = a.dataset.ideaGenAdd.split('|'); ideaFromBank(c, Number(k)); return; }
   const m = e.target.closest('button[data-idea-gen-ai]'); if (m) { ideaGenAIModal(m.dataset.ideaGenAi); return; }
   if (e.target.closest('button[data-ig-copy]')) { const ok = await copyText($('#igPrompt').value); toast(ok ? '프롬프트를 복사했어요. AI 채팅에 붙여 넣으세요.' : '복사하지 못했어요.'); }
 });
 document.addEventListener('submit', e => { if (e.target.id !== 'igForm') return; e.preventDefault(); try { ideaGenSave($('#igResponse').value, ideaGenAICtx); } catch (err) { $('#igError').textContent = err.message; } });
+
+// ===== 플랫폼별 다루는 주제 (공통 원리 + 각 플랫폼 상단에 표시) =====
+const PLATFORM_THEMES = {
+  'YouTube': '레슬링 · 생활체육인 · 멋있는 기술',
+  '네이버 블로그': '중독 · 투자 심리 · 도박 설계 · 매크로 (싱가포르는 다루지 않음)',
+  'X': '트레이딩 · 직업 · 싱가포르',
+  'Telegram': '코인 · 트레이딩 · 트레이딩 마인드',
+  'Instagram': '트레이딩 · 직업 · 싱가포르',
+  'Threads': '트레이딩 · 직업 · 싱가포르',
+};
+function platformThemesBlock() { return `<section class="panel cp-block cp-themes"><h2>플랫폼별 다루는 주제</h2><ul class="cp-theme-list">${IDEA_PLATFORMS.map(p => `<li style="--pc:${platformColor(p)}"><b>${esc(p)}</b><span>${esc(PLATFORM_THEMES[p])}</span></li>`).join('')}</ul><p class="small">싱가포르 이야기는 X · Instagram · Threads에서만 다룹니다.</p></section>`; }
