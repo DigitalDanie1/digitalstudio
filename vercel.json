@@ -11,6 +11,10 @@
       "destination": "/outputs/fieldnote-workflow.js"
     },
     {
+      "source": "/fieldnote-steps.js",
+      "destination": "/outputs/fieldnote-steps.js"
+    },
+    {
       "source": "/instatoon.js",
       "destination": "/outputs/instatoon.js"
     },
