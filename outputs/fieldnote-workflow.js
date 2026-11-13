@@ -772,9 +772,9 @@ const PLATFORM_STARTERS = [
   { sid:'x-loss-aversion', platform:'X', title:'손실 회피, 스레드 4개로 정리', angle:'블로그의 손실 회피 글을 짧은 주장과 근거로 쪼갠다.', hook:'첫 글 · "같은 10만 원인데 잃을 때가 두 배쯤 아프다"', outline:['첫 글: 핵심 주장 한 문장','후속 1: 일상 예시','후속 2: 연구 근거 한 줄 [확인 필요: 원 논문과 수치]','마지막 글: 한계 + 출처 링크 + "투자 권유 아님"'], verify:['인용 수치의 원 출처','블로그 원문 링크'] },
   { sid:'x-fomo-proof', platform:'X', title:'수익 인증 타임라인이 착시인 이유 3가지', angle:'생존자 편향을 코인 커뮤니티 장면으로 짧게 설명한다.', hook:'첫 글 · "내 타임라인에 손실 인증이 없는 이유"', outline:['첫 글: 착시라는 주장','후속 1~3: 생존자 편향 · 선택적 공유 · FOMO','마지막 글: 출처 + '+HELP_LINE], verify:['생존자 편향 설명 출처','상담처 운영 정보 최신 여부'] },
   { sid:'x-rate-priced-in', platform:'X', title:'금리 인하 "선반영"을 스레드 3개로', angle:'기대가 먼저 가격에 반영되는 구조를 한 장 이미지와 함께 설명한다.', hook:'첫 글 · "발표 날 시장이 반대로 움직이는 이유"', outline:['첫 글: 선반영 한 문장 정의','후속: 실제 사례 한 개 [확인 필요: 날짜와 수치]','마지막 글: 전망 아님 + 출처'], verify:['사례 날짜·정책 금리·시장 반응 수치'] },
-  { sid:'tg-weekly-macro', platform:'Telegram', title:'이번 주 매크로 3줄 요약', angle:'매주 같은 틀로 보내는 정기 요약. 중요한 변화부터.', hook:'제목 · [11월 2주] 이번 주 꼭 알아둘 3가지', outline:['• 핵심 변화 1 (지표·발표 + 날짜)','• 핵심 변화 2','• 핵심 변화 3','내 생각: 왜 중요한지 두 줄','원문 링크 + "투자 권유 아님"'], verify:['모든 수치의 날짜·출처','전망을 단정하지 않았는지'] },
-  { sid:'tg-sg-casino-levy', platform:'Telegram', title:'싱가포르 카지노 내국인 입장료, 3줄 정리', angle:'블로그 원문을 구독자용 요약으로 줄인다.', hook:'제목 · 싱가포르 사람은 카지노에 들어갈 때 돈을 낸다', outline:['• 제도 개요 [확인 필요: 현재 금액·대상]','• 도입 목적','• 직접 본 장면 한 줄','블로그 원문 링크'], verify:['입장료 금액과 시행 기관 공식 자료'] },
-  { sid:'tg-wrestling-week', platform:'Telegram', title:'이번 주 볼 만한 레슬링·UFC 경기 3개', angle:'레슬링 소스 채널에서 고른 영상 링크 큐레이션. 유튜브 쇼츠로 이어지는 예고편 역할.', hook:'제목 · 이번 주 레슬링 볼거리 3', outline:['• 경기 1 + 한 줄 이유 + 링크','• 경기 2','• 경기 3','다음 쇼츠 예고 한 줄'], verify:['링크가 공식 채널 원본인지','선수·대회 표기'] },
+  { sid:'tg-weekly-macro', platform:'Telegram', title:'이번 주 코인 시장을 흔든 매크로 3줄', angle:'금리·달러·주식 중 코인 가격에 실제로 영향을 준 것만 3줄로. 중요한 변화부터.', hook:'제목 · [11월 2주] 코인에 영향 준 것 3가지', outline:['• 매크로 변화 1 (지표·발표 + 날짜) → 코인 반응','• 변화 2','• 변화 3','내 해석 두 줄','원문 링크 + "투자 권유 아님"'], verify:['모든 수치의 날짜·출처','인과를 단정하지 않았는지'] },
+  { sid:'tg-sg-casino-levy', platform:'네이버 블로그', title:'싱가포르 카지노 내국인 입장료, 3줄 정리', angle:'블로그 원문을 구독자용 요약으로 줄인다.', hook:'제목 · 싱가포르 사람은 카지노에 들어갈 때 돈을 낸다', outline:['• 제도 개요 [확인 필요: 현재 금액·대상]','• 도입 목적','• 직접 본 장면 한 줄','블로그 원문 링크'], verify:['입장료 금액과 시행 기관 공식 자료'] },
+  { sid:'tg-wrestling-week', platform:'X', title:'이번 주 볼 만한 레슬링·UFC 경기 3개', angle:'레슬링 소스 채널에서 고른 영상 링크 큐레이션. 유튜브 쇼츠로 이어지는 예고편 역할.', hook:'제목 · 이번 주 레슬링 볼거리 3', outline:['• 경기 1 + 한 줄 이유 + 링크','• 경기 2','• 경기 3','다음 쇼츠 예고 한 줄'], verify:['링크가 공식 채널 원본인지','선수·대회 표기'] },
   { sid:'ig-loss-card', platform:'Instagram', title:'같은 10만 원, 잃을 때 더 아픈 이유 (카드 6장)', angle:'손실 회피를 저장하고 싶은 카드로 만든다.', hook:'1장 · "10만 원 얻기 vs 10만 원 잃기, 뭐가 더 셀까?"', outline:['1장 질문','2장 일상 예시','3장 연구 한 줄 [확인 필요: 출처]','4장 투자에서 보이는 행동','5장 한계','6장 질문 + "투자 권유 아님"'], verify:['카드 글자 잘림','출처 표기 위치'] },
   { sid:'ig-app-habit', platform:'Instagram', title:'주식 앱을 끄기 어려운 이유 5가지 (카드 7장)', angle:'실시간 시세·색·알림 같은 화면 요소를 카드 하나씩.', hook:'1장 · "확인만 하려고 연 앱, 오늘 몇 번 열었나요?"', outline:['1장 질문','2~6장 요소 하나씩(시세·색·알림·순위·커뮤니티)','7장 알림 점검 질문 + '+HELP_LINE], verify:['행동 연구 출처','상담처 정보 최신 여부'] },
   { sid:'ig-women-wrestler-reel', platform:'Instagram', title:'여자 레슬러 한 명 30초 소개 (릴스)', angle:'UWW 공식 경기 장면 몇 초 + 내 내레이션으로 선수 한 명의 강점을 소개한다.', hook:'0~3초 · "남자 선수도 피하는 그립"', outline:['훅 장면 몇 초','강점 한 가지와 기록 한 줄 [확인 필요: 메달·대회]','결론 + 다음 선수 질문'], verify:['선수 기록 공식 출처','원본 장면 사용 길이'], sources:'https://www.youtube.com/@unitedworldwrestling' },
@@ -857,18 +857,33 @@ function ytFormatOf(i) { return i && i.ytFormat === 'long' ? 'long' : 'shorts'; 
 
 // 텔레그램 주제 다양화 (정기물·알림·참여·큐레이션·생활)
 const TG_MORE_STARTERS = [
-  { sid:'tg-monday-calendar', platform:'Telegram', title:'[월요일] 이번 주 꼭 볼 일정 5개', angle:'매주 월요일 같은 틀. 지표 발표·실적·이벤트를 날짜순으로, 왜 중요한지 한 줄씩.', hook:'제목 · 이번 주 캘린더 (11/17~11/21)', outline:['• 날짜 · 일정 · 왜 중요한지 한 줄 ×5','내 관전 포인트 두 줄','"투자 권유 아님"'], verify:['일정 날짜·시간(한국/싱가포르 시간 표기)','공식 일정 출처'] },
-  { sid:'tg-friday-wrap', platform:'Telegram', title:'[금요일] 이번 주 정리: 예상과 실제', angle:'월요일에 짚은 일정이 실제로 어떻게 됐는지 맞춰 보는 회고. 틀린 것도 그대로.', hook:'제목 · 이번 주 복기 — 맞은 것 2, 틀린 것 1', outline:['• 맞은 것','• 틀린 것과 이유','다음 주 볼 것 한 줄'], verify:['수치·결과의 날짜와 출처'] },
-  { sid:'tg-new-post-alert', platform:'Telegram', title:'새 블로그 글 알림 + 3줄 요약', angle:'블로그 원문으로 보내는 알림. 요약만 읽어도 핵심이 남게.', hook:'제목 · 새 글: [블로그 제목]', outline:['• 요약 1','• 요약 2','• 요약 3','원문 링크'], verify:['블로그 링크 작동','요약이 원문과 일치'] },
-  { sid:'tg-shorts-behind', platform:'Telegram', title:'이번 쇼츠 비하인드: 기술 하나 더 자세히', angle:'유튜브 쇼츠 공개 알림 + 영상에 못 넣은 설명 하나. 구독자만 보는 보너스.', hook:'제목 · 쇼츠에 못 넣은 이야기', outline:['쇼츠 링크','못 넣은 포인트 하나','다음 영상 예고'], verify:['영상 링크','기술 명칭'] },
-  { sid:'tg-poll-next', platform:'Telegram', title:'[투표] 다음 영상·글 주제 골라 주세요', angle:'텔레그램 투표 기능으로 후보 3~4개. 결과를 다음 콘텐츠에 반영하고 공지.', hook:'투표 · 다음 주제 뭐가 좋을까요?', outline:['후보 3~4개 (한 줄 설명)','마감 시간','결과 공지 예고'], verify:['후보가 실제로 만들 수 있는 주제인지'] },
-  { sid:'tg-qna', platform:'Telegram', title:'구독자 질문 3개에 답합니다', angle:'DM·댓글로 받은 질문을 익명으로 골라 짧게 답변. 모르는 건 모른다고.', hook:'제목 · 받은 질문 3개', outline:['Q1 → 답','Q2 → 답','Q3 → 답','다음 질문 받는 방법'], verify:['질문자 익명 처리','개인 투자 조언으로 읽히지 않는지'] },
-  { sid:'tg-term-one', platform:'Telegram', title:'용어 하나 쉽게: 이번 주는 "청산"', angle:'매주 용어 하나(선반영·레버리지·청산·펀딩비 등)를 비유 하나로 설명.', hook:'제목 · 1분 용어: 청산', outline:['한 줄 정의','일상 비유','실제로 조심할 점','관련 블로그 글 링크'], verify:['정의의 정확성','"투자 권유 아님"'] },
-  { sid:'tg-sg-life', platform:'Telegram', title:'싱가포르 생활 노트: 이번 주 본 것 하나', angle:'물가·교통·제도 중 이번 주 직접 겪은 것 하나를 사진 한 장과 함께.', hook:'제목 · 싱가포르에서 이번 주에 본 것', outline:['[직접 경험] 사진 + 장면','한국과 다른 점 한 줄','관련 제도 출처'], verify:['제도·금액은 공식 출처','개인 경험을 일반화하지 않기'] },
-  { sid:'tg-help-pin', platform:'Telegram', title:'[고정 공지] 도박·투자로 힘들 때 연락할 곳', angle:'채널 상단 고정 공지. 상담 번호와 이용 방법을 짧게, 분기마다 최신 정보 확인.', hook:'제목 · 혼자 버티지 마세요', outline:['한국도박문제예방치유원 1336','정신건강위기상담 109','싱가포르 거주자용 상담처 [확인 필요]','마지막 확인 날짜'], verify:['번호·운영 시간 최신 여부','싱가포르 상담처 공식 정보'] },
+  { sid:'tg-monday-calendar', platform:'Telegram', title:'[월요일] 이번 주 코인 트레이더가 볼 일정 5개', angle:'FOMC·CPI 같은 지표, 토큰 언락, 거래소 상장·업그레이드를 날짜순으로, 왜 중요한지 한 줄씩.', hook:'제목 · 이번 주 캘린더 (11/17~11/21)', outline:['• 날짜 · 일정 · 왜 중요한지 한 줄 ×5','내 관전 포인트 두 줄','"투자 권유 아님"'], verify:['일정 날짜·시간(한국/싱가포르 시간 표기)','언락 물량은 공식 자료'] },
+  { sid:'tg-friday-wrap', platform:'Telegram', title:'[금요일] 이번 주 매매 복기: 예상과 실제', angle:'월요일에 짚은 것과 실제 시장, 내 매매를 맞춰 보는 회고. 틀린 것도 그대로.', hook:'제목 · 이번 주 복기 — 맞은 것 2, 틀린 것 1', outline:['• 맞은 것','• 틀린 것과 이유','• 내 매매 한 줄 (진입·손절·결과)','다음 주 볼 것 한 줄'], verify:['수치·결과의 날짜와 출처','실제 매매 기록만'] },
+  { sid:'tg-new-post-alert', platform:'Telegram', title:'새 트레이딩 글 알림 + 3줄 요약', angle:'투자 심리·코인 블로그 글을 텔레그램 구독자에게 요약으로. 요약만 읽어도 핵심이 남게.', hook:'제목 · 새 글: [블로그 제목]', outline:['• 요약 1','• 요약 2','• 요약 3','원문 링크'], verify:['블로그 링크 작동','요약이 원문과 일치'] },
+  { sid:'tg-shorts-behind', platform:'X', title:'이번 쇼츠 비하인드: 기술 하나 더 자세히', angle:'유튜브 쇼츠 공개 알림 + 영상에 못 넣은 설명 하나. 구독자만 보는 보너스.', hook:'제목 · 쇼츠에 못 넣은 이야기', outline:['쇼츠 링크','못 넣은 포인트 하나','다음 영상 예고'], verify:['영상 링크','기술 명칭'] },
+  { sid:'tg-poll-next', platform:'Telegram', title:'[투표] 이번 주 비트코인, 여러분 체감은?', angle:'텔레그램 투표로 공포·중립·탐욕 3지선다. 다음 날 결과와 실제 시장을 같이 공유.', hook:'투표 · 지금 시장 체감은?', outline:['보기 3개','마감 시간','다음 날 결과 + 실제 가격 비교'], verify:['결과를 매매 신호처럼 쓰지 않기'] },
+  { sid:'tg-qna', platform:'Telegram', title:'구독자 트레이딩 질문 3개에 답합니다', angle:'손절·포지션 크기·멘탈 관련 질문을 익명으로 골라 짧게 답변. 종목 추천은 하지 않음.', hook:'제목 · 받은 질문 3개', outline:['Q1 → 답','Q2 → 답','Q3 → 답','다음 질문 받는 방법'], verify:['질문자 익명 처리','개인 투자 조언으로 읽히지 않는지'] },
+  { sid:'tg-term-one', platform:'Telegram', title:'1분 트레이딩 용어: 이번 주는 "청산"', angle:'매주 용어 하나(청산·펀딩비·미결제약정·레버리지·슬리피지)를 비유 하나로.', hook:'제목 · 1분 용어: 청산', outline:['한 줄 정의','일상 비유','실제로 조심할 점','관련 블로그 글 링크'], verify:['정의의 정확성','"투자 권유 아님"'] },
+  { sid:'tg-sg-life', platform:'Threads', title:'싱가포르 생활 노트: 이번 주 본 것 하나', angle:'물가·교통·제도 중 이번 주 직접 겪은 것 하나를 사진 한 장과 함께.', hook:'제목 · 싱가포르에서 이번 주에 본 것', outline:['[직접 경험] 사진 + 장면','한국과 다른 점 한 줄','관련 제도 출처'], verify:['제도·금액은 공식 출처','개인 경험을 일반화하지 않기'] },
+  { sid:'tg-help-pin', platform:'Telegram', title:'[고정 공지] 트레이딩 손실로 힘들 때 연락할 곳', angle:'채널 상단 고정 공지. 손실·중독으로 힘들 때 상담 번호와 이용 방법을 짧게, 분기마다 최신 정보 확인.', hook:'제목 · 혼자 버티지 마세요', outline:['한국도박문제예방치유원 1336','정신건강위기상담 109','싱가포르 거주자용 상담처 [확인 필요]','마지막 확인 날짜'], verify:['번호·운영 시간 최신 여부','싱가포르 상담처 공식 정보'] },
 ];
 PLATFORM_STARTERS.push(...TG_MORE_STARTERS);
-const PLATFORM_SEED_VERSION = 6;
+
+// 텔레그램 = 코인 · 트레이딩 · 트레이딩 마인드 전용
+const TG_TRADING_STARTERS = [
+  { sid:'tg-funding-oi', platform:'Telegram', title:'펀딩비·미결제약정 한눈에: 지금 시장은 어느 쪽에 쏠렸나', angle:'BTC·ETH 펀딩비와 미결제약정 변화를 숫자 3개로. 쏠림이 무엇을 뜻하는지 한 줄.', hook:'제목 · 오늘의 쏠림 체크', outline:['• 펀딩비 (거래소·시각)','• 미결제약정 변화','• 롱/숏 비율','내 해석 한 줄 + \"투자 권유 아님\"'], verify:['데이터 출처와 조회 시각'] },
+  { sid:'tg-liquidations', platform:'Telegram', title:'어제 청산 데이터 3줄: 누가 털렸나', angle:'전날 롱·숏 청산 규모와 가장 크게 움직인 구간. 레버리지 경고로 마무리.', hook:'제목 · 어제 청산 요약', outline:['• 총 청산 규모와 롱/숏 비중','• 가장 크게 털린 구간','• 교훈 한 줄 (레버리지)'], verify:['청산 데이터 출처·집계 기준'] },
+  { sid:'tg-trade-journal', platform:'Telegram', title:'내 매매일지 공개: 진입 이유 · 손절 · 결과', angle:'실제 매매 하나를 진입 근거·손절 위치·결과·배운 점으로. 이긴 매매만 올리지 않기.', hook:'제목 · 이번 매매 기록', outline:['진입 근거','손절·익절 계획','결과 (부호 붙은 %)','배운 점'], verify:['실제 기록만','특정 종목 추천으로 읽히지 않는지'] },
+  { sid:'tg-mistake', platform:'Telegram', title:'이번 주 내 실수 하나: FOMO로 따라 탄 날', angle:'FOMO·물타기·복수 매매 같은 실수 하나를 솔직하게. 다음엔 어떻게 할지.', hook:'제목 · 이번 주 실수', outline:['[직접 경험] 상황','왜 그랬는지','다음 규칙 한 줄'], verify:['개인 경험임을 밝히기'] },
+  { sid:'tg-risk-rule', platform:'Telegram', title:'포지션 크기 정하는 법: 계좌 1% 룰', angle:'손절폭과 계좌 크기로 포지션을 계산하는 공식 하나와 예시 하나.', hook:'제목 · 얼마나 사야 할까?', outline:['공식 한 줄','예시 계산','레버리지와의 관계','\"투자 권유 아님\"'], verify:['계산 예시 검산'] },
+  { sid:'tg-mindset-line', platform:'Telegram', title:'[매일] 오늘의 트레이딩 원칙 한 줄', angle:'아침마다 원칙 한 줄(손절은 계획대로, 복수 매매 금지 등)과 그 이유 한 줄.', hook:'제목 · 오늘의 한 줄', outline:['원칙 한 줄','이유 한 줄','(선택) 내가 어긴 날 이야기'], verify:['인용이면 출처'] },
+  { sid:'tg-perp-dex', platform:'Telegram', title:'perp DEX 이번 주 업데이트: 공식 발표만 3줄', angle:'Variational 등 프리TGE perp DEX의 공식 공지·포인트 변경을 사실만 요약.', hook:'제목 · perp DEX 주간 업데이트', outline:['• 거래소 · 발표 내용 · 날짜 ×3','내 한 줄','\"투자 권유 아님\" + 이해관계 표기'], verify:['공식 공지 링크','이해관계(내가 쓰는 거래소인지) 표기'] },
+];
+PLATFORM_STARTERS.push(...TG_TRADING_STARTERS);
+// v7: 텔레그램 범위 밖 주제는 지우지 않고 맞는 플랫폼으로 이동, 재구성한 주제는 손대지 않은 경우만 새 제목으로
+const TG_MOVED = { 'tg-sg-casino-levy':'네이버 블로그', 'tg-wrestling-week':'X', 'tg-shorts-behind':'X', 'tg-sg-life':'Threads' };
+const TG_RETITLED = { 'tg-weekly-macro':'이번 주 매크로 3줄 요약', 'tg-monday-calendar':'[월요일] 이번 주 꼭 볼 일정 5개', 'tg-friday-wrap':'[금요일] 이번 주 정리: 예상과 실제', 'tg-new-post-alert':'새 블로그 글 알림 + 3줄 요약', 'tg-poll-next':'[투표] 다음 영상·글 주제 골라 주세요', 'tg-qna':'구독자 질문 3개에 답합니다', 'tg-term-one':'용어 하나 쉽게: 이번 주는 \"청산\"', 'tg-help-pin':'[고정 공지] 도박·투자로 힘들 때 연락할 곳' };
+const PLATFORM_SEED_VERSION = 7;
 let ideaPlatformFilter = 'all';
 
 function platformStarterNote(s) {
@@ -876,6 +891,11 @@ function platformStarterNote(s) {
 }
 function ensurePlatformStarters() {
   if (!db || !Array.isArray(db.ideas) || (db.platformSeedVersion || 0) >= PLATFORM_SEED_VERSION) return;
+  if ((db.platformSeedVersion || 0) < 7) for (const i of db.ideas) {
+    const sid = String(i.id).replace('pf-starter-', '');
+    if (TG_MOVED[sid] && i.platform === 'Telegram') { i.platform = TG_MOVED[sid]; if (TG_MOVED[sid] === '네이버 블로그') i.preferredChannel = 'blog'; }
+    if (TG_RETITLED[sid] && i.title === TG_RETITLED[sid]) { const st = PLATFORM_STARTERS.find(x => x.sid === sid); if (st) { i.title = st.title; i.note = platformStarterNote(st); } }
+  }
   const have = new Set(db.ideas.map(i => i && i.id)); const base = Date.now(); let k = 0;
   for (const s of PLATFORM_STARTERS) {
     const id = 'pf-starter-' + s.sid; if (have.has(id)) continue;
@@ -927,7 +947,7 @@ const PLATFORM_PLAYBOOK = {
   'YouTube': { role:'생활체육인을 위한 레슬링 쇼츠·롱폼', make:['레슬링 소스에서 분석할 장면 3~5개 고르기','🔎 자료조사 프롬프트로 선수·기록·규정 출처 확인','질문 하나·결론 하나로 해설 대본 쓰기','내 목소리로 해설 영상(5~10분) 녹화','Vizard·OpusClip으로 쇼츠 쪼개기 → 캡컷 자막 템플릿','YouTube Studio에 업로드'], good:['멋있는 기술은 3번 반복: 원속도 → 슬로우+화살표 → 원속도','첫 3초에 질문이나 결정적 장면','원본 경기는 몇 초만, 중심은 내 해설','자막은 크게, 화면 위쪽 중앙','끝은 다음 영상으로 이어지는 질문'], metric:'시청 지속 시간' },
   '네이버 블로그': { role:'검색으로 찾아오는 상세 원문', make:['독자가 검색할 질문을 제목으로','FIELDNOTE 블로그 원고: 소제목 3개 + 직접 경험 + 출처','직접 찍은 사진 또는 Canva 설명 이미지','네이버 에디터에 붙이고 카테고리 지정'], good:['제목에 검색어를 그대로','첫 문단에 답부터','직접 찍은 사진 1장 이상','출처와 확인 날짜 표기'], metric:'검색 유입어' },
   'X': { role:'관점과 근거를 빠르게', make:['블로그·영상에서 주장 하나 뽑기','첫 글 주장 → 근거 2~3개 → 출처 순 스레드','필요하면 설명 이미지 한 장','X에서 게시'], good:['첫 글만 읽어도 이해되게','글 하나에 생각 하나','숫자와 출처로 신뢰','마지막 글에 블로그 링크'], metric:'북마크·프로필 방문' },
-  'Telegram': { role:'구독자용 정기 요약', make:['이번 주 소재 3개 고르기','제목 + 핵심 3줄 + 내 해석 + 원문 링크','Telegram 데스크톱으로 채널 게시'], good:['매주 같은 요일, 같은 틀','중요한 변화부터','링크는 원문으로','길어지면 블로그로 보내기'], metric:'조회·전달 수' },
+  'Telegram': { role:'코인 · 트레이딩 · 트레이딩 마인드', make:['시장 데이터·일정 확인 (출처와 시각 표기)','제목 + 핵심 3줄 + 내 해석 + 무효화 조건','"투자 권유 아님" 고정 문구','Telegram 데스크톱으로 채널 게시'], good:['매일·매주 같은 시간, 같은 틀','숫자는 출처와 조회 시각까지','맞힌 것보다 틀린 것을 솔직하게','손절·포지션 크기·멘탈 이야기를 자주'], metric:'조회·전달 수' },
   'Instagram': { role:'저장하고 싶은 카드·릴스', make:['주제를 질문 하나로 바꾸기','카드 5~7장 문구: 질문 → 근거 → 결론','Canva 템플릿에 얹기 (릴스는 캡컷)','앱 또는 Meta Business Suite로 게시'], good:['1장에 질문을 크게','한 장에 한 문장','같은 템플릿·색으로 통일','마지막 장은 저장을 부르는 질문'], metric:'저장·공유 수' },
   'Threads': { role:'경험과 질문으로 대화', make:['직접 본 장면 하나 고르기','장면 → 내 생각 → 질문, 200~400자','긴 근거는 답글로','Threads에 게시'], good:['1인칭 경험으로 시작','결론보다 질문으로 끝내기','답글에 빨리 답하기','한 사람 경험을 일반화하지 않기'], metric:'답글 수' },
 };
@@ -1082,7 +1102,7 @@ const COMMON_RULES = [
   '남의 영상·사진은 몇 초·한 장만, 원본 출처와 사용 권리 확인',
 ];
 const COMMON_CHAIN = ['네이버 블로그', 'Telegram', 'X', 'Instagram', 'Threads', 'YouTube'];
-const COMMON_CHAIN_NOTE = { '네이버 블로그':'상세 원문', 'Telegram':'요약', 'X':'관점과 근거', 'Instagram':'카드', 'Threads':'경험과 질문', 'YouTube':'대본과 영상' };
+const COMMON_CHAIN_NOTE = { '네이버 블로그':'상세 원문', 'Telegram':'코인·트레이딩 요약', 'X':'관점과 근거', 'Instagram':'카드', 'Threads':'경험과 질문', 'YouTube':'대본과 영상' };
 
 function commonPage() {
   ensurePlatformStarters();
@@ -1393,15 +1413,17 @@ const IDEA_BANK = {
     { t:'체크리스트', title:'포지션 열기 전 스스로에게 묻는 5가지', note:'짧은 목록형, 저장·북마크 유도.' },
   ],
   'Telegram': [
-    { t:'정기물', title:'[매일 아침] 밤사이 일어난 일 3줄', note:'같은 시간, 같은 틀. 사실만, 출처 링크.' },
-    { t:'정기물', title:'[월말] 이번 달 콘텐츠 모아보기', note:'블로그·쇼츠·스레드 링크 정리. 가장 반응 좋았던 것 하나 코멘트.' },
-    { t:'참여', title:'[투표] 이번 주 시장 분위기, 여러분 체감은?', note:'공포·중립·탐욕 3지선다. 결과를 다음 날 공유.' },
-    { t:'큐레이션', title:'이번 주 읽은 자료 1개, 5줄 요약', note:'논문·기사·리포트 하나. 원문 링크와 내 한 줄 해석.' },
-    { t:'알림', title:'레슬링 대회·UFC 이번 주 일정', note:'날짜·시간(한국/싱가포르)·볼 경기 하나.' },
-    { t:'비하인드', title:'콘텐츠 만들다 버린 아이디어 3개', note:'왜 안 만들었는지. 구독자와 거리 좁히기.' },
-    { t:'용어', title:'1분 용어: 레버리지', note:'정의·비유·주의 한 줄씩.' },
-    { t:'생활', title:'싱가포르 물가 체감: 이번 주 장바구니', note:'직접 산 것 사진 + 가격(날짜). 일반화 금지.' },
-    { t:'회복', title:'손실 뒤에 마음 다잡는 법, 구독자가 보내 준 방법 모음', note:'익명 사연 + 도움 받을 곳 안내.' },
+    { t:'시장 데이터', title:'[매일 아침] 밤사이 코인 시장 3줄', note:'BTC·ETH 가격 변화, 큰 뉴스 하나, 청산 규모. 사실만, 출처와 시각.' },
+    { t:'시장 데이터', title:'거래소 순유입·유출로 보는 이번 주 분위기', note:'온체인 데이터 하나와 해석 한 줄. 데이터 출처 표기.' },
+    { t:'일정·복기', title:'[월말] 이번 달 내 매매 성적표', note:'승률·평균 손익(부호 붙은 %)·가장 큰 실수 하나. 실제 기록만.' },
+    { t:'매매일지', title:'손절한 매매 하나, 왜 잘한 손절이었나', note:'계획대로 손절한 사례. 결과보다 과정 칭찬.' },
+    { t:'트레이딩 마인드', title:'연패 중일 때 내가 하는 3가지', note:'매매 쉬기·포지션 줄이기·일지 다시 읽기. 직접 경험.' },
+    { t:'트레이딩 마인드', title:'복수 매매가 시작되는 신호 체크리스트', note:'손실 직후 행동 패턴 5개. 저장용.' },
+    { t:'리스크 관리', title:'레버리지 10배면 몇 % 움직임에 청산될까', note:'계산 표 하나. 투자 권유 아님.' },
+    { t:'리스크 관리', title:'손절 위치를 정하는 3가지 기준', note:'구조·변동성·계좌 기준. 예시 하나씩.' },
+    { t:'용어', title:'1분 용어: 슬리피지', note:'정의·비유·주의 한 줄씩.' },
+    { t:'참여', title:'[투표] 지금 포지션: 롱 / 숏 / 관망', note:'다음 날 결과와 실제 가격을 같이 공유. 신호로 쓰지 않기.' },
+    { t:'회복', title:'큰 손실 뒤 다시 시작한 구독자 이야기', note:'익명 사연 + 도움 받을 곳 안내.' },
   ],
   'Instagram': [
     { t:'카드뉴스', title:'오해 vs 사실: 도파민에 대한 흔한 오해 5개', note:'카드 7장: 표지 질문 → 오해/사실 5쌍 → 저장 유도.' },
