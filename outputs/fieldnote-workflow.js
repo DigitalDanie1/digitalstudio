@@ -615,6 +615,66 @@ const WRESTLING_SOURCES = [
     note:'러시아어 MMA·레슬링 모음 채널입니다(구독 9.84만, 쇼츠 약 2,900개). 사이티예프 태클 강의, 치마예프·예블로예프 테이크다운, 타주디노프 폴 같은 장면이 많습니다. 소개 글에 "모든 권리는 원작자에게"라고 적힌 재업로드 채널이라 여기서 받지 말고, 장면을 찾은 뒤 원본(선수 인스타·대회·UWW 채널)에서 받습니다.',
     candidate:{title:'Лекция Бувайсара Сайтиева на тему проход в ноги',url:'https://www.youtube.com/shorts/88sOwS3WYa4',topic:'yt-wrestling-technique',angle:'부바이사르 사이티예프의 양다리 태클 강의. 핵심 설명 한 줄을 한국어로 옮기고, 같은 장면의 원본 출처를 찾아 확보합니다.'},
   },
+  {
+    id:'uakgz', name:'UA KGZ Traveler', emoji:'🎥', url:'https://www.youtube.com/@UAKGZtraveler',
+    role:'2026 아스타나 세계선수권 관중석 직촬', topics:['yt-wrestling-highlights','yt-wrestling-athletes'],
+    note:'2026 아스타나 세계선수권을 관중석에서 직접 찍은 영상 5편(3~15분)이 있습니다(2026.11.14 #вольнаяборьба #астана 검색에서 확인). 중계 화면이 아닌 본인 촬영이라 경기장 분위기·대기실 장면 소재로 좋고, 허락받기도 쉽습니다. 선수 이름은 영상 안에 없으니 대진표로 따로 확인합니다.',
+    candidate:{title:'Чемпионат мира по борьбе 2026! #астана #казахстан',url:'https://www.youtube.com/watch?v=xXorE8fjtt0',topic:'yt-wrestling-highlights',angle:'경기장 현장감을 도입 3초에 쓰고, 나오는 경기의 선수·체급을 대진표로 확인한 뒤 결정적 장면을 해설합니다.'},
+  },
+  {
+    id:'grekokz', name:'Grekoroman_wrestlingkz', emoji:'🇰🇿', url:'https://www.youtube.com/@Grekoroman_wrestlingkz2/shorts',
+    role:'카자흐 그레코로만·여자 레슬링 쇼츠', topics:['yt-wrestling-highlights','yt-wrestling-women','yt-wrestling-athletes'],
+    note:'카자흐스탄 그레코로만 중심 쇼츠 채널입니다(2026.11.14 #вольнаяборьба #астана 검색에서 확인). 세계선수권 87kg 결승(노비코프 vs 모함마디피아니), 다울레트베코프의 이변, 아시안게임 동메달 제이네프 바야노바 같은 여자 선수 쇼츠까지 있어 여자·중앙아시아 선수 소개에 씁니다. 중계 화면은 UWW 공식 원본에서 받습니다.',
+    candidate:{title:'Зейнеп Баянова — бронзовый призёр Азиатских игр-2026',url:'https://www.youtube.com/shorts/ZiqXC1wbpwM',topic:'yt-wrestling-women',angle:'한국에 거의 안 알려진 카자흐 여자 선수. 이 선수의 득점 기술 하나를 골라 셋업→마무리로 해설합니다. 이름 한글 표기는 추가 확인합니다.'},
+  },
+  {
+    id:'aidartt', name:'AIDARTT', emoji:'📱', url:'https://www.youtube.com/@AIDARTT7/shorts',
+    role:'아스타나 세계선수권 현장 쇼츠', topics:['yt-wrestling-highlights','yt-wrestling-technique'],
+    note:'2026.10.24 아스타나 세계선수권 현장 쇼츠 3편("Опасно", "Битва титанов")을 확인했습니다(2026.11.14 #вольнаяборьба #астана 검색에서 확인). 매트 옆에서 찍은 짧은 교환 장면이라 기술 반복(원속도→슬로우→원속도) 소재로 맞습니다. 선수 이름이 제목에 없어 대진표로 확인해야 합니다.',
+    candidate:{title:'Опасно🤨 Чемпионат Мира Астана 24.10.26г',url:'https://www.youtube.com/shorts/E79MvCD8qYQ',topic:'yt-wrestling-technique',angle:'위험했던 교환 장면 하나를 멈춤 화면으로 나눠, 어느 쪽이 무엇을 노렸는지 해설합니다. 선수·체급은 날짜와 대진표로 확인합니다.'},
+  },
+  {
+    id:'shegai', name:'HEALTHY LIFESTYLE (Мырзабек Талгат)', emoji:'🧒', url:'https://www.youtube.com/@SVS.SHEGAI/shorts',
+    role:'아스타나 유소년·베테랑 자유형 훈련', topics:['yt-wrestling-technique','yt-wrestling-athletes'],
+    note:'아스타나의 유소년·베테랑 자유형 훈련(코치 므르자벡 탈가트)과 세계선수권 쇼츠를 확인했습니다(2026.11.14 #вольнаяборьба #астана 검색에서 확인). 생활체육인 눈높이의 훈련·드릴 장면이라 "카자흐스탄 동네 레슬링장은 이렇게 가르친다" 같은 주제에 맞고, 본인 촬영이라 허락받기 쉽습니다.',
+    candidate:{title:'Юные вольники и ветераны Астаны. Тренер Мырзабек Талгат',url:'https://www.youtube.com/shorts/u5RP4z7fx84',topic:'yt-wrestling-technique',angle:'훈련 장면에서 드릴 하나를 골라 한국 생활체육인이 따라 할 수 있게 순서대로 설명합니다.'},
+  },
+  {
+    id:'atletkg', name:'ATLET_KG', emoji:'🇰🇬', url:'https://www.youtube.com/@atlet_kg3844',
+    role:'키르기스 레슬링 경기 해설·소식', topics:['yt-wrestling-highlights','yt-wrestling-athletes'],
+    note:'키르기스스탄 스포츠 채널입니다. 사둘라예프 vs 아이트무한(카자흐) 준결승 영상이 조회 29만으로 검색 상위였습니다(2026.11.14 #вольнаяборьба #астана 검색에서 확인). 중앙아시아 시청자가 반응하는 대진을 고르는 참고가 됩니다. 경기 화면은 UWW 공식 원본에서 받습니다.',
+    candidate:{title:'1/2: АБДУЛРАШИД САДУЛАЕВ – РИЗАБЕК АЙТМУХАН. КТО ОДЕРЖАЛ ПОБЕДУ?',url:'https://www.youtube.com/watch?v=OH2Z_sO73r4',topic:'yt-wrestling-highlights',angle:'두 선수의 결정적 교환을 하이라이트로 정리하고, 사둘라예프가 쓰는 기술 하나를 따로 해설합니다. 대회명과 결과는 UWW 기록으로 확인합니다.'},
+  },
+  {
+    id:'khabar', name:'Khabar SPORT', emoji:'📺', url:'https://www.youtube.com/@KhabarSPORT1',
+    role:'카자흐 방송사 · 세계선수권 일일 결과', topics:['yt-wrestling-highlights','yt-wrestling-athletes'],
+    note:'카자흐스탄 방송사 하바르의 스포츠 채널입니다. 아스타나 세계선수권 일차별 결과 리포트를 확인했습니다(2026.11.14 #вольнаяборьба #астана 검색에서 확인). 경기 결과·메달 사실 확인용으로 씁니다. 방송사 영상이라 장면은 짧게만 쓰고 출처를 표기합니다.',
+    candidate:{title:'Второй день Чемпионата мира по борьбе завершился в Астане',url:'https://www.youtube.com/watch?v=7menVwQyBsM',topic:'yt-wrestling-highlights',angle:'대회 둘째 날 결과에서 한국에 소개할 만한 선수 한 명을 골라 쇼츠 주제로 잡습니다.'},
+  },
+  {
+    id:'volchata', name:'Волчата', emoji:'🐺', url:'https://www.youtube.com/@Rustam_Murtazaliev',
+    role:'세계선수권 체급별 경기 전체', topics:['yt-wrestling-highlights','yt-wrestling-technique'],
+    note:'2026 아스타나 세계선수권 65kg 두만(튀르키예) vs 아무자드할릴리(이란) 같은 체급별 경기를 올리는 채널입니다(2026.11.14 #вольнаяборьба #астана 검색에서 확인). 경기 전체가 있어 기술 장면을 찾기 좋지만 중계 화면 재업로드일 수 있으니, 받기는 UWW 공식에서 합니다.',
+    candidate:{title:'65 кг. Чемпионат Мира. Казахстан 2026 Думан (Турция) : Амузадхалили (Иран)',url:'https://www.youtube.com/watch?v=9nTRTJ_ykpM',topic:'yt-wrestling-technique',angle:'이란·튀르키예 선수의 스타일 차이가 드러나는 교환 하나를 골라 해설합니다.'},
+  },
+  {
+    id:'dagnews', name:'DagNews (Дагестан·Новости)', emoji:'📰', url:'https://www.youtube.com/@MGDagNews/shorts',
+    role:'다게스탄 레슬링 소식 쇼츠', topics:['yt-wrestling-athletes','yt-wrestling-highlights'],
+    note:'다게스탄 뉴스 쇼츠 채널입니다. 제목상 세계선수권 8강에서 사둘라예프가 카일 스나이더에게 졌다는 소식 쇼츠를 확인했습니다(2026.11.14 #вольнаяборьба #астана 검색에서 확인). 다게스탄 현지 반응과 선수 소식 출처로 씁니다. 결과는 UWW 기록으로 한 번 더 확인합니다.',
+    candidate:{title:'Абдулрашид Садулаев к сожалению проиграл Кайлу Снайдеру в 1/4',url:'https://www.youtube.com/shorts/cr5QEeZtmvs',topic:'yt-wrestling-athletes',angle:'사둘라예프 vs 스나이더 라이벌 이야기. 경기 결과를 UWW 기록으로 확인한 뒤, 승부를 가른 기술을 해설합니다.'},
+  },
+  {
+    id:'wrestling-y6i', name:'Wrestling (러시아어 결승 모음)', emoji:'🥇', url:'https://www.youtube.com/@Wrestling-y6i',
+    role:'세계선수권 결승 경기 모음', topics:['yt-wrestling-highlights'],
+    note:'2026 세계선수권 자유형 74kg 결승(셰리예프 vs 카이파노프) 같은 결승 경기를 올리는 채널입니다(2026.11.14 #вольнаяборьба #астана 검색에서 확인). 중계 화면 재업로드로 보이니 장면 찾기용으로만 쓰고, 받기는 UWW 공식에서 합니다.',
+    candidate:{title:'Чемпионат мира по вольной борьбе финал 74 кг Иналбек Шериев vs Нуркожа Кайпанов',url:'https://www.youtube.com/watch?v=g8m2Z26Yt4U',topic:'yt-wrestling-highlights',angle:'결승에서 점수가 난 장면을 찾아 시간을 적고, 같은 장면을 UWW 공식 영상에서 받습니다.'},
+  },
+  {
+    id:'alexandr-crimea', name:'АЛЕКСАНДР АЛЕКСЕЕВИЧ (Wrestling Crimea)', emoji:'🏅', url:'https://www.youtube.com/@alexandr-wrestlingCrimea/shorts',
+    role:'러시아 자유형 선수 쇼츠', topics:['yt-wrestling-athletes','yt-wrestling-highlights'],
+    note:'러시아 자유형 선수 쇼츠 채널입니다. 2026 세계 챔피언 아마눌라 가지마고메도프, 아바스가지 마고메도프 쇼츠를 확인했습니다(2026.11.14 #вольнаяборьба #астана 검색에서 확인). 선수 소개 도입 소재로 쓰고 원본 출처를 확인합니다.',
+    candidate:{title:'Аманула Гаджимагомедов чемпион мира 2026',url:'https://www.youtube.com/shorts/BGRFMW6gsEA',topic:'yt-wrestling-athletes',angle:'한국에 안 알려진 다게스탄 세계 챔피언 소개. 그의 대표 기술 하나를 경기 장면으로 해설합니다.'},
+  },
 ];
 
 function wrestlingPromptSources(topicId) {
