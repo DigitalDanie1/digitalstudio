@@ -56,6 +56,24 @@
 .it-art-card h3{margin:0 0 9px;font-size:15px}
 .it-art-card p{margin:0 0 7px;color:#c9cdd2;font-size:13px;line-height:1.5}
 .it-art-card textarea{width:100%;min-height:155px;margin-top:7px;border:1px solid #414852;border-radius:4px;background:#101318;color:#ececec;font-size:13px;line-height:1.6;padding:10px;resize:vertical}
+/* 무료 그림 작업 */
+.it-free{display:grid;grid-template-columns:115px 1fr;gap:18px;align-items:start;max-width:920px;margin:10px 0 22px;color:#cbd0d6;font-size:14px;line-height:1.6}
+.it-free img{width:115px;aspect-ratio:1;object-fit:cover;background:#fff;border-radius:4px}
+.it-free strong{display:block;color:#f6d1ce;font-size:17px;margin-bottom:6px}
+.it-free ol{margin:0 0 6px;padding-left:20px}
+.it-free li{margin:2px 0}
+.it-free b{color:#f1f2f4}
+.it .it-link{color:#ffb3ad;font-weight:750;text-decoration:underline;text-underline-offset:3px}
+.it-art-drop{position:relative;margin-bottom:10px;border:1px dashed #6a6f76;border-radius:6px;overflow:hidden;cursor:pointer;background:#fffdfa;outline:none}
+.it-art-drop:focus-visible,.it-art-drop.is-over{border-color:#f1a4a0;box-shadow:0 0 0 3px #f1a4a055}
+.it-art-drop.has-img{border-style:solid;border-color:#434950}
+.it-art-canvas{display:block;width:100%;height:auto;aspect-ratio:1/1}
+.it-drop-hint{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);padding:4px 10px;border-radius:99px;background:#26211ecc;color:#fff;font-size:12px;font-weight:700;white-space:nowrap;pointer-events:none}
+.it-drop-hint{opacity:0;transition:opacity .15s}
+.it-art-drop.has-img:hover .it-drop-hint,.it-art-drop.has-img:focus-visible .it-drop-hint{opacity:1}
+.it-art-buttons{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
+.it-art-buttons .it-button{padding:7px 10px;font-size:12px}
+@media(max-width:620px){.it-free{grid-template-columns:1fr}.it-free img{width:80px}}
 .it-art-preview{aspect-ratio:1/1;display:grid;place-items:center;margin-bottom:12px;border:1px dashed #666;background:#25292d;color:#b8bdc4;text-align:center;font-size:13px}
 .it-muted{color:#88919c;font-size:12px}
 @media(max-width:1050px){.it-head{grid-template-columns:80px 1fr}.it-logo{width:80px;height:80px}.it-progress{grid-column:1/-1}.it-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}

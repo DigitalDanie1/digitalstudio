@@ -107,30 +107,218 @@
   }
 
   function artBrief(project, card, index) {
-    return `싱부부의 외노자 일기 · ${project.title || '이번 편'} · ${index + 1}/${project.cards.length}\n` +
-      `정사각형 인스타툰. 첨부한 수달 부부 캐릭터의 형태와 표정을 일관되게 유지. 싱가포르 생활 배경.\n` +
-      `장면: ${card.scene || card.top || '(장면을 적어주세요)'}\n` +
-      `표정·소품·구도: ${card.artNote || '(그림 메모 없음)'}\n` +
-      `텍스트는 그림에 그리지 말고 비워두기. 편집 단계에서 얹을 문구: ${[card.top, card.dialogue, card.bottom].filter(Boolean).join(' / ') || '(없음)'}`;
+    return `싱부부의 외노자 일기 · ${project.title || '이번 편'} · ${index + 1}/${project.cards.length}\n` + flowPrompt(card);
+  }
+
+  function flowPrompt(card) {
+    return [
+      '첨부한 기준 이미지의 수달 부부 캐릭터(생김새·색·옷)를 그대로 유지해서 그려줘.',
+      '스타일: 귀여운 한국 인스타툰, 부드러운 선, 따뜻한 파스텔 색, 깔끔한 배경. 배경은 싱가포르 생활.',
+      '비율: 가로 4:3 한 컷.',
+      `장면: ${card.scene || card.top || '(장면을 적어주세요)'}`,
+      card.artNote ? `표정·소품·구도: ${card.artNote}` : '',
+      card.dialogue ? `상황(이 대사를 하는 순간의 표정으로): "${card.dialogue}"` : '',
+      '그림 안에 글자·말풍선·로고·워터마크는 넣지 마. 아래쪽 1/4은 말풍선을 얹을 수 있게 단순하게 비워줘.'
+    ].filter(Boolean).join('\n');
   }
 
   function artPage(project) {
+    const done = project.cards.filter(card => imgCache.get(imgKey(project, card))).length;
     return `${header('art')}
       <div class="it-topline"><h2>${safe(project.title || '이번 편')} · 그림 작업</h2>
-      <div class="it-actions"><button type="button" class="it-button it-button-quiet" data-it="edit-cards">카드 수정</button><button type="button" class="it-button it-button-primary" data-it="copy-brief">그림 요청서 복사</button></div></div>
-      <div class="it-art-intro"><img src="./assets/singbubu-logo.png" alt="수달 부부 캐릭터 기준 이미지"><div><strong>원고 승인 완료</strong>수달 부부의 표정과 구도를 카드마다 그릴 차례입니다. 아래 지시서는 복사해 그림 작업에 사용하고, 그림 메모는 여기서 계속 고칠 수 있습니다.</div></div>
+      <div class="it-actions"><button type="button" class="it-button it-button-quiet" data-it="edit-cards">카드 수정</button><button type="button" class="it-button it-button-quiet" data-it="copy-brief">요청서 전체 복사</button><button type="button" class="it-button it-button-primary" data-it="save-all">전체 PNG 저장</button></div></div>
+      <div class="it-free">
+        <img src="./assets/singbubu-logo.png" alt="수달 부부 캐릭터 기준 이미지">
+        <div><strong>무료로 그림 만들기</strong>
+        <ol>
+          <li><a class="it-link" href="./assets/singbubu-logo.png" download="싱부부-기준이미지.png">기준 이미지 저장</a> — 매번 같은 수달 부부로 나오게 하는 사진</li>
+          <li><a class="it-link" href="${FLOW_URL}" target="_blank" rel="noopener noreferrer">구글 Flow 열기 ↗</a> — 무료 나노바나나. 기준 이미지를 첨부하고, 카드의 <b>Flow 프롬프트 복사</b>를 붙여 넣어 생성</li>
+          <li>마음에 드는 그림을 아래 카드 칸에 <b>끌어다 놓기</b> (클릭해서 고르기 · 칸을 누르고 ⌘V 붙여넣기도 됨)</li>
+          <li>대사·문장은 자동으로 얹혀요 → <b>PNG 저장</b> → 인스타 업로드 때 'AI 정보' 표시 켜기</li>
+        </ol>
+        <p class="it-muted">그림은 이 브라우저에만 저장됩니다 · <span id="itArtCount">${done}</span>/${project.cards.length}장 완료</p></div>
+      </div>
       <div class="it-art-grid">${project.cards.map((card, index) => `<article class="it-art-card" data-card-id="${safe(card.id)}">
         <h3>${String(index + 1).padStart(2, '0')} / ${project.cards.length}</h3>
-        <div class="it-art-preview">그림이 들어갈 자리</div>
+        <div class="it-art-drop" data-it-drop="${safe(card.id)}" tabindex="0" role="button" aria-label="${index + 1}번째 카드 그림 올리기">
+          <canvas class="it-art-canvas" data-it-canvas="${safe(card.id)}" width="540" height="540"></canvas>
+          <span class="it-drop-hint">그림 바꾸기 · 끌어다 놓거나 클릭</span>
+          <input type="file" accept="image/*" hidden data-it-file="${safe(card.id)}">
+        </div>
+        <div class="it-art-buttons"><button type="button" class="it-button" data-it="copy-prompt" data-id="${safe(card.id)}">Flow 프롬프트 복사</button><button type="button" class="it-button" data-it="save-png" data-id="${safe(card.id)}">PNG 저장</button><button type="button" class="it-button it-button-quiet" data-it="remove-img" data-id="${safe(card.id)}">그림 빼기</button></div>
         <p><strong>장면</strong> ${safe(card.scene || card.top)}</p><p><strong>대사</strong> ${safe(card.dialogue || '—')}</p>
-        <label class="it-field"><span>그림 메모</span><textarea data-it-card="${safe(card.id)}" data-it-field="artNote">${safe(card.artNote)}</textarea></label>
-      </article>`).join('')}</div>
-      <p class="it-muted">${safe(state.note || '그림은 승인된 원고와 캐릭터 기준 이미지를 바탕으로 제작합니다.')}</p>`;
+        <label class="it-field"><span>그림 메모 (프롬프트에 들어가요)</span><textarea data-it-card="${safe(card.id)}" data-it-field="artNote">${safe(card.artNote)}</textarea></label>
+      </article>`).join('')}</div>`;
+  }
+
+  // ===== 무료 그림 작업: 그림 보관(IndexedDB) + 글자·말풍선 합성 =====
+  const FLOW_URL = 'https://labs.google/fx/tools/flow';
+  const IMG_DB = 'fieldnote-instatoon-art', IMG_STORE = 'images';
+  const imgCache = new Map();
+  const imgKey = (project, card) => project.id + ':' + card.id;
+  function idb() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(IMG_DB, 1);
+      req.onupgradeneeded = () => req.result.createObjectStore(IMG_STORE);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function idbDo(mode, fn) {
+    const store = await idb();
+    return new Promise((resolve, reject) => {
+      const tx = store.transaction(IMG_STORE, mode), req = fn(tx.objectStore(IMG_STORE));
+      tx.oncomplete = () => resolve(req ? req.result : undefined);
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+  function blobToImage(blob) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(blob), image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => { URL.revokeObjectURL(url); reject(Error('이미지를 읽지 못했습니다.')); };
+      image.src = url;
+    });
+  }
+  async function loadImg(key) {
+    if (imgCache.has(key)) return imgCache.get(key);
+    let image = null;
+    try { const blob = await idbDo('readonly', st => st.get(key)); if (blob) image = await blobToImage(blob); } catch (_) {}
+    imgCache.set(key, image);
+    return image;
+  }
+  async function shrink(file) {
+    const image = await blobToImage(file);
+    const scale = Math.min(1, 1800 / Math.max(image.naturalWidth, image.naturalHeight));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(image.naturalWidth * scale); canvas.height = Math.round(image.naturalHeight * scale);
+    canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+    URL.revokeObjectURL(image.src);
+    return new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.92));
+  }
+  async function setCardImage(cardId, file) {
+    const project = current(), card = project && project.cards.find(item => item.id === cardId);
+    if (!card || !file || !/^image\//.test(file.type)) { toast('이미지 파일을 올려주세요.'); return; }
+    try {
+      const blob = await shrink(file), key = imgKey(project, card);
+      await idbDo('readwrite', st => st.put(blob, key));
+      const old = imgCache.get(key); if (old) URL.revokeObjectURL(old.src);
+      imgCache.set(key, await blobToImage(blob));
+      hydrateArt(); toast('그림을 넣었어요.');
+    } catch (error) { toast('그림을 저장하지 못했어요: ' + error.message); }
+  }
+  async function removeCardImage(cardId) {
+    const project = current(), card = project && project.cards.find(item => item.id === cardId);
+    if (!card) return;
+    const key = imgKey(project, card);
+    try { await idbDo('readwrite', st => st.delete(key)); } catch (_) {}
+    const old = imgCache.get(key); if (old) URL.revokeObjectURL(old.src);
+    imgCache.set(key, null); hydrateArt();
+  }
+
+  const FONT = '"Pretendard","Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif';
+  function wrapLines(ctx, text, maxWidth) {
+    const fits = t => ctx.measureText(t).width <= maxWidth, lines = [];
+    for (const para of String(text).split('\n')) {
+      let line = '';
+      for (const word of para.split(/\s+/).filter(Boolean)) {
+        const next = line ? line + ' ' + word : word;
+        if (fits(next)) { line = next; continue; }
+        if (line) lines.push(line);
+        line = '';
+        if (fits(word)) { line = word; continue; }
+        for (const ch of word) { if (line && !fits(line + ch)) { lines.push(line); line = ''; } line += ch; }
+      }
+      if (line) lines.push(line);
+    }
+    return lines;
+  }
+  function fitText(ctx, text, maxWidth, maxHeight, size, weight) {
+    for (let px = size; px >= 22; px -= 2) {
+      ctx.font = `${weight} ${px}px ${FONT}`;
+      const lines = wrapLines(ctx, text, maxWidth), lh = px * 1.32;
+      if (lines.length * lh <= maxHeight) return { lines, px, lh };
+    }
+    ctx.font = `${weight} 22px ${FONT}`;
+    return { lines: wrapLines(ctx, text, maxWidth), px: 22, lh: 29 };
+  }
+  function drawLines(ctx, fit, cx, top, color) {
+    ctx.fillStyle = color; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    fit.lines.forEach((line, i) => ctx.fillText(line, cx, top + i * fit.lh));
+  }
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+  function compose(canvas, card, image) {
+    const W = 1080; canvas.width = W; canvas.height = W;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fffdfa'; ctx.fillRect(0, 0, W, W);
+    const top = (card.top || '').trim(), bottom = (card.bottom || '').trim(), talk = (card.dialogue || '').trim();
+    const fx = 0.06 * W, fw = 0.88 * W, fy = top ? 0.2 * W : 0.06 * W, fb = bottom ? 0.83 * W : 0.94 * W, fh = fb - fy;
+    ctx.save(); roundRect(ctx, fx, fy, fw, fh, 26); ctx.clip();
+    if (image) {
+      const s = Math.max(fw / image.naturalWidth, fh / image.naturalHeight), w = image.naturalWidth * s, h = image.naturalHeight * s;
+      ctx.drawImage(image, fx + (fw - w) / 2, fy + (fh - h) / 2, w, h);
+    } else {
+      ctx.fillStyle = '#f1ece6'; ctx.fillRect(fx, fy, fw, fh);
+      ctx.font = `600 40px ${FONT}`; ctx.fillStyle = '#a39a92'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('그림을 끌어다 놓으세요', W / 2, fy + fh / 2);
+    }
+    ctx.restore();
+    ctx.lineWidth = 5; ctx.strokeStyle = '#36312e'; roundRect(ctx, fx, fy, fw, fh, 26); ctx.stroke();
+    if (top) { const f = fitText(ctx, top, 0.86 * W, fy - 0.07 * W, 56, 800); drawLines(ctx, f, W / 2, (fy - f.lines.length * f.lh) / 2 + 4, '#26211e'); }
+    if (bottom) { const room = W - fb - 0.05 * W, f = fitText(ctx, bottom, 0.86 * W, room, 42, 600); drawLines(ctx, f, W / 2, fb + (W - fb - f.lines.length * f.lh) / 2, '#5f5954'); }
+    if (talk) {
+      const f = fitText(ctx, talk, 0.64 * W, 0.2 * W, 54, 800);
+      const textW = Math.max(...f.lines.map(line => ctx.measureText(line).width));
+      const bw = Math.min(0.8 * W, textW + 0.09 * W), bh = f.lines.length * f.lh + 0.06 * W;
+      const bx = (W - bw) / 2, by = fb - bh - 0.045 * W, tx = bx + bw * 0.32;
+      ctx.fillStyle = '#ffffff'; ctx.strokeStyle = '#36312e'; ctx.lineWidth = 5;
+      roundRect(ctx, bx, by, bw, bh, 40); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(tx - 22, by + 3); ctx.lineTo(tx - 6, by - 38); ctx.lineTo(tx + 24, by + 3); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(tx - 22, by + 1); ctx.lineTo(tx - 6, by - 38); ctx.lineTo(tx + 24, by + 1); ctx.stroke();
+      drawLines(ctx, f, W / 2, by + 0.03 * W + 2, '#26211e');
+    }
+  }
+  async function hydrateArt() {
+    const project = current();
+    if (!project || project.stage !== 'art') return;
+    let done = 0;
+    for (const card of project.cards) {
+      const canvas = document.querySelector(`canvas[data-it-canvas="${CSS.escape(card.id)}"]`);
+      const image = await loadImg(imgKey(project, card));
+      if (image) done++;
+      if (!canvas) continue;
+      compose(canvas, card, image);
+      canvas.closest('.it-art-drop')?.classList.toggle('has-img', !!image);
+    }
+    const count = document.querySelector('#itArtCount'); if (count) count.textContent = done;
+  }
+  function slug(text) { return String(text || '이번편').replace(/[\\/:*?"<>|\s]+/g, '-').slice(0, 40); }
+  async function savePng(card, index) {
+    const project = current(), image = await loadImg(imgKey(project, card));
+    if (!image) { toast(`${index + 1}번째 카드에 그림이 없어요.`); return false; }
+    const canvas = document.createElement('canvas'); compose(canvas, card, image);
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `싱부부-${slug(project.title)}-${String(index + 1).padStart(2, '0')}.png`;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    return true;
+  }
+  async function saveAll() {
+    const project = current(); let n = 0;
+    for (const [index, card] of project.cards.entries()) {
+      if (!(await loadImg(imgKey(project, card)))) continue;
+      await savePng(card, index); n++; await new Promise(r => setTimeout(r, 350));
+    }
+    toast(n ? `PNG ${n}장을 저장했어요.` : '아직 그림을 넣은 카드가 없어요.');
   }
 
   function page() {
     const project = current();
     const stage = project?.stage || 'story';
+    if (stage === 'art') setTimeout(hydrateArt, 0);
     return `<section class="it" aria-label="싱부부 인스타툰 작업대">${stage === 'art' ? artPage(project) : stage === 'cards' ? cardsPage(project) : storyPage(project)}</section>`;
   }
 
@@ -217,7 +405,10 @@
   document.addEventListener('DOMContentLoaded', () => {
     const originalPlatformPage = platformPage;
     platformPage = function (channel) {
-      return channel === 'insta' ? page() : originalPlatformPage(channel);
+      if (channel !== 'insta') return originalPlatformPage(channel);
+      // 주제 목록(상단 소개 + 주제 보드) → 만화 작업대 → 원고·프로그램
+      const base = originalPlatformPage(channel), cut = base.indexOf('<section class="pf-section"');
+      return cut < 0 ? base + page() : base.slice(0, cut) + page() + base.slice(cut);
     };
     if (view === 'insta' && !editing) render();
   });
@@ -262,7 +453,47 @@
       case 'approve': approve(); break;
       case 'edit-cards': project.stage = 'cards'; flush(); render(); break;
       case 'copy-brief': copyBrief(); break;
+      case 'copy-prompt': {
+        const card = project.cards.find(item => item.id === button.dataset.id);
+        navigator.clipboard.writeText(flowPrompt(card)).then(() => toast('Flow 프롬프트를 복사했어요. 기준 이미지와 함께 붙여 넣으세요.'), () => toast('복사하지 못했어요.'));
+        break;
+      }
+      case 'save-png': { const index = project.cards.findIndex(item => item.id === button.dataset.id); savePng(project.cards[index], index); break; }
+      case 'save-all': saveAll(); break;
+      case 'remove-img': removeCardImage(button.dataset.id); break;
     }
+  });
+
+  document.addEventListener('click', event => {
+    const drop = event.target.closest('.it-art-drop');
+    if (drop && !event.target.closest('input')) drop.querySelector('input[type=file]')?.click();
+  });
+  document.addEventListener('keydown', event => {
+    const drop = event.target.closest && event.target.closest('.it-art-drop');
+    if (drop && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); drop.querySelector('input[type=file]')?.click(); }
+  });
+  document.addEventListener('change', event => {
+    const input = event.target.closest('input[data-it-file]');
+    if (input && input.files[0]) setCardImage(input.dataset.itFile, input.files[0]);
+  });
+  document.addEventListener('dragover', event => {
+    const drop = event.target.closest && event.target.closest('.it-art-drop');
+    if (!drop) return; event.preventDefault(); drop.classList.add('is-over');
+  });
+  document.addEventListener('dragleave', event => {
+    const drop = event.target.closest && event.target.closest('.it-art-drop'); if (drop) drop.classList.remove('is-over');
+  });
+  document.addEventListener('drop', event => {
+    const drop = event.target.closest && event.target.closest('.it-art-drop');
+    if (!drop) return; event.preventDefault(); drop.classList.remove('is-over');
+    const file = [...(event.dataTransfer?.files || [])].find(f => /^image\//.test(f.type));
+    if (file) setCardImage(drop.dataset.itDrop, file); else toast('이미지 파일을 끌어다 놓아 주세요.');
+  });
+  document.addEventListener('paste', event => {
+    const drop = document.activeElement && document.activeElement.closest && document.activeElement.closest('.it-art-drop');
+    if (!drop) return;
+    const file = [...(event.clipboardData?.files || [])].find(f => /^image\//.test(f.type));
+    if (file) { event.preventDefault(); setCardImage(drop.dataset.itDrop, file); }
   });
 
   window.addEventListener('pagehide', () => {

@@ -775,7 +775,7 @@ const PLATFORM_STARTERS = [
   { sid:'tg-weekly-macro', platform:'Telegram', title:'이번 주 코인 시장을 흔든 매크로 3줄', angle:'금리·달러·주식 중 코인 가격에 실제로 영향을 준 것만 3줄로. 중요한 변화부터.', hook:'제목 · [11월 2주] 코인에 영향 준 것 3가지', outline:['• 매크로 변화 1 (지표·발표 + 날짜) → 코인 반응','• 변화 2','• 변화 3','내 해석 두 줄','원문 링크 + "투자 권유 아님"'], verify:['모든 수치의 날짜·출처','인과를 단정하지 않았는지'] },
   { sid:'tg-sg-casino-levy', platform:'X', title:'싱가포르 카지노 내국인 입장료, 3줄 정리', angle:'블로그 원문을 구독자용 요약으로 줄인다.', hook:'제목 · 싱가포르 사람은 카지노에 들어갈 때 돈을 낸다', outline:['• 제도 개요 [확인 필요: 현재 금액·대상]','• 도입 목적','• 직접 본 장면 한 줄','블로그 원문 링크'], verify:['입장료 금액과 시행 기관 공식 자료'] },
   { sid:'tg-wrestling-week', platform:'YouTube', ytFormat:'shorts', title:'이번 주 볼 만한 레슬링·UFC 경기 3개', angle:'레슬링 소스 채널에서 고른 영상 링크 큐레이션. 유튜브 쇼츠로 이어지는 예고편 역할.', hook:'제목 · 이번 주 레슬링 볼거리 3', outline:['• 경기 1 + 한 줄 이유 + 링크','• 경기 2','• 경기 3','다음 쇼츠 예고 한 줄'], verify:['링크가 공식 채널 원본인지','선수·대회 표기'] },
-  { sid:'ig-loss-card', platform:'Instagram', title:'같은 10만 원, 잃을 때 더 아픈 이유 (카드 6장)', angle:'손실 회피를 저장하고 싶은 카드로 만든다.', hook:'1장 · "10만 원 얻기 vs 10만 원 잃기, 뭐가 더 셀까?"', outline:['1장 질문','2장 일상 예시','3장 연구 한 줄 [확인 필요: 출처]','4장 투자에서 보이는 행동','5장 한계','6장 질문 + "투자 권유 아님"'], verify:['카드 글자 잘림','출처 표기 위치'] },
+  { sid:'ig-loss-card', platform:'네이버 블로그', title:'같은 10만 원, 잃을 때 더 아픈 이유 (카드 6장)', angle:'손실 회피를 저장하고 싶은 카드로 만든다.', hook:'1장 · "10만 원 얻기 vs 10만 원 잃기, 뭐가 더 셀까?"', outline:['1장 질문','2장 일상 예시','3장 연구 한 줄 [확인 필요: 출처]','4장 투자에서 보이는 행동','5장 한계','6장 질문 + "투자 권유 아님"'], verify:['카드 글자 잘림','출처 표기 위치'] },
   { sid:'ig-app-habit', platform:'Instagram', title:'주식 앱을 끄기 어려운 이유 5가지 (카드 7장)', angle:'실시간 시세·색·알림 같은 화면 요소를 카드 하나씩.', hook:'1장 · "확인만 하려고 연 앱, 오늘 몇 번 열었나요?"', outline:['1장 질문','2~6장 요소 하나씩(시세·색·알림·순위·커뮤니티)','7장 알림 점검 질문 + '+HELP_LINE], verify:['행동 연구 출처','상담처 정보 최신 여부'] },
   { sid:'ig-women-wrestler-reel', platform:'YouTube', ytFormat:'shorts', title:'여자 레슬러 한 명 30초 소개 (릴스)', angle:'UWW 공식 경기 장면 몇 초 + 내 내레이션으로 선수 한 명의 강점을 소개한다.', hook:'0~3초 · "남자 선수도 피하는 그립"', outline:['훅 장면 몇 초','강점 한 가지와 기록 한 줄 [확인 필요: 메달·대회]','결론 + 다음 선수 질문'], verify:['선수 기록 공식 출처','원본 장면 사용 길이'], sources:'https://www.youtube.com/@unitedworldwrestling' },
   { sid:'th-sg-lunch-money', platform:'Threads', title:'싱가포르 점심시간에 들은 돈 이야기', angle:'직접 들은 대화 한 장면으로 시작하고 일반화하지 않는다.', hook:'"오늘 점심에 동료가 한 말이 계속 생각난다"', outline:['[직접 경험: 들은 말과 장소]','처음 든 생각 → 바뀐 생각','질문: "여러분 회사에서는 돈 얘기 하시나요?"','긴 근거는 답글로'], verify:['개인 경험을 나라 전체로 일반화하지 않았는지'] },
@@ -885,12 +885,24 @@ const TG_MOVED = { 'tg-sg-casino-levy':'네이버 블로그', 'tg-wrestling-week
 const TG_RETITLED = { 'tg-weekly-macro':'이번 주 매크로 3줄 요약', 'tg-monday-calendar':'[월요일] 이번 주 꼭 볼 일정 5개', 'tg-friday-wrap':'[금요일] 이번 주 정리: 예상과 실제', 'tg-new-post-alert':'새 블로그 글 알림 + 3줄 요약', 'tg-poll-next':'[투표] 다음 영상·글 주제 골라 주세요', 'tg-qna':'구독자 질문 3개에 답합니다', 'tg-term-one':'용어 하나 쉽게: 이번 주는 \"청산\"', 'tg-help-pin':'[고정 공지] 도박·투자로 힘들 때 연락할 곳' };
 
 // v8: 트레이딩 · 직업 · 싱가포르 = X · Instagram · Threads, 레슬링 = YouTube
+// v10: Instagram = 싱가포르 부부 · 외노자 · 주식 앱 습관 · 크립토 직장인의 하루
 const JOB_STARTERS = [
   { sid:'x-job-crypto-work', platform:'X', title:'크립토 회사에서 일하면 실제로 하는 일 5가지', angle:'회사·동료를 특정하지 않고 업무 종류와 오해/실제를 스레드로.', hook:'첫 글 · "코인 회사 다닌다고 하면 다들 차트만 보는 줄 안다"', outline:['첫 글: 오해 한 줄','후속 1~5: 실제 업무 하나씩','마지막 글: 이 일에 맞는 사람'], verify:['회사 기밀·동료 정보 없는지'] },
   { sid:'ig-job-day', platform:'Instagram', title:'싱가포르 크립토 직장인의 하루 (캐러셀 6장)', angle:'출근부터 퇴근까지 사진 6장. 회사 정보는 가리고 재미있는 장면 위주.', hook:'1장 · "싱가포르에서 코인 회사 다니면 하루가 이렇다"', outline:['1장 표지','2~5장 시간대별 장면','6장 질문: "여러분의 하루는?"'], verify:['사진 속 회사·동료 정보 가림'] },
   { sid:'th-job-colleague', platform:'Threads', title:'싱가포르 동료가 한 말이 계속 생각난다', angle:'일하다 들은 말 한마디로 시작하는 짧은 글. 동료 특정 금지.', hook:'"오늘 회의에서 들은 말"', outline:['[직접 경험] 들은 말','처음 든 생각 → 바뀐 생각','질문: "여러분 회사에서는?"'], verify:['동료·회사 특정 안 되는지'] },
 ];
 PLATFORM_STARTERS.push(...JOB_STARTERS);
+const COUPLE_STARTERS = [
+  { sid:'ig-couple-weekend', platform:'Instagram', title:'싱가포르 부부의 주말 하루 (캐러셀 6장)', angle:'아침 호커 → 장보기 → 산책 → 저녁까지 사진 6장. 둘이 나눈 말 한 줄씩.', hook:'1장 · "싱가포르 사는 한국 부부의 토요일"', outline:['1장 표지(둘의 뒷모습·손 등)','2~5장 시간대별 장면 + 대화 한 줄','6장 질문: "여러분 부부의 주말 루틴은?"'], verify:['배우자 게시 동의','집·동네가 특정되지 않는지'] },
+  { sid:'ig-sg-info-cost', platform:'Instagram', title:'싱가포르 2인 생활비, 항목 5개로 (카드 7장)', angle:'월세·장보기·외식·교통·공과금을 카드 한 장씩. 우리 집 기준임을 밝힌다.', hook:'1장 · "싱가포르에서 둘이 살면 한 달에 얼마?"', outline:['1장 질문','2~6장 항목별 금액 [직접 경험] + 한 줄 팁','7장 "저장해 두세요" + 질문'], verify:['금액은 확인한 달 표기','공식 통계와 섞을 땐 출처'] },
+  { sid:'ig-couple-abroad', platform:'Instagram', title:'해외에서 둘만 살면 달라지는 것 5가지 (릴스)', angle:'친구·가족 없이 둘이 버티며 바뀐 점. 웃긴 장면 위주, 갈등은 가볍게.', hook:'"해외 나오면 부부가 더 친해질까?"', outline:['컷 5개 + 자막 한 줄씩','마지막 컷 질문: "해외 사는 부부들, 공감?"'], verify:['배우자 게시 동의','다른 부부를 일반화하지 않기'] },
+];
+PLATFORM_STARTERS.push(...COUPLE_STARTERS);
+const V10_MOVES = [
+  // [아이디어 id, Instagram일 때만 이동 → 새 플랫폼] 지우지 않고 맞는 곳으로
+  ['pf-starter-ig-loss-card', '네이버 블로그'],
+  ['starter-sg-3', 'X'],
+];
 const V8_MOVES = [
   // [id, 지금 플랫폼(이때만 이동), 새 플랫폼]
   ['starter-sg-1', '네이버 블로그', 'X'],
@@ -902,7 +914,7 @@ const V8_MOVES = [
   ['pf-starter-tg-shorts-behind', 'X', 'YouTube'],
   ['pf-starter-ig-women-wrestler-reel', 'Instagram', 'YouTube'],
 ];
-const PLATFORM_SEED_VERSION = 8;
+const PLATFORM_SEED_VERSION = 10;
 let ideaPlatformFilter = 'all';
 
 function platformStarterNote(s) {
@@ -919,6 +931,13 @@ function ensurePlatformStarters() {
     const sid = String(i.id).replace('pf-starter-', '');
     if (TG_MOVED[sid] && i.platform === 'Telegram') { i.platform = TG_MOVED[sid]; if (TG_MOVED[sid] === '네이버 블로그') i.preferredChannel = 'blog'; }
     if (TG_RETITLED[sid] && i.title === TG_RETITLED[sid]) { const st = PLATFORM_STARTERS.find(x => x.sid === sid); if (st) { i.title = st.title; i.note = platformStarterNote(st); } }
+  }
+  // v10은 v7·v8 이동 뒤에 실행해야 4D·토토가 Instagram으로 되돌아가지 않음
+  if ((db.platformSeedVersion || 0) < 10) for (const [id, to] of V10_MOVES) {
+    const i = db.ideas.find(x => x.id === id); if (!i || ideaPlatform(i) !== 'Instagram') continue;
+    i.platform = to;
+    if (to === '네이버 블로그') i.preferredChannel = 'blog'; else if (i.preferredChannel === 'insta') delete i.preferredChannel;
+    const st = PLATFORM_STARTERS.find(x => 'pf-starter-' + x.sid === id); if (st && i.title === st.title) i.note = platformStarterNote(st);
   }
   const have = new Set(db.ideas.map(i => i && i.id)); const base = Date.now(); let k = 0;
   for (const s of PLATFORM_STARTERS) {
@@ -987,7 +1006,7 @@ function platformStudio() {
   const bar = `<div class="ps-tabs" role="tablist" aria-label="플랫폼">${tabs.map(t => `<button role="tab" aria-selected="${t === p}" class="ps-tab ${t === p ? 'active' : ''}" style="--pc:${t === '미분류' ? '#8b929e' : platformColor(t)}" data-studio-platform="${esc(t)}">${esc(t)}<b>${list(t).length}</b></button>`).join('')}</div>`;
   const topic = i => `<li class="ps-topic"><details><summary><span class="ps-topic-title">${esc(i.title)}</span>${i.sample ? '<span class="sampletag">예시</span>' : ''}</summary>
     <p class="ps-note">${esc(i.note)}</p>${ideaPlatformPicker(i)}
-    <div class="actions"><button class="btn primary" data-create="${esc(i.id)}">원고 만들기</button><button class="btn ghost" data-idea-edit="${esc(i.id)}">수정</button><button class="btn ghost danger" data-idea-delete="${esc(i.id)}" aria-label="소재 삭제">×</button></div></details></li>`;
+    <div class="actions"><button class="btn primary" data-create="${esc(i.id)}">${ideaChannel(i)==='youtube'?'원고 만들기':'원고 생성'}</button><button class="btn ghost" data-idea-edit="${esc(i.id)}">수정</button><button class="btn ghost danger" data-idea-delete="${esc(i.id)}" aria-label="소재 삭제">×</button></div></details></li>`;
   return bar + `<section class="ps-board" style="--pc:${pc}">
     <header class="ps-head"><h2>${esc(p)}</h2>${book ? `<span>${esc(book.role)}</span>` : '<span>플랫폼을 정해 주세요</span>'}</header>
     <div class="ps-cols">
@@ -1077,7 +1096,7 @@ function platformPage(c) {
   const tools = (PLATFORM_TOOLS[p] || []).filter(([id]) => id !== 'ai');
   const topic = i => `<li class="ps-topic"><details><summary><span class="ps-topic-title">${esc(i.title)}</span>${i.sample ? '<span class="sampletag">예시</span>' : ''}</summary>
     <p class="ps-note">${esc(i.note)}</p>${ideaPlatformPicker(i)}
-    <div class="actions"><button class="btn primary" data-create="${esc(i.id)}">원고 만들기</button>${c === 'youtube' ? `<button class="btn" data-yp-pick="${esc(i.id)}">▶ 제작 라인에서 작업</button>` : ''}<button class="btn ghost" data-idea-edit="${esc(i.id)}">수정</button><button class="btn ghost danger" data-idea-delete="${esc(i.id)}" aria-label="소재 삭제">×</button></div></details></li>`;
+    <div class="actions"><button class="btn primary" data-create="${esc(i.id)}">${ideaChannel(i)==='youtube'?'원고 만들기':'원고 생성'}</button>${c === 'youtube' ? `<button class="btn" data-yp-pick="${esc(i.id)}">▶ 제작 라인에서 작업</button>` : ''}<button class="btn ghost" data-idea-edit="${esc(i.id)}">수정</button><button class="btn ghost danger" data-idea-delete="${esc(i.id)}" aria-label="소재 삭제">×</button></div></details></li>`;
   const hero = `<section class="pf-hero" style="--pc:${pc}"><div class="pf-hero-main"><div class="eyebrow">PLATFORM</div><h1>${esc(platformLabel(p))}</h1><p>${esc(book.role)}</p><p class="pf-themes">다루는 주제 · ${esc(PLATFORM_THEMES[p] || '')}</p></div>
     <dl class="pf-stats">${c === 'youtube' ? `<div><dt>쇼츠</dt><dd>${ideas.filter(i => ytFormatOf(i) === 'shorts').length}</dd></div><div><dt>롱폼</dt><dd>${ideas.filter(i => ytFormatOf(i) === 'long').length}</dd></div>` : `<div><dt>주제</dt><dd>${ideas.length}</dd></div>`}<div><dt>작성 중</dt><dd>${n('draft')}</dd></div><div><dt>검수 대기</dt><dd class="orange">${n('review')}</dd></div><div><dt>승인</dt><dd class="green">${n('approved')}</dd></div></dl>
     <div class="pf-hero-actions"><button class="btn ${ideaGenOpen[c] ? 'active' : ''}" data-idea-gen="${c}" aria-expanded="${!!ideaGenOpen[c]}">💡 아이디어 생성</button><button class="btn primary" data-action="newIdea">＋ 새 주제</button></div></section>${ideaGenOpen[c] ? ideaGenPanel(c) : ''}`;
@@ -1089,7 +1108,7 @@ function platformPage(c) {
       <p class="ps-metric"><b>올린 뒤 볼 숫자</b>${esc(book.metric)}</p>${guide ? `<p class="ps-metric"><b>올리는 곳</b>${esc(guide.publish)}</p>` : ''}</div>
   </div></section>`;
   const postRows = posts.map(x => `<div class="draftitem">${icon(c)}<div class="grow"><h3>${esc(x.title)}${sample(x)}</h3><div class="small">${c === 'youtube' && ytValidCh(x.ytChannel) ? esc(ytChName(x.ytChannel)) + ' · ' : ''}${x.body.length.toLocaleString()}자 · ${relative(x.updated)} 수정</div></div>${badge(x)}<div class="actions"><button class="btn" data-edit="${esc(x.id)}">원고 열기 ↗</button><button class="btn ghost" data-export="${esc(x.id)}" aria-label="내보내기">↓</button></div></div>`).join('');
-  const drafts = `<section class="pf-section"><div class="sectionhead"><div class="left"><h2><span class="pf-num" style="--pc:${pc}">④</span> 원고</h2><span class="number">${posts.length}</span></div><span class="small">주제에서 '원고 만들기'를 누르면 여기에 쌓입니다</span></div>
+  const drafts = `<section class="pf-section"><div class="sectionhead"><div class="left"><h2><span class="pf-num" style="--pc:${pc}">④</span> 원고</h2><span class="number">${posts.length}</span></div><span class="small">주제에서 원고를 만들면 여기에 쌓입니다</span></div>
     <div class="draft-list">${postRows || '<div class="panel empty">아직 원고가 없습니다.</div>'}</div></section>`;
   const toolCards = tools.map(([id, must]) => { const t = PREP_TOOLS[id], r = roleOf[id]; return `<article class="pf-tool ${ready[id] ? 'is-ready' : ''}" data-ready-row>
     <div class="sub-card-head"><label class="pp-check"><input type="checkbox" data-tool-ready="${id}" ${ready[id] ? 'checked' : ''}><h4>${esc(t.name)}</h4></label><span class="tc-price ${priceClass(t.price)}">${esc(t.price)}</span></div>
@@ -1109,8 +1128,7 @@ function platformPage(c) {
 
 const COMMON_FLOW = [
   ['주제 기록', '직접 본 장면·경험을 해당 플랫폼 화면의 ① 주제에 적습니다.'],
-  ['원고 틀', "주제에서 '원고 만들기' → 그 플랫폼 원고 틀이 자동으로 들어갑니다."],
-  ['초안', '원고 작성 AI로 초안. 경험과 해석은 직접 씁니다.'],
+  ['초안', '주제에서 원고 생성을 누르면 AI가 초안을 작성합니다. 유튜브는 원고 틀에서 시작합니다.'],
   ['검수 · 승인', '아래 검수 3가지를 체크하고 승인합니다.'],
   ['게시', "플랫폼에서 직접 올리고 '게시 확인'에 링크를 남깁니다."],
   ['숫자 기록', "플랫폼마다 정해 둔 '올린 뒤 볼 숫자'를 봅니다."],
@@ -1452,17 +1470,22 @@ const IDEA_BANK = {
     { t:'회복', title:'큰 손실 뒤 다시 시작한 구독자 이야기', note:'익명 사연 + 도움 받을 곳 안내.' },
   ],
   'Instagram': [
-    { t:'트레이딩', title:'오해 vs 사실: 레버리지에 대한 흔한 오해 5개', note:'카드 7장: 표지 질문 → 오해/사실 5쌍 → 저장 유도.' },
-    { t:'트레이딩', title:'투자 전 체크리스트 카드 (저장용)', note:'카드 5장, 마지막 장 "저장해 두세요".' },
-    { t:'트레이딩', title:'이 중 가장 위험한 투자 습관은? (퀴즈 카드)', note:'1장 질문, 2장 보기, 3장 정답·이유. 댓글 참여.' },
-    { t:'트레이딩', title:'숫자 카드: 10배 레버리지는 몇 % 하락에 청산될까', note:'큰 숫자 + 한 줄 설명. 투자 권유 아님.' },
-    { t:'직업', title:'크립토 직장인의 하루 (캐러셀 6장)', note:'출근 → 리서치 → 회의 → 퇴근. 회사 정보는 가리기.' },
-    { t:'직업', title:'내 책상과 업무 도구 소개', note:'사진 5장 + 도구별 한 줄. 협찬이면 표기.' },
-    { t:'직업', title:'해외 취업 Q&A 카드', note:'자주 받는 질문 5개에 짧게 답. 직접 경험 기준.' },
-    { t:'싱가포르', title:'싱가포르 일상 사진 5장 + 한 줄 관찰', note:'캐러셀. 장소·날짜 표기.' },
-    { t:'싱가포르', title:'한국 vs 싱가포르: 돈 문화 비교 카드', note:'항목 4개, 출처 있는 것만.' },
-    { t:'싱가포르', title:'호커센터 한 끼, 얼마일까? (가격 맞히기 릴스)', note:'메뉴 보여주고 가격 퀴즈 → 정답. 확인한 날짜 표기.' },
-    { t:'싱가포르', title:'싱가포르에서 처음 놀란 것 TOP 5 (릴스)', note:'짧은 컷 5개 + 자막. 재미 위주, 일반화 금지.' },
+    { t:'싱가포르 부부', title:'싱가포르 부부의 주말 하루 (캐러셀 6장)', note:'시간대별 사진 + 둘이 나눈 말 한 줄. 집·동네 특정 금지, 배우자 동의.' },
+    { t:'싱가포르 부부', title:'싱가포르 2인 생활비, 항목 5개로 (저장용 카드)', note:'월세·장보기·외식·교통·공과금. 우리 집 기준, 확인한 달 표기.' },
+    { t:'싱가포르 부부', title:'해외에서 둘만 살면 달라지는 것 5가지 (릴스)', note:'웃긴 장면 위주. 다른 부부를 일반화하지 않기.' },
+    { t:'싱가포르 부부', title:'퇴근 후 둘이 가는 호커센터 단골 메뉴 (릴스)', note:'메뉴 3개 + 각자 한 줄 평. 가격은 확인한 날짜 표기.' },
+    { t:'싱가포르 부부', title:'부부 생활비 나누는 우리 방식 (카드)', note:'공동 통장·각자 용돈 등 우리 규칙. 정답 아닌 한 가지 예시.' },
+    { t:'외노자', title:'싱가포르 외노자 1년 차가 놀란 것 5가지 (릴스)', note:'짧은 컷 5개 + 자막. 재미 위주, 일반화 금지.' },
+    { t:'외노자', title:'해외 취업 Q&A 카드: 자주 받는 질문 5개', note:'직접 경험 기준으로 짧게. 비자·제도는 공식 출처.' },
+    { t:'외노자', title:'싱가포르 처음 오면 꼭 까는 앱 5개', note:'교통·배달·결제·정부앱. 광고면 표기.' },
+    { t:'외노자', title:'외노자가 제일 그리운 한국 음식 TOP 5', note:'마지막 장 질문: "해외 사는 분들은 뭐가 제일 그리워요?"' },
+    { t:'주식 앱 습관', title:'주식 앱을 끄기 어려운 이유 5가지 (카드 7장)', note:'시세·색·알림·순위·커뮤니티를 한 장씩. 마지막 장 도움 받을 곳.' },
+    { t:'주식 앱 습관', title:'하루에 주식 앱 몇 번 열까? 일주일 세어 봤다', note:'직접 실험 기록. 스크린타임 캡처, 개인 경험임을 밝히기.' },
+    { t:'주식 앱 습관', title:'주식 앱 알림 정리 체크리스트 (저장용)', note:'카드 5장, 끌 알림·남길 알림. 마지막 장 "저장해 두세요".' },
+    { t:'주식 앱 습관', title:'이 중 가장 위험한 투자 습관은? (퀴즈 카드)', note:'1장 질문, 2장 보기, 3장 정답·이유. 투자 권유 아님.' },
+    { t:'크립토 직장인', title:'싱가포르 크립토 직장인의 하루 (캐러셀 6장)', note:'출근 → 리서치 → 회의 → 퇴근. 회사 정보는 가리기.' },
+    { t:'크립토 직장인', title:'크립토 회사에서 실제로 하는 일 5가지 (카드)', note:'회사·동료 특정 없이 업무 종류만. 오해와 실제 비교.' },
+    { t:'크립토 직장인', title:'내 책상과 업무 도구 소개', note:'사진 5장 + 도구별 한 줄. 협찬이면 표기.' },
   ],
   'Threads': [
     { t:'트레이딩', title:'내가 처음 코인으로 잃었던 날', note:'직접 경험 또는 각색임을 밝히기. 교훈 하나 + 도움 받을 곳.' },
@@ -1554,7 +1577,7 @@ const PLATFORM_THEMES = {
   '네이버 블로그': '중독 · 투자 심리 · 도박 설계 · 매크로 (싱가포르는 다루지 않음)',
   'X': '트레이딩 · 직업 · 싱가포르',
   'Telegram': '코인 · 트레이딩 · 트레이딩 마인드',
-  'Instagram': '트레이딩 · 직업 · 싱가포르',
+  'Instagram': '싱가포르 부부 · 외노자 · 주식 앱 습관 · 크립토 직장인의 하루',
   'Threads': '트레이딩 · 직업 · 싱가포르',
 };
 function platformThemesBlock() { return `<section class="panel cp-block cp-themes"><h2>플랫폼별 다루는 주제</h2><ul class="cp-theme-list">${IDEA_PLATFORMS.map(p => `<li style="--pc:${platformColor(p)}"><b>${esc(p)}</b><span>${esc(PLATFORM_THEMES[p])}</span></li>`).join('')}</ul><p class="small">싱가포르 이야기는 X · Instagram · Threads에서만 다룹니다.</p></section>`; }

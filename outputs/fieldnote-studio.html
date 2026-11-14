@@ -697,7 +697,22 @@ function connectedCount(){return Object.keys(CH).filter(isConnected).length}
 function routeHash(){return editing?'#edit/'+encodeURIComponent(editing):'#'+view}
 function syncHash(replace){const h=routeHash();if(location.hash===h)return;if(replace){try{history.replaceState(null,'',h)}catch(_){location.hash=h}}else location.hash=h}
 function parseHash(h){h=String(h||'').replace(/^#/,'');if(h==='keywords')h='analytics';if(h==='overview')h='dashboard';if(h.startsWith('edit/')){let id=h.slice(5);try{id=decodeURIComponent(id)}catch(_){}const p=db.posts.find(p=>p.id===id);return p?{edit:id,view:p.channel}:{view:'dashboard'}}return {view:ROUTES.includes(h)?h:'dashboard'}}
-function injectEditorAiButton(){const target=$('#postBody')?.closest('.panel')?.querySelector('.actions');if(!target||target.querySelector('[data-action="generateEditorDraft"]'))return;const b=document.createElement('button');b.className='btn';b.dataset.action='generateEditorDraft';b.textContent='초안 프롬프트';target.prepend(b)}
+function injectEditorAiButton(){
+ const target=$('#postBody')?.closest('.panel')?.querySelector('.actions');
+ if(!target||target.querySelector('[data-action="generateEditorDraft"]'))return;
+ const button=document.createElement('button');
+ button.className='btn';
+ button.dataset.action='generateEditorDraft';
+ target.prepend(button);
+ updateEditorAiButton();
+}
+function updateEditorAiButton(){
+ const button=$('[data-action="generateEditorDraft"]');
+ if(!button)return;
+ const youtube=$('#postChannel').value==='youtube';
+ button.disabled=!youtube&&genBusy!==null;
+ button.textContent=youtube?'초안 프롬프트':genBusy===('editor:'+editing)?'원고 생성 중…':'원고 생성';
+}
 function render(){ensurePublish();if(view==='dashboard'||view==='ideas')view='common';if(view==='ytGithub')view='github';const screen=editing?editor():view==='common'?commonPage():view==='ytSkills'?ytSkillsPage():view==='ytSources'?ytSourcesPage():view==='github'?ytGithubPage():view==='blogSkills'?blogSkillsPage():view==='settings'?settings():view==='analytics'?analytics():view==='research'?publicResearch():view==='reach'?reachView():view==='topics'?topicsPage():view==='publish'?publishing():view==='blogPlan'?head('블로그 기획','카테고리별 글감을 발굴하고 초안으로 이어가세요.',false)+genPanel():view==='youtubePlan'?head('유튜브 기획','채널별 영상 주제를 발굴하고 대본으로 이어가세요.',false)+ytTabs()+ytPanel():CH[view]?platformPage(view):postList();const active=editing?(db.posts.find(p=>p.id===editing)?.channel||'common'):workspaceSection(view);document.querySelectorAll('.nav[data-view]').forEach(n=>{const selected=n.dataset.view===active;n.classList.toggle('active',selected);if(selected)n.setAttribute('aria-current','page');else n.removeAttribute('aria-current')});$('#breadcrumb').textContent=editing?'원고 편집':TITLES[view];$('.workspace').firstChild.textContent=db.profile.name;paintStorage();const n=connectedCount();$('#sideConn').textContent=n?`발행 브리지 ${n}/${Object.keys(CH).length} 설정됨`:'외부 계정 · 연결 안 됨';$('#content').innerHTML=(editing?'':workspaceNav(active))+screen+`<footer class="footer"><span>FIELDNOTE STUDIO / LOCAL EDITION</span><span>${view==='publish'&&!editing?'승인은 당신이, 게시 권한은 플랫폼이.':'경험은 당신에게서, 근거는 원문에서.'}</span></footer>`;injectEditorAiButton();syncHash(false)}
 function canLeave(){if(!dirty)return true;if(!confirm('저장하지 않은 수정이 있습니다. 버리고 이동할까요?'))return false;if(editing){clearTimeout(draftTimer);draftDel(editing)}return true}
 function closeSidebar(){$('#sidebar').classList.remove('open')}
@@ -726,9 +741,9 @@ function template(i,c){const memo=`## 작업 메모\n${i.note}\n\n## 채널 관�
 function saveEditor(target){const p=db.posts.find(p=>p.id===editing);if(!p)return false;const title=$('#postTitle').value.trim(),body=$('#postBody').value,sources=$('#postSources').value,channel=$('#postChannel').value,memo=$('#postMemo').value,naverCategory=$('#postNaverCategory').value.trim(),ytCh=channel==='youtube'?(ytValidCh($('#postYtChannel').value)||ytValidCh(p.ytChannel)||ytTab()):'',youtubeMeta=channel==='youtube'?ytMetaForm():null;if(!title){toast('제목을 입력하세요.');$('#postTitle').focus();return false}if(channel==='youtube'&&youtubeMeta.titleOptions.length&&title!==youtubeMeta.titleOptions[0])youtubeMeta.titleOptions.unshift(title);const changed=p.title!==title||p.body!==body||p.sources!==sources||p.channel!==channel||(p.memo||'')!==memo||(p.naverCategory||'')!==naverCategory||(p.ytChannel||'')!==ytCh||JSON.stringify(p.youtubeMeta||{})!==JSON.stringify(youtubeMeta||{});const checkValues=Array.from(document.querySelectorAll('[data-check]')).map(el=>el.checked);if(target==='approved'&&!checkValues.every(Boolean)){toast('검수 항목 3개를 모두 확인하세요.');return false}if(target==='approved'&&!body.trim()){toast('원고를 작성하세요.');return false}if(target==='approved'){const marks=aiMarkCount(body);if(marks){toast(AI_MARK_MSG(marks));return false}}if(target==='approved'){const ph=placeholderLines(body);if(ph.length){toast(`원고에 채우지 않은 자리표시자 ${ph.length}곳이 남아 있습니다 (예: ${ph[0].slice(0,24)}). 작성하거나 지운 뒤 승인하세요.`);return false}}if(p.channel!==channel)delete p.publicationCheck;p.title=title;p.body=body;p.memo=memo;p.naverCategory=naverCategory;p.sources=sources;p.channel=channel;if(ytCh)p.ytChannel=ytCh;else delete p.ytChannel;if(youtubeMeta)p.youtubeMeta=youtubeMeta;else delete p.youtubeMeta;p.checks=checkValues;p.status=target||(p.status==='approved'&&(changed||!checkValues.every(Boolean))?'draft':p.status);p.updated=Date.now();log(target==='approved'?'원고 검수 승인: '+title:target==='review'?'검수 요청: '+title:'원고 저장: '+title);persist();clearTimeout(draftTimer);draftDel(p.id);dirty=false;render();toast(target==='approved'?'승인 완료. 외부 게시물은 발행하지 않았습니다.':target==='review'?'검수함으로 보냈습니다.':'원고를 저장했습니다.');return true}
 function download(name,content,type){const blob=new Blob([content],{type}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000)}
 function exportPost(id){const p=db.posts.find(p=>p.id===id);if(!p)return;download(p.title.replace(/[\\/:*?"<>|]/g,'_').slice(0,90)+'.md',`# ${p.title}\n\n${p.body}\n\n---\n\n## 출처\n${p.sources||'미입력'}\n\n작업 상태: ${STATUS[p.status]} / 채널: ${CH[p.channel].name}\n`,'text/markdown;charset=utf-8');toast('Markdown 파일을 내보냈습니다.')}
-document.addEventListener('click',e=>{const t=e.target.closest('button');if(!t)return;if(t.dataset.view){navigate(t.dataset.view);return}if(t.dataset.filter){filter=t.dataset.filter;render();return}if(t.dataset.edit){openPost(t.dataset.edit);return}if(t.dataset.create){createModal(t.dataset.create);return}if(t.dataset.ideaEdit){ideaModal(t.dataset.ideaEdit);return}if(t.dataset.ideaDelete){if(confirm('이 소재를 삭제할까요? 연결된 원고는 유지됩니다.')){db.ideas=db.ideas.filter(i=>i.id!==t.dataset.ideaDelete);log('소재를 삭제했습니다');persist();render()}return}if(t.dataset.export){exportPost(t.dataset.export);return}switch(t.dataset.action){case'newIdea':ideaModal();break;case'close':closeModal();break;case'back':navigate(CH[view]?view:'dashboard');break;case'savePost':saveEditor();break;case'requestReview':saveEditor('review');break;case'approve':saveEditor('approved');break;case'exportCurrent':if(saveEditor())exportPost(editing);break;case'backup':download('fieldnote-backup-'+new Date().toISOString().slice(0,10)+'.json',JSON.stringify(backupData(),null,2),'application/json');toast('워크스페이스 백업을 내보냈습니다. 브리지 토큰은 포함되지 않습니다.');break;case'import':$('#importFile').click();break;case'saveSettings':{const name=$('#profileName').value.trim();if(!name){toast('워크스페이스 이름을 입력하세요.');return}db.profile={...db.profile,name,tone:$('#profileTone').value,blogVoice:$('#profileBlogVoice').value};db.ytChannels=YT_CHANNELS.map(y=>({id:y.id,name:($('#ytName-'+y.id).value.trim()||y.name),voice:$('#ytVoice-'+y.id).value}));log('편집 기준을 저장했습니다');persist();render();toast('설정을 저장했습니다.');break}case'clearSamples':if(confirm('예시로 표시된 소재와 원고만 삭제할까요?')){db.ideas=db.ideas.filter(i=>!i.sample);db.posts=db.posts.filter(p=>!p.sample);log('예시 데이터를 지웠습니다');persist();render();toast('예시 데이터를 지웠습니다.')}break;case'deletePost':if(confirm('이 원고를 삭제할까요? 삭제 후 되돌릴 수 없습니다.')){clearTimeout(draftTimer);draftDel(editing);db.posts=db.posts.filter(p=>p.id!==editing);log('원고를 삭제했습니다');persist();dirty=false;editing=null;render()}break;}});
-document.addEventListener('submit',e=>{if(e.target.id==='ideaForm'){e.preventDefault();const f=e.target,id=f.dataset.id,old=db.ideas.find(i=>i.id===id),title=$('#ideaTitle').value.trim(),note=$('#ideaNote').value.trim(),sources=$('#ideaSources').value;if(!title||!note){toast('제목과 경험 메모를 입력하세요.');return}if(old)Object.assign(old,{title,note,sources});else db.ideas.unshift({id:uid(),title,note,sources,created:Date.now(),sample:false,...(PF_NAME[view]?{platform:PF_NAME[view],...(['youtube','blog','insta'].includes(view)?{preferredChannel:view}:{}),...(view==='youtube'?{ytFormat:ytPipe.format}:{})}:{})});log((old?'소재 수정: ':'새 소재: ')+title);persist();closeModal();navigate(view);toast('소재를 저장했습니다.')}if(e.target.id==='createForm'){e.preventDefault();if(!canLeave())return;const i=db.ideas.find(i=>i.id===e.target.dataset.id),channel=$('#createChannel').value;if(!i)return;const p=newPost(i,channel,i.sample);db.posts.unshift(p);log(CH[channel].short+' 원고 틀 생성: '+i.title);persist();closeModal();dirty=false;editing=p.id;view=channel;render();toast('편집용 원고 틀을 만들었습니다.')}});
-document.addEventListener('input',e=>{if(['postTitle','postBody','postSources','postChannel','postYtChannel','postMemo','postNaverCategory','ytTitleOptions','ytThumbnailText','ytThumbnailBrief'].includes(e.target.id))editorInput()});
+document.addEventListener('click',e=>{const t=e.target.closest('button');if(!t)return;if(t.dataset.view){navigate(t.dataset.view);return}if(t.dataset.filter){filter=t.dataset.filter;render();return}if(t.dataset.edit){openPost(t.dataset.edit);return}if(t.dataset.create){createIdeaDraft(t.dataset.create);return}if(t.dataset.ideaEdit){ideaModal(t.dataset.ideaEdit);return}if(t.dataset.ideaDelete){if(confirm('이 소재를 삭제할까요? 연결된 원고는 유지됩니다.')){db.ideas=db.ideas.filter(i=>i.id!==t.dataset.ideaDelete);log('소재를 삭제했습니다');persist();render()}return}if(t.dataset.export){exportPost(t.dataset.export);return}switch(t.dataset.action){case'newIdea':ideaModal();break;case'close':closeModal();break;case'back':navigate(CH[view]?view:'dashboard');break;case'savePost':saveEditor();break;case'requestReview':saveEditor('review');break;case'approve':saveEditor('approved');break;case'exportCurrent':if(saveEditor())exportPost(editing);break;case'backup':download('fieldnote-backup-'+new Date().toISOString().slice(0,10)+'.json',JSON.stringify(backupData(),null,2),'application/json');toast('워크스페이스 백업을 내보냈습니다. 브리지 토큰은 포함되지 않습니다.');break;case'import':$('#importFile').click();break;case'saveSettings':{const name=$('#profileName').value.trim();if(!name){toast('워크스페이스 이름을 입력하세요.');return}db.profile={...db.profile,name,tone:$('#profileTone').value,blogVoice:$('#profileBlogVoice').value};db.ytChannels=YT_CHANNELS.map(y=>({id:y.id,name:($('#ytName-'+y.id).value.trim()||y.name),voice:$('#ytVoice-'+y.id).value}));log('편집 기준을 저장했습니다');persist();render();toast('설정을 저장했습니다.');break}case'clearSamples':if(confirm('예시로 표시된 소재와 원고만 삭제할까요?')){db.ideas=db.ideas.filter(i=>!i.sample);db.posts=db.posts.filter(p=>!p.sample);log('예시 데이터를 지웠습니다');persist();render();toast('예시 데이터를 지웠습니다.')}break;case'deletePost':if(confirm('이 원고를 삭제할까요? 삭제 후 되돌릴 수 없습니다.')){clearTimeout(draftTimer);draftDel(editing);db.posts=db.posts.filter(p=>p.id!==editing);log('원고를 삭제했습니다');persist();dirty=false;editing=null;render()}break;}});
+document.addEventListener('submit',e=>{if(e.target.id==='ideaForm'){e.preventDefault();const f=e.target,id=f.dataset.id,old=db.ideas.find(i=>i.id===id),title=$('#ideaTitle').value.trim(),note=$('#ideaNote').value.trim(),sources=$('#ideaSources').value;if(!title||!note){toast('제목과 경험 메모를 입력하세요.');return}if(old)Object.assign(old,{title,note,sources});else db.ideas.unshift({id:uid(),title,note,sources,created:Date.now(),sample:false,...(PF_NAME[view]?{platform:PF_NAME[view],...(['youtube','blog','insta'].includes(view)?{preferredChannel:view}:{}),...(view==='youtube'?{ytFormat:ytPipe.format}:{})}:{})});log((old?'소재 수정: ':'새 소재: ')+title);persist();closeModal();navigate(view);toast('소재를 저장했습니다.')}if(e.target.id==='createForm'){e.preventDefault();const i=db.ideas.find(i=>i.id===e.target.dataset.id),channel=$('#createChannel').value;if(!i)return;if(channel!=='youtube'){closeModal();genDraft(i.id,channel);return}if(!canLeave())return;const p=newPost(i,channel,i.sample);db.posts.unshift(p);log(CH[channel].short+' 원고 틀 생성: '+i.title);persist();closeModal();dirty=false;editing=p.id;view=channel;render();toast('편집용 원고 틀을 만들었습니다.')}});
+document.addEventListener('input',e=>{if(['postTitle','postBody','postSources','postChannel','postYtChannel','postMemo','postNaverCategory','ytTitleOptions','ytThumbnailText','ytThumbnailBrief'].includes(e.target.id)){editorInput();updateEditorAiButton()}});
 document.addEventListener('click',e=>{if(!e.target.closest('button[data-action="copyThumbnailBrief"]'))return;const brief=$('#ytThumbnailBrief')?.value.trim();if(!brief){toast('먼저 썸네일 제작 브리프를 입력하세요.');return}copyText(brief).then(ok=>toast(ok?'썸네일 제작 브리프를 복사했습니다.':'복사하지 못했습니다. 직접 선택해 복사하세요.'))});
 document.addEventListener('change',e=>{if(e.target.matches('[data-check]')){dirty=true;$('#saveIndicator').textContent='저장되지 않은 변경'}});
 $('#importFile').addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>10000000)throw Error('백업은 10MB 이하만 불러올 수 있습니다.');const incoming=prepareImport(validate(JSON.parse(await file.text())));if(confirm('백업으로 현재 소재·원고·설정을 교체할까요? 먼저 JSON 백업을 권장합니다.')){db=incoming;log('JSON 백업을 복원했습니다');persist();dirty=false;editing=null;view='dashboard';filter='all';query='';render();toast('백업을 복원했습니다.')}}catch(err){toast('복원 실패: '+err.message)}e.target.value=''});
@@ -773,31 +788,117 @@ function genPanel(){
  const cat=NAVER_BY_ID[genCategory]||NAVER_POSTABLE[0],name=cat.name,busy=genBusy!==null;
  const list=genIdeas(name),shown=list.slice(0,12),hasAi=list.some(i=>i.aiGenerated);
  const label=(kind,text)=>text;
- return `<section class="panel gen-panel" id="genPanel"><div class="sectionhead" style="margin:0 0 10px"><h2>블로그 주제 생성기</h2><span class="statuspill">AI 1차 원고 → 사람 검수</span></div><p class="small" style="margin:0">소재를 고르면 AI가 1차 원고를 작성합니다. 직접 경험·수치·출처가 필요한 자리는 표시로 남기며, 승인 전에 반드시 검수합니다.</p><div class="gen-controls"><div class="field"><label for="genCategory">카테고리</label><select id="genCategory">${categoryOptions(cat.id,'id')}</select></div><div class="actions"><button class="btn primary" data-action="genTopics" data-gen-cat="${esc(name)}" ${busy?'disabled':''}>${label('topics','주제 프롬프트')}</button><button class="btn" data-action="genMore" data-gen-cat="${esc(name)}" ${busy||!hasAi?'disabled':''}>${label('more','추가 주제 프롬프트')}</button></div></div><p class="help">${esc(cat.note)} · 자동 생성은 AI 환경변수가 설정된 배포에서만 작동합니다. 실패하면 프롬프트 방식으로 전환할 수 있습니다.</p>${shown.length?`<div class="idea-grid" style="margin-top:14px">${shown.map(i=>{const linked=db.posts.filter(p=>p.ideaId===i.id).length;return `<article class="idea"><div class="actions" style="margin:0 0 8px;gap:4px">${ideaTag(i)}</div><h3>${esc(i.title)}</h3><p>${esc(i.note)}</p>${linked?`<div class="small">연결된 원고 ${linked}개</div>`:''}<div class="actions"><button class="btn primary" data-gen-draft="${esc(i.id)}" ${busy?'disabled':''}>${genBusy==='draft:'+i.id?'AI 작성 중…':'AI 초안 생성'}</button><button class="btn ghost" data-gen-draft-manual="${esc(i.id)}" ${busy?'disabled':''}>프롬프트 방식</button><button class="btn ghost" data-create="${esc(i.id)}">직접 원고 틀</button><button class="btn ghost danger" data-idea-delete="${esc(i.id)}" aria-label="주제 삭제">삭제</button></div></article>`}).join('')}</div>${list.length>shown.length?`<p class="help">최신 ${shown.length}개만 표시합니다. 나머지 ${list.length-shown.length}개는 경험·소재함에서 볼 수 있습니다.</p>`:''}`:`<div class="empty" style="padding:18px">이 카테고리에는 아직 주제가 없습니다. "주제 프롬프트"을 눌러 보세요.</div>`}</section>`}
+ return `<section class="panel gen-panel" id="genPanel"><div class="sectionhead" style="margin:0 0 10px"><h2>블로그 주제 생성기</h2><span class="statuspill">AI 1차 원고 → 사람 검수</span></div><p class="small" style="margin:0">소재를 고르면 AI가 1차 원고를 작성합니다. 직접 경험·수치·출처가 필요한 자리는 표시로 남기며, 승인 전에 반드시 검수합니다.</p><div class="gen-controls"><div class="field"><label for="genCategory">카테고리</label><select id="genCategory">${categoryOptions(cat.id,'id')}</select></div><div class="actions"><button class="btn primary" data-action="genTopics" data-gen-cat="${esc(name)}" ${busy?'disabled':''}>${label('topics','주제 프롬프트')}</button><button class="btn" data-action="genMore" data-gen-cat="${esc(name)}" ${busy||!hasAi?'disabled':''}>${label('more','추가 주제 프롬프트')}</button></div></div><p class="help">${esc(cat.note)} · 자동 생성은 AI 환경변수가 설정된 배포에서만 작동합니다. 실패하면 프롬프트 방식으로 전환할 수 있습니다.</p>${shown.length?`<div class="idea-grid" style="margin-top:14px">${shown.map(i=>{const linked=db.posts.filter(p=>p.ideaId===i.id).length;return `<article class="idea"><div class="actions" style="margin:0 0 8px;gap:4px">${ideaTag(i)}</div><h3>${esc(i.title)}</h3><p>${esc(i.note)}</p>${linked?`<div class="small">연결된 원고 ${linked}개</div>`:''}<div class="actions"><button class="btn primary" data-gen-draft="${esc(i.id)}" ${busy?'disabled':''}>${genBusy==='draft:'+i.id?'AI 작성 중…':'AI 초안 생성'}</button><button class="btn ghost" data-gen-draft-manual="${esc(i.id)}" ${busy?'disabled':''}>프롬프트 방식</button><button class="btn ghost danger" data-idea-delete="${esc(i.id)}" aria-label="주제 삭제">삭제</button></div></article>`}).join('')}</div>${list.length>shown.length?`<p class="help">최신 ${shown.length}개만 표시합니다. 나머지 ${list.length-shown.length}개는 경험·소재함에서 볼 수 있습니다.</p>`:''}`:`<div class="empty" style="padding:18px">이 카테고리에는 아직 주제가 없습니다. "주제 프롬프트"을 눌러 보세요.</div>`}</section>`}
 function genTopics(name){manualBlogTopics(name)}
-async function genDraft(ideaId){
- const idea=db.ideas.find(i=>i.id===ideaId),channel=idea?.preferredChannel==='youtube'?'youtube':'blog';
- const category=channel==='youtube'?ytCatPayload(idea?.topicId):NAVER_BY_NAME[idea?.naverCategory];
- if(!idea||!category||!canLeave())return;
- genBusy='draft:'+ideaId;render();
- try{
-  const request=channel==='youtube'
-   ? {channel,category,ytChannel:idea.ytChannel||ytChannelOf(idea.topicId),format:idea.format||ytFormat(),voice:ytChVoice(idea.ytChannel||ytChannelOf(idea.topicId)),idea:{title:idea.title,note:idea.note}}
-   : {channel,category:catPayload(category),blogVoice:db.profile.blogVoice||db.profile.tone,idea:{title:idea.title,note:idea.note}};
-  const res=await jfetch('/api/generate/draft',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(request)},300000);
-  const data=await res.json().catch(()=>({}));
-  if(!res.ok||!data.ok)throw Error(data.message||'AI 초안 요청에 실패했습니다.');
-  const draft=data.draft;
-  const body=channel==='youtube'?ytBody(draft):draft?.body;
-  if(!draft||typeof draft.title!=='string'||typeof body!=='string'||!body.trim())throw Error('AI가 올바른 초안 형식으로 응답하지 않았습니다.');
-  const post=newPost(idea,channel,false);
-  Object.assign(post,{title:draft.title.trim(),body:body.trim(),sources:idea.sources||'',memo:['AI 1차 초안 · '+(data.model||'Claude'),...(Array.isArray(draft.sources_to_verify)&&draft.sources_to_verify.length?['발행 전 확인할 자료\n'+draft.sources_to_verify.map(s=>'• '+s).join('\n')]:[])].join('\n\n'),status:'draft',aiDraft:true,checks:[false,false,false],...(channel==='youtube'?{youtubeMeta:{titleOptions:Array.isArray(draft.title_options)?draft.title_options.filter(x=>typeof x==='string'&&x.trim()).slice(0,5):[draft.title.trim()],thumbnailText:typeof draft.thumbnail_text==='string'?draft.thumbnail_text:'',thumbnailBrief:typeof draft.thumbnail_brief==='string'?draft.thumbnail_brief:''}}:{})});
-  db.posts.unshift(post);log('AI 1차 초안 생성: '+post.title);persist();dirty=false;editing=post.id;view=channel;toast('AI 1차 초안을 만들었습니다. [확인 필요]·[직접 경험] 표시를 채운 뒤 검수하세요.');
- }catch(error){toast('AI 초안 생성 실패: '+error.message)}
- finally{genBusy=null;render()}
+function createIdeaDraft(id){
+ const idea=db.ideas.find(item=>item.id===id);
+ if(!idea)return;
+ const channel=ideaChannel(idea);
+ if(!CH[channel]||channel==='youtube'){createModal(id);return}
+ genDraft(id,channel);
 }
-function genDraft(ideaId){manualIdeaDraft(ideaId)}
-function generateEditorDraft(){manualEditorDraft()}
+
+async function requestAiDraft(channel, categoryName, idea){
+ const category=channel==='blog'?NAVER_BY_NAME[categoryName]:null;
+ const voice=(channel==='blog'?db.profile.blogVoice||db.profile.tone:db.profile.tone).slice(0,4000);
+ const payload={
+  channel,
+  ...(category?{category:catPayload(category)}:{}),
+  ...(channel==='blog'?{blogVoice:voice}:{voice}),
+  idea:{
+   title:idea.title.slice(0,300),
+   note:(idea.note||'').slice(0,8000),
+   sources:(idea.sources||'').slice(0,8000),
+   body:(idea.body||'').slice(0,20000)
+  }
+ };
+ const response=await jfetch('/api/generate/draft',{
+  method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)
+ },305000);
+ const data=await response.json().catch(()=>({}));
+ if(!response.ok||!data.ok)throw Error(data.message||'AI 원고 요청에 실패했습니다.');
+ const title=data.draft?.title?.trim(),body=data.draft?.body?.trim();
+ if(!title||!body)throw Error('AI가 제목과 본문을 모두 반환하지 않았습니다.');
+ const checks=data.draft.sources_to_verify||[];
+ const memo=['AI 1차 초안 · '+(data.model||'Claude')];
+ if(checks.length)memo.push('발행 전 확인할 자료\n'+checks.map(item=>'• '+item).join('\n'));
+ return {title,body,memo:memo.join('\n\n')};
+}
+
+async function genDraft(id, channel){
+ const idea=db.ideas.find(item=>item.id===id);
+ if(!idea)return;
+ channel=channel||ideaChannel(idea)||'blog';
+ if(channel==='youtube'){manualIdeaDraft(id);return}
+ if(genBusy!==null){toast('이미 AI 원고를 생성하고 있습니다.');return}
+ if(!canLeave())return;
+
+ const startingHash=location.hash;
+ genBusy='draft:'+id;
+ toast('AI가 원고를 작성하고 있습니다.');
+ let openResult=false;
+ try{
+  const result=await requestAiDraft(channel,idea.naverCategory,idea);
+  const post=newPost(idea,channel,idea.sample);
+  Object.assign(post,{title:result.title,body:result.body,memo:[post.memo,result.memo].filter(Boolean).join('\n\n'),aiDraft:true});
+  db.posts.unshift(post);
+  log('AI 원고 생성: '+post.title);
+  persist();
+  openResult=location.hash===startingHash&&!dirty;
+  if(openResult){editing=post.id;view=channel}
+  toast(openResult?'AI 원고를 만들었습니다.':'AI 원고를 저장했습니다. 채널의 원고 목록에서 열 수 있습니다.');
+ }catch(error){toast('AI 원고 생성 실패: '+error.message)}
+ finally{
+  genBusy=null;
+  if(openResult||!editing)render();
+  else updateEditorAiButton();
+  if(openResult)window.scrollTo(0,0);
+ }
+}
+
+function editorDraftFields(){
+ return {
+  title:$('#postTitle').value.trim(),body:$('#postBody').value,
+  note:$('#postMemo').value,sources:$('#postSources').value,
+  category:$('#postNaverCategory').value,channel:$('#postChannel').value
+ };
+}
+
+async function generateEditorDraft(){
+ const post=db.posts.find(item=>item.id===editing);
+ if(!post)return;
+ const fields=editorDraftFields();
+ if(fields.channel==='youtube'){manualEditorDraft();return}
+ if(genBusy!==null){toast('이미 AI 원고를 생성하고 있습니다.');return}
+ if(!fields.title){toast('먼저 제목을 입력하세요.');return}
+
+ const idea=db.ideas.find(item=>item.id===post.ideaId);
+ const updated=post.updated;
+ genBusy='editor:'+post.id;
+ updateEditorAiButton();
+ toast('AI가 원고를 작성하고 있습니다.');
+ try{
+  const result=await requestAiDraft(fields.channel,fields.category,{
+   ...fields,note:[idea?.note,fields.note].filter(Boolean).join('\n\n')
+  });
+  if(editing===post.id&&post.updated===updated&&JSON.stringify(editorDraftFields())===JSON.stringify(fields)){
+   $('#postTitle').value=result.title;
+   $('#postBody').value=result.body;
+   $('#postMemo').value=[fields.note,result.memo].filter(Boolean).join('\n\n');
+   editorInput();
+   toast('AI 원고를 편집기에 넣었습니다. 검토한 뒤 저장하세요.');
+  }else{
+   const draft=newPost({id:post.ideaId,title:fields.title,note:fields.note,sources:fields.sources,naverCategory:fields.category},fields.channel,post.sample);
+   Object.assign(draft,{title:result.title,body:result.body,memo:[fields.note,result.memo].filter(Boolean).join('\n\n'),aiDraft:true});
+   db.posts.unshift(draft);
+   log('AI 원고 생성: '+draft.title);
+   persist();
+   if(!editing)render();
+   toast('생성 중 편집 상태가 바뀌어 AI 원고를 새 초안으로 저장했습니다.');
+  }
+ }catch(error){toast('AI 원고 생성 실패: '+error.message)}
+ finally{genBusy=null;updateEditorAiButton()}
+}
 document.addEventListener('click',e=>{const t=e.target.closest('button');if(!t||t.disabled)return;if(t.dataset.genDraft){genDraft(t.dataset.genDraft);return}if(t.dataset.genDraftManual){manualIdeaDraft(t.dataset.genDraftManual);return}if(t.dataset.action==='genTopics'||t.dataset.action==='genMore')genTopics(t.dataset.genCat||(NAVER_BY_ID[genCategory]||{}).name,t.dataset.action==='genMore'?'more':'topics')});
 document.addEventListener('click',e=>{if(e.target.closest('button[data-action="generateEditorDraft"]'))generateEditorDraft()});
 document.addEventListener('change',e=>{if(e.target.id==='genCategory'&&NAVER_BY_ID[e.target.value]){genCategory=e.target.value;render()}});
