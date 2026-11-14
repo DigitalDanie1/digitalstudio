@@ -675,6 +675,12 @@ const WRESTLING_SOURCES = [
     note:'러시아 자유형 선수 쇼츠 채널입니다. 2026 세계 챔피언 아마눌라 가지마고메도프, 아바스가지 마고메도프 쇼츠를 확인했습니다(2026.11.14 #вольнаяборьба #астана 검색에서 확인). 선수 소개 도입 소재로 쓰고 원본 출처를 확인합니다.',
     candidate:{title:'Аманула Гаджимагомедов чемпион мира 2026',url:'https://www.youtube.com/shorts/BGRFMW6gsEA',topic:'yt-wrestling-athletes',angle:'한국에 안 알려진 다게스탄 세계 챔피언 소개. 그의 대표 기술 하나를 경기 장면으로 해설합니다.'},
   },
+  {
+    id:'rabadanov', name:'Rabadanov_trener', emoji:'🌀', url:'https://www.youtube.com/@Rabadanov_trener/shorts',
+    role:'사둘라예프 기술 쇼츠 · 레슬링 비중 낮음', topics:['yt-wrestling-technique','yt-wrestling-athletes'],
+    note:'구독 7.76천 채널입니다(2026.11.14 확인). 최근 쇼츠 18개 중 레슬링은 사둘라예프의 "윈드밀" 던지기와 자유형 기술 2개뿐이고, 나머지는 축구·타격·옛날 휴대폰 영상입니다. 사둘라예프 기술 장면을 찾는 용도로만 쓰고, 장면은 원본(UWW 공식·대회 영상)에서 받습니다.',
+    candidate:{title:'A "windmill" throw from Olympic champion Abdulrashid Sadulaev',url:'https://www.youtube.com/shorts/SVU0LpyTBjs',topic:'yt-wrestling-technique',angle:'사둘라예프의 윈드밀 던지기를 원속도 → 슬로우 → 원속도로 보여주고, 잡기·회전·마무리 3단계로 해설합니다. 같은 기술이 나온 실제 경기를 UWW 영상에서 찾습니다.'},
+  },
 ];
 
 function wrestlingPromptSources(topicId) {
