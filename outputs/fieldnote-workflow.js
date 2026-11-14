@@ -597,6 +597,24 @@ const WRESTLING_SOURCES = [
     note:'아이오와 대학 레슬링(Hawkeyes) 연습 현장, 선수 체력 서킷, Terry Brands 코치 기술 세션 쇼츠(2026.11.08 확인). 생활체육인용 체력 루틴·기술 교정 주제의 소스로 좋습니다. 영상은 몇 초만 쓰고 채널을 표기합니다.',
     candidate:{title:'Terry Brands Breaks Down How to Improve Your Wrestling',url:'https://www.youtube.com/shorts/kzj3qy5EgyM',topic:'yt-wrestling-technique',angle:'코치가 기술을 교정하는 장면. 생활체육인이 바로 가져갈 교정 포인트 하나로 해설합니다. 체력 서킷 영상(T4_aM6F69I4)은 체력 루틴 주제에 씁니다.'},
   },
+  {
+    id:'wreststore', name:'Wreststore', emoji:'🏔️', url:'https://www.youtube.com/@wreststoree',
+    role:'다게스탄·러시아 자유형 현장 · 러시아어', topics:['yt-wrestling-highlights','yt-wrestling-athletes','yt-wrestling-technique'],
+    note:'러시아·다게스탄 자유형 대회(야리긴, 러시아 선수권, 알리예프 대회, U-23)를 현장에서 찍는 브이로그와 선수 인터뷰 채널입니다(구독 2.15만, 2026.11.14 확인). 롱폼은 40분~3시간이라 구간을 찾아 써야 하고, 쇼츠는 판정 논란·방어 기술 장면입니다. 한국에 거의 소개되지 않은 러시아 선수들의 기술 소스로 가장 직접적입니다. 본인 촬영 원본이라 영어·한국어 자막 협업을 제안해 허락받고 쓰는 쪽을 권합니다.',
+    candidate:{title:'Красивая защита от призера Ярыгинского турнира - Ибрагима Ибрагимова',url:'https://www.youtube.com/shorts/054ZPtpr1vI',topic:'yt-wrestling-technique',angle:'야리긴 대회 입상자 이브라김 이브라기모프의 방어 장면. 원속도 → 슬로우 → 원속도로 방어가 어떻게 태클을 끊는지 해설합니다. 대회 브이로그(ITYwn7ByZ_U)에서 같은 선수의 경기 구간도 찾습니다.'},
+  },
+  {
+    id:'pischulin', name:'Pischulin Life', emoji:'🇷🇺', url:'https://www.youtube.com/@Pischulinlife/shorts',
+    role:'러시아 자유형 훈련·기술 연습 · 본인 촬영', topics:['yt-wrestling-technique','yt-wrestling-athletes'],
+    note:'알렉산드르 피슐린이 직접 찍는 러시아어 레슬링 채널입니다(구독 594명, 2026.11.14 확인). 아담 사이티예프의 다게스탄 대표팀 훈련, 타이무라즈 살카자노프 아침 훈련, 러시아 선수권 결승 쇼츠와 기술 연습 롱폼이 있습니다. 훈련 영상은 본인 촬영 원본이라 허락받기 쉽고, 대회 쇼츠는 연맹 영상을 다시 올린 것일 수 있으니 원본을 확인합니다.',
+    candidate:{title:'Олимпийский чемпион Адам Сайтиев не оставляет шансов молодым спортсменам на тренировках',url:'https://www.youtube.com/shorts/Y8rN7prfg1Q',topic:'yt-wrestling-technique',angle:'올림픽 챔피언 아담 사이티예프가 훈련에서 어린 선수를 다루는 장면. 그가 쓰는 기술 하나를 골라 셋업·진입·마무리로 해설합니다. 기술 연습 롱폼(8CLt6ZGXsek, sQy2Qehp0o0)도 함께 씁니다.'},
+  },
+  {
+    id:'izbrannoemma', name:'избранное MMA', emoji:'🗂️', url:'https://www.youtube.com/@izbrannoemma/shorts',
+    role:'러시아어 MMA·레슬링 장면 찾기용 (재업로드)', topics:['yt-wrestling-ufc','yt-wrestling-athletes','yt-wrestling-technique'],
+    note:'러시아어 MMA·레슬링 모음 채널입니다(구독 9.84만, 쇼츠 약 2,900개). 사이티예프 태클 강의, 치마예프·예블로예프 테이크다운, 타주디노프 폴 같은 장면이 많습니다. 소개 글에 "모든 권리는 원작자에게"라고 적힌 재업로드 채널이라 여기서 받지 말고, 장면을 찾은 뒤 원본(선수 인스타·대회·UWW 채널)에서 받습니다.',
+    candidate:{title:'Лекция Бувайсара Сайтиева на тему проход в ноги',url:'https://www.youtube.com/shorts/88sOwS3WYa4',topic:'yt-wrestling-technique',angle:'부바이사르 사이티예프의 양다리 태클 강의. 핵심 설명 한 줄을 한국어로 옮기고, 같은 장면의 원본 출처를 찾아 확보합니다.'},
+  },
 ];
 
 function wrestlingPromptSources(topicId) {
