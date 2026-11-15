@@ -1255,7 +1255,7 @@ function platformPage(c) {
     const group = f => { const l = ytFmtIdeas(f); return `<div class="yt-fmt-group ${f}"><h4>${f === 'long' ? '🎬 롱폼' : '📱 쇼츠'} <em>${l.length}</em><span>${esc(YT_FORMAT_TEXT[f])}</span></h4>${l.length ? `<ul class="ps-topics">${l.map(ytTopic).join('')}</ul>` : '<p class="small">아직 없습니다.</p>'}</div>`; };
     board = board.replace(/<div class="ps-col"><h3><span>①<\/span> 주제 <em>\d+<\/em><\/h3>[\s\S]*?<\/div>\s*<div class="ps-col"><h3><span>②/, `<div class="ps-col"><h3><span>①</span> 주제 <em>${ideas.length}</em></h3><div class="yt-fmt-groups">${group('shorts')}${group('long')}</div></div>\n    <div class="ps-col"><h3><span>②`);
     const ytBoard = board.replace(/<div class="ps-col"><h3><span>②<\/span> 제작 방법<\/h3>[\s\S]*?<\/div>\s*<div class="ps-col"><h3><span>③/, '<div class="ps-col"><h3><span>③').replace('<div class="ps-cols">', '<div class="ps-cols ps-cols2">');
-    return hero + mustAthletesPanel() + ytPipeline() + ytAudioGuide() + ytBoard + drafts + toolSec;
+    return hero + ytPipeline() + ytAudioGuide() + ytBoard + drafts + toolSec;
   }
   return hero + board + drafts + toolSec;
 }
@@ -1400,6 +1400,7 @@ function ytSourcesPage() {
     ? wrestlingSourceLibrary(cur.sources)
     : `<div class="empty" style="border:1px dashed var(--line);border-radius:10px">${cur.emoji} <b>${esc(cur.tab)}</b>가 아직 비어 있습니다.<br><span class="small">참고할 유튜브 채널을 알려주면 이 탭에 박스로 추가됩니다.</span></div>`;
   return head('YouTube 소스', `3개 채널 · 소스 ${total}곳 · 탭으로 채널을 고르세요. '⬇ 제작 라인'을 누르면 그 영상이 소스 다운로드 칸에 들어갑니다`, false)
+    + mustAthletesPanel()
     + tabs
     + `<section class="panel"><div class="sectionhead" style="margin-top:0"><h2>${cur.emoji} ${esc(cur.tab)}</h2><span class="small">${cur.sources.length}개 채널</span></div>${body}</section>`
     + `<div class="actions" style="margin-top:14px"><button class="btn ghost" data-workflow="import">쇼츠 백업 가져오기</button></div>`;
