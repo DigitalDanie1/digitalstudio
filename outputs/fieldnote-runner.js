@@ -44,7 +44,7 @@ function ytAutoLive() {
       <div class="ya-body"><div class="ya-title"><b>${esc(s.name)}</b><span class="ya-kind">${esc(s.kind)}</span>${s.gate ? '<span class="ya-kind gate">✋ 확인 지점</span>' : ''}</div>
         <div class="ya-row">${s.outputs.filter(o => o.exists).map(o => runnerFileLink(cur.ep, o.path)).join('')}${s.error && s.status === 'failed' ? `<span class="ya-err">${esc(s.error)}</span>` : ''}</div></div>
       <span class="ya-st">${RUN_ICON[s.status]} ${RUN_LABEL[s.status]}</span>
-      <div class="ya-acts"><button class="btn ${s.status === 'done' ? 'ghost' : ''}" data-ya-run="${s.id}" ${cur.running ? 'disabled' : ''}>${s.status === 'done' ? '↻ 다시' : '▶ 실행'}</button><button class="btn ghost" data-ya-log="${s.id}">로그</button></div>
+      <div class="ya-acts"><button class="btn ${s.status === 'done' ? 'ghost' : ''}" data-ya-run="${s.id}" ${cur.running ? 'disabled' : ''}>${s.status === 'done' ? '↻ 다시' : '▶ 실행'}</button>${s.id === 'mix' ? '<button class="btn primary" data-ya-recopen>🎙 녹음·음악</button>' : ''}<button class="btn ghost" data-ya-log="${s.id}">로그</button></div>
       ${runnerOpenLog === s.id ? `<pre class="ya-log" id="yaLog">불러오는 중…</pre>` : ''}</li>`).join('');
   const src = cur.sources.length ? cur.sources.map(s => `${esc(s.url)} · ${esc((s.ranges || []).join(', '))}`).join('<br>') : '<span class="ya-err">소스 URL 없음 — 1단계 전에 아래 "소스 추가"</span>';
   return `${pick}
@@ -57,7 +57,7 @@ function ytAutoPanel() {
   const idea = typeof ytPipeIdea === 'function' ? ytPipeIdea() : null;
   setTimeout(runnerRefresh, 0);
   return `<section class="panel ya" id="ytAuto"><div class="sectionhead" style="margin-top:0"><h2>⚡ 자동 실행 <span class="small">버튼을 누르면 이 맥에서 단계별로 돌아요 · 대본 뒤 한 번 멈춤</span></h2></div>
-    <div id="ytAutoLive">${ytAutoLive()}</div>
+    <div id="ytAutoLive">${ytAutoLive()}</div><div id="yaRec">${recState.open ? recPanel() : ''}</div>
     <details class="ya-new"><summary>＋ 새 에피소드 만들기</summary><div class="ya-form">
       <input class="input" data-ya-new="title" placeholder="주제 제목 (예: 심권호 그레코로만 들어 던지기)" value="${esc(idea?.title || '')}">
       <input class="input" data-ya-new="note" placeholder="주제 메모 (선수·대회·보여 줄 기술)">
@@ -103,4 +103,67 @@ document.addEventListener('click', async e => {
     }
   } catch (err) { toast('실행기: ' + err.message); }
   finally { runnerBusy = false; runnerRefresh(); }
+});
+
+// ===== 🎙 녹음·음악 (8단계 '내 목소리·음악 넣기' 준비) =====
+// 대본 줄마다 녹음 → 실행기로 보냄. 자동 새로고침과 분리된 칸(#yaRec)이라 녹음 중에 화면이 안 바뀐다.
+const recState = { open: false, ep: null, lines: [], assets: { bgm: [], sting: [] }, mix: {}, stream: null, rec: null, idx: null, sel: 0, busy: false };
+function recPaint() { const el = document.getElementById('yaRec'); if (el) el.innerHTML = recState.open ? recPanel() : ''; }
+async function recLoad() {
+  const cur = runnerEp(); if (!cur) return;
+  const d = await runnerFetch('/lines?ep=' + encodeURIComponent(cur.ep));
+  Object.assign(recState, { ep: cur.ep, lines: d.lines, assets: d.assets, mix: d.mix || {} });
+  if (recState.sel >= d.lines.length) recState.sel = 0;
+  recPaint();
+}
+function recPanel() {
+  const L = recState.lines, done = L.filter(l => l.file).length;
+  if (!L.length) return `<div class="ya-rec"><p class="small">6단계(자막·효과 완성본)가 끝나야 녹음할 줄이 생겨요.</p></div>`;
+  const opt = (list, v) => `<option value="">없음</option>` + list.map(f => `<option value="${esc(f)}" ${f === v ? 'selected' : ''}>${esc(f)}</option>`).join('');
+  return `<div class="ya-rec"><div class="ya-rec-head"><b>🎙 녹음 ${done}/${L.length}줄</b><span class="small">줄을 고르고 <kbd>스페이스</kbd> = 녹음 시작/멈춤 · 멈추면 다음 줄로 넘어가요 · 칸보다 길면 최대 1.25배까지 자동으로 맞춤</span></div>
+    <ol class="ya-lines">${L.map((l, i) => { const rec = recState.idx === i; return `<li class="ya-line ${i === recState.sel ? 'sel' : ''} ${rec ? 'rec' : ''}" data-ya-sel="${i}">
+      <span class="ya-n">${String(i + 1).padStart(2, '0')}</span><span class="ya-t">${esc(l.text)}</span><span class="small">${(l.end - l.start).toFixed(1)}초</span>
+      <span>${l.file ? '✅' : '○'}</span>
+      <button class="btn ${rec ? 'danger' : 'primary'}" data-ya-rec="${i}">${rec ? '■ 멈춤' : '● 녹음'}</button>
+      ${l.file ? `<audio controls preload="none" src="${RUNNER}/file?ep=${encodeURIComponent(recState.ep)}&path=${encodeURIComponent('편집/녹음/' + l.file)}&t=${Date.now()}"></audio>` : ''}</li>`; }).join('')}</ol>
+    <div class="ya-mixset"><label>배경음악 <select data-ya-mix="bgm">${opt(recState.assets.bgm, recState.mix.bgm)}</select></label>
+      <label>시그니처 소리 (설명 시작 순간) <select data-ya-mix="sting">${opt(recState.assets.sting, recState.mix.sting)}</select></label>
+      <button class="btn" data-ya-mixsave>저장</button><button class="btn primary" data-ya-run="mix" ${done ? '' : 'disabled'}>▶ 목소리·음악 넣기</button></div>
+    <p class="small">음악·시그니처 소리는 <a href="https://studio.youtube.com/channel/UC/music" target="_blank" rel="noopener noreferrer">유튜브 스튜디오 → 오디오 보관함</a>에서 받아 <code>~/Desktop/유투브/소리/BGM</code>, <code>~/Desktop/유투브/소리/시그니처</code> 에 넣으면 여기 목록에 떠요. 저작자 표시가 필요 없는 곡만.</p></div>`;
+}
+async function recStart(i) {
+  if (recState.rec) return recStop();
+  try {
+    if (!recState.stream) recState.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: true, autoGainControl: false } });
+  } catch (e) { toast('마이크를 쓸 수 없어요: ' + e.message); return; }
+  const type = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : '';
+  const rec = new MediaRecorder(recState.stream, type ? { mimeType: type } : {}), chunks = [];
+  rec.ondataavailable = e => e.data.size && chunks.push(e.data);
+  rec.onstop = async () => {
+    const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' }), idx = recState.idx;
+    recState.rec = null; recState.idx = null;
+    try {
+      const r = await fetch(`${RUNNER}/voice?ep=${encodeURIComponent(recState.ep)}&idx=${idx}`, { method: 'POST', headers: { 'Content-Type': blob.type.split(';')[0] }, body: blob });
+      if (!r.ok) throw new Error((await r.json()).error);
+      recState.sel = Math.min(idx + 1, recState.lines.length - 1);
+      await recLoad();
+    } catch (e) { toast('녹음 저장 실패: ' + e.message); recPaint(); }
+  };
+  recState.rec = rec; recState.idx = i; recState.sel = i; rec.start(); recPaint();
+}
+function recStop() { if (recState.rec && recState.rec.state !== 'inactive') recState.rec.stop(); }
+document.addEventListener('click', async e => {
+  if (e.target.closest('button[data-ya-recopen]')) { recState.open = !recState.open; if (recState.open) await recLoad().catch(err => toast('실행기: ' + err.message)); else recPaint(); return; }
+  const r = e.target.closest('button[data-ya-rec]'); if (r) { const i = Number(r.dataset.yaRec); recState.rec ? recStop() : recStart(i); return; }
+  if (e.target.closest('button[data-ya-mixsave]')) {
+    const v = k => document.querySelector(`[data-ya-mix="${k}"]`)?.value || '';
+    try { await runnerFetch('/mixset', { ep: recState.ep, bgm: v('bgm'), sting: v('sting') }); recState.mix = { bgm: v('bgm'), sting: v('sting') }; toast('음악 설정을 저장했어요.'); } catch (err) { toast('실행기: ' + err.message); }
+    return;
+  }
+  const li = e.target.closest('li[data-ya-sel]'); if (li && !e.target.closest('button,audio')) { recState.sel = Number(li.dataset.yaSel); recPaint(); }
+});
+document.addEventListener('keydown', e => {
+  if (!recState.open || e.code !== 'Space' || /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '')) return;
+  if (!document.getElementById('yaRec')) return;
+  e.preventDefault(); recState.rec ? recStop() : recStart(recState.sel);
 });
