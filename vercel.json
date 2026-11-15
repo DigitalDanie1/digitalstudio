@@ -11,6 +11,10 @@
       "destination": "/outputs/fieldnote-workflow.js"
     },
     {
+      "source": "/fieldnote-runner.js",
+      "destination": "/outputs/fieldnote-runner.js"
+    },
+    {
       "source": "/fieldnote-steps.js",
       "destination": "/outputs/fieldnote-steps.js"
     },
