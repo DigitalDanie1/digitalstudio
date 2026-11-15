@@ -1360,7 +1360,7 @@ function ytPipeline() {
     <div class="yp-tools">${(st.links || []).filter(l => !l[2] || l[2] === ytPipe.format).map(([l, u]) => u.startsWith('@') ? `<button class="linkbtn" data-view="${u.slice(1)}">${esc(l)} →</button>` : u.startsWith('#') ? `<button class="linkbtn" data-yp-jump="${u.slice(1)}">${esc(l)} ↓</button>` : `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(l)} ↗</a>`).join('')}${st.publish ? '<button class="linkbtn" data-view="publish">게시 확인 →</button>' : ''}</div>
   </li>`;
   return `<section class="yp" style="--pc:${platformColor('YouTube')}"><div class="yp-top"><h2>제작 라인 <span class="small">자료조사 → 소스 다운로드 → 편집 → 업로드 · ${sh ? '쇼츠 15~60초 세로' : '롱폼 8~12분 가로'}</span></h2>${sel}</div>
-    ${ytOrchestration()}<ol class="yp-stages">${YT_PIPELINE.map(card).join('')}</ol>
+    ${typeof ytAutoPanel === 'function' ? ytAutoPanel() : ''}${ytOrchestration()}<ol class="yp-stages">${YT_PIPELINE.map(card).join('')}</ol>
     <p class="small yp-foot">'명령 복사' → Claude Code 새 대화에 붙여 넣기 → 그 단계 스킬이 실행됩니다. 모든 단계가 같은 주제 폴더를 이어 씁니다. 원본 경기 장면은 한 번에 몇 초만, 중심은 내 해설입니다.</p></section>`;
 }
 function ytSkillsPage() {
