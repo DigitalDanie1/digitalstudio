@@ -2,7 +2,7 @@
 // 실행기는 ~/Desktop/유투브/실행기/실행기 켜기.command 로 켠다. 작업판은 버튼만 누르고, 실제 작업은 맥에서 돈다.
 const RUNNER = 'http://127.0.0.1:4777';
 const RUN_EP_KEY = 'fn_yt_auto_ep';
-let runnerData = null, runnerOnline = null, runnerBusy = false, runnerTimer = null, runnerOpenLog = null;
+let runnerData = null, runnerOnline = null, runnerBusy = false, runnerTimer = null, runnerOpenLog = null, runnerSelectedStep = null;
 function runnerEp() {
   const eps = runnerData?.episodes || [];
   let id = null; try { id = localStorage.getItem(RUN_EP_KEY); } catch (_) {}
@@ -19,13 +19,12 @@ async function runnerRefresh() {
   try { runnerData = await runnerFetch('/status'); runnerOnline = true; }
   catch (_) { runnerOnline = false; }
   const live = document.getElementById('ytAutoLive');
-  if (live) live.innerHTML = ytAutoLive();
+  if (live) runnerPaint(live);
   if (runnerOpenLog) runnerShowLog(runnerOpenLog, true);
   const busy = runnerData?.episodes?.some(e => e.running);
   clearTimeout(runnerTimer);
   if (document.getElementById('ytAuto')) runnerTimer = setTimeout(runnerRefresh, busy ? 2000 : 8000);
 }
-const RUN_ICON = { done: '✅', running: '⏳', failed: '❌', todo: '○' };
 const RUN_LABEL = { done: '완료', running: '진행 중', failed: '실패', todo: '대기' };
 function runnerFileLink(ep, p, label) {
   return `<a class="btn ghost ya-file" href="${RUNNER}/file?ep=${encodeURIComponent(ep)}&path=${encodeURIComponent(p)}" target="_blank" rel="noopener noreferrer">${esc(label || p.split('/').pop())} ↗</a>`;
@@ -37,26 +36,68 @@ function ytAutoLive() {
   const pick = `<label class="ya-pick"><span>에피소드</span><select data-ya-ep>${eps.map(e => `<option value="${esc(e.ep)}" ${cur && e.ep === cur.ep ? 'selected' : ''}>${esc(e.ep)}</option>`).join('')}</select></label>`;
   if (!cur) return pick + '<p class="small">아직 에피소드가 없어요. 아래에서 새로 만드세요.</p>';
   const doneN = cur.steps.filter(s => s.status === 'done').length;
-  const gate = cur.gate ? `<div class="ya-gate">✋ <b>대본을 확인하세요.</b> 사실·말투를 보고 괜찮으면 계속을 누르면 편집부터 끝까지 이어서 돌아요. 고칠 게 있으면 대본.md를 직접 고친 뒤 계속.
-      <div class="ya-row">${runnerFileLink(cur.ep, '편집/대본.md', '📄 대본 보기')}<button class="btn primary" data-ya-act="continue">▶ 계속</button></div></div>` : '';
-  const rows = cur.steps.map((s, i) => `<li class="ya-step ${s.status}">
-      <span class="ya-n">${String(i + 1).padStart(2, '0')}</span>
-      <div class="ya-body"><div class="ya-title"><b>${esc(s.name)}</b><span class="ya-kind">${esc(s.kind)}</span>${s.gate ? '<span class="ya-kind gate">✋ 확인 지점</span>' : ''}</div>
-        <div class="ya-row">${s.outputs.filter(o => o.exists).map(o => runnerFileLink(cur.ep, o.path)).join('')}${s.error && s.status === 'failed' ? `<span class="ya-err">${esc(s.error)}</span>` : ''}</div></div>
-      <span class="ya-st">${RUN_ICON[s.status]} ${RUN_LABEL[s.status]}</span>
-      <div class="ya-acts"><button class="btn ${s.status === 'done' ? 'ghost' : ''}" data-ya-run="${s.id}" ${cur.running ? 'disabled' : ''}>${s.status === 'done' ? '↻ 다시' : '▶ 실행'}</button>${s.id === 'mix' ? '<button class="btn primary" data-ya-recopen>🎙 녹음·음악</button>' : ''}<button class="btn ghost" data-ya-log="${s.id}">로그</button></div>
-      ${runnerOpenLog === s.id ? `<pre class="ya-log" id="yaLog">불러오는 중…</pre>` : ''}</li>`).join('');
-  const src = cur.sources.length ? cur.sources.map(s => `${esc(s.url)} · ${esc((s.ranges || []).join(', '))}`).join('<br>') : '<span class="ya-err">소스 URL 없음 — 1단계 전에 아래 "소스 추가"</span>';
+  const percent = cur.steps.length ? Math.round(doneN / cur.steps.length * 100) : 0;
+  const next = cur.steps.find(s => s.id === cur.running) || cur.steps.find(s => s.status !== 'done');
+  const selected = cur.steps.find(s => s.id === runnerSelectedStep)
+    || (cur.gate && cur.steps.find(s => s.gate)) || next || cur.steps.at(-1);
+  const rows = cur.steps.map((s, i) => {
+    const count = s.outputs.filter(o => o.exists).length;
+    const status = cur.gate && s.gate ? '확인 대기' : RUN_LABEL[s.status];
+    return `<li><button type="button" class="ya-stage-pick" data-ya-step="${esc(s.id)}" aria-pressed="${s === selected}">
+      <span class="ya-stage-number" aria-hidden="true">${s.status === 'done' && status !== '확인 대기' ? '✓' : i + 1}</span>
+      <span><strong>${esc(s.name)}</strong><small>${status} · 결과물 ${count}개</small></span>
+    </button></li>`;
+  }).join('');
+  const files = selected?.outputs.filter(o => o.exists) || [];
+  const reviewing = cur.gate && selected?.gate;
+  const action = !selected ? '' : reviewing
+    ? '<button class="btn primary" data-ya-act="continue">대본 확인 완료 · 계속</button>'
+    : cur.running ? (cur.running === selected.id ? '<button class="btn danger" data-ya-act="stop">실행 멈춤</button>' : '')
+    : selected.id === 'mix' ? '<button class="btn primary" data-ya-recopen>녹음·음악 열기</button>'
+    : `<button class="btn ${selected.status === 'done' ? 'ghost' : 'primary'}" data-ya-run="${esc(selected.id)}">${selected.status === 'done' ? '다시 실행' : esc(selected.name) + ' 실행'}</button>`;
+  const panel = selected ? `<section class="ya-stage-detail" aria-label="선택한 단계">
+      <div class="small">${reviewing ? '확인 대기' : RUN_LABEL[selected.status]}</div>
+      <h3>${esc(selected.name)}</h3>
+      ${selected.error && selected.status === 'failed' ? `<p class="ya-err">${esc(selected.error)}</p>` : ''}
+      <div class="actions">${action}${selected.id === 'mix' && !cur.running && !reviewing ? `<button class="btn ghost" data-ya-run="${esc(selected.id)}">믹스 실행</button>` : ''}<button class="btn ghost" data-ya-log="${esc(selected.id)}" aria-expanded="${runnerOpenLog === selected.id}">로그</button></div>
+      <h4>결과물</h4>
+      ${files.length ? `<ul class="ya-artifacts">${files.map(o => `<li>${runnerFileLink(cur.ep, o.path)}</li>`).join('')}</ul>` : '<p class="small">저장된 결과물이 없습니다.</p>'}
+      ${runnerOpenLog === selected.id ? '<pre class="ya-log" id="yaLog">불러오는 중…</pre>' : ''}
+    </section>` : '';
+  const src = cur.sources.length ? cur.sources.map(s => `${esc(s.url)} · ${esc((s.ranges || []).join(', '))}`).join('<br>') : '<span class="ya-err">등록된 소스가 없습니다.</span>';
   return `${pick}
-    <div class="ya-head"><div><b>${esc(cur.title)}</b> <span class="small">${doneN}/${cur.steps.length} 단계 완료${cur.running ? ' · 지금: ' + esc(cur.steps.find(s => s.id === cur.running)?.name || '') : ''}</span><div class="small">소스: ${src}</div></div>
-      <div class="ya-row">${cur.running ? '<button class="btn danger" data-ya-act="stop">⏹ 멈춤</button>' : `<button class="btn primary" data-ya-act="runall" ${doneN === cur.steps.length ? 'disabled' : ''}>▶▶ 전부 실행</button>`}<button class="btn ghost" data-ya-act="open">📂 폴더</button></div></div>
-    ${gate}<ol class="ya-steps">${rows}</ol>
-    <details class="ya-new"><summary>＋ 이 에피소드에 소스 추가</summary><div class="ya-form"><input class="input" data-ya-src="url" placeholder="유튜브 주소"><input class="input" data-ya-src="ranges" placeholder="구간: 0:30-0:42, 1:05-1:12 (한 구간 15초까지)"><button class="btn" data-ya-act="addsrc">추가</button></div></details>`;
+    <div class="ya-progress"><div><strong>제작 진척률</strong><span class="small">${doneN}/${cur.steps.length} 단계 완료 · ${percent}%</span></div>
+      <progress value="${percent}" max="100" aria-label="제작 진척률"></progress></div>
+    ${cur.gate && !reviewing ? '<button class="btn" data-ya-review>대본 확인 대기 · 대본 보기</button>' : ''}
+    <div class="ya-work-grid"><ol class="ya-stage-list" aria-label="제작 단계">${rows}</ol>${panel}</div>
+    <details class="ya-new" data-ya-settings><summary>실행 옵션 · 프로젝트 폴더</summary>
+      <div class="ya-row">${cur.running ? '<button class="btn danger" data-ya-act="stop">실행 멈춤</button>' : `<button class="btn" data-ya-act="runall" ${cur.gate || doneN === cur.steps.length ? 'disabled' : ''}>남은 단계 이어서 실행</button>`}<button class="btn ghost" data-ya-act="open">폴더 열기</button></div>
+      <p class="small ya-source-list">${src}</p></details>
+    <details class="ya-new" data-ya-source-form><summary>＋ 이 에피소드에 소스 추가</summary><div class="ya-form"><input class="input" data-ya-src="url" placeholder="유튜브 주소"><input class="input" data-ya-src="ranges" placeholder="구간: 0:30-0:42, 1:05-1:12 (한 구간 15초까지)"><button class="btn" data-ya-act="addsrc">추가</button></div></details>`;
+}
+// Poll without replacing unchanged controls or clearing a source being typed.
+function runnerPaint(live, force = false) {
+  const html = ytAutoLive();
+  if (!force && live.dataset.rendered === html) return;
+  if (!force && live.contains(document.activeElement) && document.activeElement.matches('input, select')) return;
+  const sourceForm = live.querySelector('[data-ya-source-form]');
+  const settingsOpen = live.querySelector('[data-ya-settings]')?.open;
+  const episode = runnerOnline ? runnerEp()?.ep : '';
+  live.innerHTML = html;
+  live.dataset.rendered = html;
+  if (live.dataset.episode === episode) {
+    if (sourceForm) live.querySelector('[data-ya-source-form]')?.replaceWith(sourceForm);
+    if (settingsOpen) {
+      const settings = live.querySelector('[data-ya-settings]');
+      if (settings) settings.open = true;
+    }
+  }
+  live.dataset.episode = episode || '';
 }
 function ytAutoPanel() {
   const idea = typeof ytPipeIdea === 'function' ? ytPipeIdea() : null;
   setTimeout(runnerRefresh, 0);
-  return `<section class="panel ya" id="ytAuto"><div class="sectionhead" style="margin-top:0"><h2>⚡ 자동 실행 <span class="small">버튼을 누르면 이 맥에서 단계별로 돌아요 · 대본 뒤 한 번 멈춤</span></h2></div>
+  return `<section class="panel ya" id="ytAuto"><div class="sectionhead" style="margin-top:0"><h2>에피소드 제작</h2></div>
     <div id="ytAutoLive">${ytAutoLive()}</div><div id="yaRec">${recState.open ? recPanel() : ''}</div>
     <details class="ya-new"><summary>＋ 새 에피소드 만들기</summary><div class="ya-form">
       <input class="input" data-ya-new="title" placeholder="주제 제목 (예: 심권호 그레코로만 들어 던지기)" value="${esc(idea?.title || '')}">
@@ -64,7 +105,7 @@ function ytAutoPanel() {
       <input class="input" data-ya-new="url" placeholder="소스 유튜브 주소 (UWW·RAF 공식 먼저)" value="${esc(typeof ytPipe === 'object' ? ytPipe.url || '' : '')}">
       <input class="input" data-ya-new="ranges" placeholder="구간: 0:30-0:42 (한 구간 15초까지, 여러 개는 쉼표)" value="${esc(typeof ytPipe === 'object' ? ytPipe.ranges || '' : '')}">
       <button class="btn primary" data-ya-act="create">만들기</button></div>
-      <p class="small">폴더는 ~/Desktop/유투브/NN_주제 로 생겨요. 만든 뒤 ▶▶ 전부 실행.</p></details></section>`;
+      <p class="small">폴더는 ~/Desktop/유투브/NN_주제 로 생겨요. 만든 뒤 제작 단계에서 시작하세요.</p></details></section>`;
 }
 async function runnerShowLog(step, quiet) {
   const cur = runnerEp(), el = document.getElementById('yaLog');
@@ -75,11 +116,19 @@ async function runnerShowLog(step, quiet) {
 document.addEventListener('change', e => {
   const s = e.target.closest?.('select[data-ya-ep]'); if (!s) return;
   try { localStorage.setItem(RUN_EP_KEY, s.value); } catch (_) {}
-  runnerOpenLog = null; document.getElementById('ytAutoLive').innerHTML = ytAutoLive();
+  runnerOpenLog = runnerSelectedStep = null; runnerPaint(document.getElementById('ytAutoLive'), true);
 });
 document.addEventListener('click', async e => {
+  const step = e.target.closest('button[data-ya-step], button[data-ya-review]');
+  if (step) {
+    runnerSelectedStep = step.dataset.yaStep || runnerEp()?.steps.find(s => s.gate)?.id;
+    const live = document.getElementById('ytAutoLive');
+    runnerPaint(live, true);
+    [...live.querySelectorAll('[data-ya-step]')].find(b => b.dataset.yaStep === runnerSelectedStep)?.focus();
+    return;
+  }
   const lg = e.target.closest('button[data-ya-log]');
-  if (lg) { runnerOpenLog = runnerOpenLog === lg.dataset.yaLog ? null : lg.dataset.yaLog; document.getElementById('ytAutoLive').innerHTML = ytAutoLive(); if (runnerOpenLog) runnerShowLog(runnerOpenLog); return; }
+  if (lg) { runnerOpenLog = runnerOpenLog === lg.dataset.yaLog ? null : lg.dataset.yaLog; runnerPaint(document.getElementById('ytAutoLive'), true); document.querySelector('[data-ya-log]')?.focus(); if (runnerOpenLog) runnerShowLog(runnerOpenLog); return; }
   const run = e.target.closest('button[data-ya-run]'), act = e.target.closest('button[data-ya-act]');
   if ((!run && !act) || runnerBusy) return;
   const cur = runnerEp();
@@ -92,12 +141,14 @@ document.addEventListener('click', async e => {
         const v = k => document.querySelector(`[data-ya-new="${k}"]`)?.value || '';
         const r = await runnerFetch('/episodes', { title: v('title'), note: v('note'), url: v('url'), ranges: v('ranges') });
         try { localStorage.setItem(RUN_EP_KEY, r.ep); } catch (_) {}
+        runnerSelectedStep = runnerOpenLog = null;
         toast('에피소드를 만들었어요: ' + r.ep);
       } else if (a === 'addsrc') {
         const v = k => document.querySelector(`[data-ya-src="${k}"]`)?.value || '';
-        await runnerFetch('/source', { ep: cur.ep, url: v('url'), ranges: v('ranges') }); toast('소스를 추가했어요.');
+        await runnerFetch('/source', { ep: cur.ep, url: v('url'), ranges: v('ranges') });
+        document.querySelectorAll('[data-ya-src]').forEach(input => { input.value = ''; }); toast('소스를 추가했어요.');
       } else if (a === 'runall') { const r = await runnerFetch('/runall', { ep: cur.ep }); runnerOpenLog = r.from || null; toast('처음 안 끝난 단계부터 차례로 돌아요.'); }
-      else if (a === 'continue') { const r = await runnerFetch('/continue', { ep: cur.ep }); runnerOpenLog = r.from || null; toast('편집 단계부터 이어서 돌아요.'); }
+      else if (a === 'continue') { const r = await runnerFetch('/continue', { ep: cur.ep }); runnerSelectedStep = runnerOpenLog = r.from || null; toast('편집 단계부터 이어서 돌아요.'); }
       else if (a === 'stop') { await runnerFetch('/stop', { ep: cur.ep }); toast('멈췄어요.'); }
       else if (a === 'open') { await runnerFetch('/open', { ep: cur.ep }); }
     }

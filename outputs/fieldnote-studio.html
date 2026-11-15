@@ -136,11 +136,42 @@
 .bs-head{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:baseline}.bs-head h3{margin:0;font-size:18px}.bs-head code{font-size:13px;color:var(--muted)}
 .bs-need{font-size:12px;padding:2px 8px;border-radius:999px;border:1px solid var(--orange);color:var(--orange)}.bs-ok{font-size:12px;padding:2px 8px;border-radius:999px;border:1px solid var(--green);color:var(--green)}
 .bs-main p{margin:6px 0 8px;font-size:15px}.bs-cmd{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.bs-cmd code{flex:1 1 360px;font-size:12.5px;background:#0b0d10;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:#cfd5de;white-space:pre-wrap;word-break:break-all}
+
+.yt-workbench-head h1{margin:4px 0 16px;overflow-wrap:anywhere}
+.yt-workbench .yp-top{margin:0 0 14px}
+.yt-workbench .yp-topic{flex:1 1 240px;min-width:0}
+.yt-workbench .yp-topic select{min-width:0}
+.yt-workbench #ytAuto{margin:0 0 12px;border-color:var(--line)}
+.yt-reference{margin:12px 0}
+.yt-reference>summary{padding:10px 0;color:var(--muted);cursor:pointer}
+.ya-pick select{min-width:0}
+.ya-progress{margin:12px 0 16px}
+.ya-progress>div{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.ya-progress progress{display:block;width:100%;height:8px;margin-top:7px;accent-color:var(--lime)}
+.ya-work-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.45fr);gap:14px;margin:12px 0}
+.ya-stage-list,.ya-artifacts{list-style:none;margin:0;padding:0;display:grid;gap:6px;align-content:start}
+.ya-stage-pick{display:flex;align-items:center;gap:10px;width:100%;min-height:54px;padding:7px 10px;color:var(--text);text-align:left;background:var(--panel2);border:1px solid var(--line);border-radius:8px}
+.ya-stage-pick[aria-pressed="true"]{border-color:var(--lime);background:#222b1b}
+.ya-stage-number{flex:0 0 24px;text-align:center;color:var(--lime);font-size:13px}
+.ya-stage-pick strong,.ya-stage-pick small{display:block;overflow-wrap:anywhere}
+.ya-stage-pick small{color:var(--muted);font-size:12px}
+.ya-stage-detail{min-width:0;align-self:start;border:1px solid var(--line);border-radius:8px;padding:14px}
+.ya-stage-detail h3{font-size:21px;margin-bottom:10px}
+.ya-stage-detail h4{margin:16px 0 6px}
+.ya-stage-detail p{margin:6px 0}
+.ya-stage-detail .ya-file{max-width:100%;white-space:normal;overflow-wrap:anywhere;text-align:left}
+.ya-source-list,.ya-off{overflow-wrap:anywhere}
+@media(max-width:760px){
+  .ya-work-grid{grid-template-columns:1fr}
+  .ya-stage-list{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .ya-stage-pick{gap:4px;padding:6px}
+}
+
 </style></head><body><div class="app"><aside class="sidebar" id="sidebar"><div class="brand"><span class="brandmark">f/</span> FIELDNOTE</div><div class="workspace">싱가포르에서, 한국을 보다<small>개인 콘텐츠 워크스페이스</small></div><nav aria-label="워크스페이스 탭"><button class="nav" data-view="common"><span class="navicon">◎</span>공통 원리</button><button class="nav" data-view="github"><span class="navicon">⌥</span>GitHub 모음집</button><div class="nav-label">플랫폼</div><button class="nav pf-nav" data-view="youtube" style="--pc:#ff6b6b"><span class="navicon"><i class="pf-dot"></i></span>YouTube</button><button class="nav pf-nav" data-view="blog" style="--pc:#3ddc84"><span class="navicon"><i class="pf-dot"></i></span>네이버 블로그</button><button class="nav pf-nav" data-view="x" style="--pc:#f2c94c"><span class="navicon"><i class="pf-dot"></i></span>X</button><button class="nav pf-nav" data-view="telegram" style="--pc:#4fb3ff"><span class="navicon"><i class="pf-dot"></i></span>Telegram</button><button class="nav pf-nav" data-view="insta" style="--pc:#ff7ac8"><span class="navicon"><i class="pf-dot"></i></span>Instagram</button><button class="nav pf-nav" data-view="threads" style="--pc:#b9a1f5"><span class="navicon"><i class="pf-dot"></i></span>Threads</button></nav><div class="sidebottom"><button class="nav" data-view="publish"><span class="navicon">✓</span>게시 확인</button><button class="nav" data-view="settings"><span class="navicon">⚙</span>설정·데이터</button><div class="local"><span class="dot"></span><span id="storageState">이 브라우저에 저장</span><div id="sideConn" style="margin:5px 0 0 13px;color:#626c78">외부 계정 · 연결 안 됨</div></div><button class="nav" id="logoutBtn" hidden><span class="navicon">⇥</span>로그아웃</button></div></aside><div class="sidebar-backdrop" id="sidebarBackdrop"></div><main><header class="topbar"><div><button class="menu" id="mobileMenu" aria-label="메뉴 열기">☰</button>워크스페이스 <span style="margin:0 12px;color:#454d59">/</span><b id="breadcrumb">작업</b></div><div class="topmeta"><span id="date"></span><span>LOCAL EDITION</span><div class="avatar">FN</div></div></header><div class="content" id="content"></div></main></div><div id="modalRoot"></div><div class="toasts" id="toasts" role="status" aria-live="polite"></div><input type="file" accept="application/json,.json" id="importFile" hidden><input type="file" accept="application/json,.json" id="shortsImportFile" hidden>
 <link rel="stylesheet" href="./instatoon.css">
 <script src="./instatoon.js"></script>
-<script src="./fieldnote-workflow.js"></script>
-<script src="./fieldnote-runner.js"></script>
+<script src="./fieldnote-workflow.js?v=youtube-workbench"></script>
+<script src="./fieldnote-runner.js?v=youtube-workbench"></script>
 <script src="./fieldnote-manual-ai.js"></script>
 <script src="./fieldnote-steps.js"></script>
 <script>

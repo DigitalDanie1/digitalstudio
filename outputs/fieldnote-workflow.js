@@ -1255,7 +1255,9 @@ function platformPage(c) {
     const group = f => { const l = ytFmtIdeas(f); return `<div class="yt-fmt-group ${f}"><h4>${f === 'long' ? '🎬 롱폼' : '📱 쇼츠'} <em>${l.length}</em><span>${esc(YT_FORMAT_TEXT[f])}</span></h4>${l.length ? `<ul class="ps-topics">${l.map(ytTopic).join('')}</ul>` : '<p class="small">아직 없습니다.</p>'}</div>`; };
     board = board.replace(/<div class="ps-col"><h3><span>①<\/span> 주제 <em>\d+<\/em><\/h3>[\s\S]*?<\/div>\s*<div class="ps-col"><h3><span>②/, `<div class="ps-col"><h3><span>①</span> 주제 <em>${ideas.length}</em></h3><div class="yt-fmt-groups">${group('shorts')}${group('long')}</div></div>\n    <div class="ps-col"><h3><span>②`);
     const ytBoard = board.replace(/<div class="ps-col"><h3><span>②<\/span> 제작 방법<\/h3>[\s\S]*?<\/div>\s*<div class="ps-col"><h3><span>③/, '<div class="ps-col"><h3><span>③').replace('<div class="ps-cols">', '<div class="ps-cols ps-cols2">');
-    return hero + ytPipeline() + ytAudioGuide() + ytBoard + drafts + toolSec;
+    return ytPipeline()
+      + '<details class="yt-reference"><summary>주제 관리 · 원고</summary>' + hero + ytBoard + drafts + '</details>'
+      + '<details class="yt-reference" id="ytAudioReference"><summary>음악·음성 가이드 · 프로그램</summary>' + ytAudioGuide() + toolSec + '</details>';
   }
   return hero + board + drafts + toolSec;
 }
@@ -1349,7 +1351,7 @@ function ytPipeline() {
   const cur = ytPipeIdea(), sh = ytPipe.format !== 'long';
   if (cur && !ytPipe.url) ytPipe.url = ytFirstUrl(cur);
   const fmtBtn = f => `<button class="yp-fmt ${ytPipe.format === f ? 'active' : ''}" data-yp-format="${f}" aria-pressed="${ytPipe.format === f}">${f === 'long' ? '🎬 롱폼' : '📱 쇼츠'} <b>${ytFmtIdeas(f).length}</b></button>`;
-  const sel = `<div class="yp-fmts">${fmtBtn('shorts')}${fmtBtn('long')}</div><label class="yp-topic"><span>작업할 주제</span><select data-yp-idea aria-label="작업할 주제">${ytFmtIdeas(ytPipe.format).map(i => `<option value="${esc(i.id)}" ${cur && i.id === cur.id ? 'selected' : ''}>${esc(i.title)}</option>`).join('')}</select></label><span class="small">폴더 · ~/Movies/FIELDNOTE/<b data-yp-folder>${esc(ytFolder(cur?.title))}</b></span>`;
+  const sel = `<div class="yp-fmts">${fmtBtn('shorts')}${fmtBtn('long')}</div><label class="yp-topic"><span>작업할 주제</span><select data-yp-idea aria-label="작업할 주제">${ytFmtIdeas(ytPipe.format).map(i => `<option value="${esc(i.id)}" ${cur && i.id === cur.id ? 'selected' : ''}>${esc(i.title)}</option>`).join('')}</select></label>`;
   const skillRow = ([label, kind]) => { const sk = ytSkillOf(kind); return `<div class="yp-skill"><span class="yp-skill-name">${esc(label)} · <button class="linkbtn" data-view="ytSkills">/${esc(sk.id)}</button></span><code data-yp-cmd="${kind}">${esc(ytPipeText(kind))}</code><button class="btn primary" data-yp-copy="${kind}">명령 복사</button></div>`; };
   const card = (st, idx) => `<li class="yp-stage"><div class="yp-head"><span class="yp-n">${String(idx + 1).padStart(2, '0')}</span><h3>${esc(st.title)}</h3></div>
     <p class="yp-what">${esc(st.what)}</p>${ytStageTools(idx)}<p class="yp-out"><b>결과물</b>${esc(st.out)}</p>
@@ -1359,9 +1361,16 @@ function ytPipeline() {
       ${st.inputs ? '<details class="yp-term"><summary>터미널 명령으로 직접</summary><code data-yp-cmd="download-term">' + esc(ytPipeText('download-term')) + '</code><button class="btn ghost" data-yp-copy="download-term">터미널 명령 복사</button></details>' : ''}</div>
     <div class="yp-tools">${(st.links || []).filter(l => !l[2] || l[2] === ytPipe.format).map(([l, u]) => u.startsWith('@') ? `<button class="linkbtn" data-view="${u.slice(1)}">${esc(l)} →</button>` : u.startsWith('#') ? `<button class="linkbtn" data-yp-jump="${u.slice(1)}">${esc(l)} ↓</button>` : `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(l)} ↗</a>`).join('')}${st.publish ? '<button class="linkbtn" data-view="publish">게시 확인 →</button>' : ''}</div>
   </li>`;
-  return `<section class="yp" style="--pc:${platformColor('YouTube')}"><div class="yp-top"><h2>제작 라인 <span class="small">자료조사 → 소스 다운로드 → 편집 → 업로드 · ${sh ? '쇼츠 15~60초 세로' : '롱폼 8~12분 가로'}</span></h2>${sel}</div>
-    ${typeof ytAutoPanel === 'function' ? ytAutoPanel() : ''}${ytOrchestration()}<ol class="yp-stages">${YT_PIPELINE.map(card).join('')}</ol>
-    <p class="small yp-foot">'명령 복사' → Claude Code 새 대화에 붙여 넣기 → 그 단계 스킬이 실행됩니다. 모든 단계가 같은 주제 폴더를 이어 씁니다. 원본 경기 장면은 한 번에 몇 초만, 중심은 내 해설입니다.</p></section>`;
+  return `<section class="yp yt-workbench" style="--pc:${platformColor('YouTube')}">
+    <header class="yt-workbench-head"><div class="eyebrow">YOUTUBE · 작업판</div><h1>${esc(cur?.title || '작업할 주제를 선택하세요')}</h1></header>
+    <div class="yp-top">${sel}</div>
+    ${typeof ytAutoPanel === 'function' ? ytAutoPanel() : ''}
+    <details id="ytManual" class="yt-reference"><summary>수동 작업 · 명령 복사</summary><div class="yp-top">
+      <span class="small">폴더 · ~/Movies/FIELDNOTE/<b data-yp-folder>${esc(ytFolder(cur?.title))}</b></span></div>
+      <ol class="yp-stages">${YT_PIPELINE.map(card).join('')}</ol>
+      <p class="small yp-foot">복사한 명령은 Claude Code 새 대화에서 실행하세요.</p>
+      <details class="yt-reference"><summary>사용 도구</summary>${ytOrchestration()}</details>
+    </details></section>`;
 }
 function ytSkillsPage() {
   if (!ytPipeIdea()) ytPipe.format = ytFmtIdeas('shorts').length ? 'shorts' : 'long';
@@ -1385,7 +1394,7 @@ document.addEventListener('change', e => {
 document.addEventListener('click', async e => {
   const fm = e.target.closest('button[data-yp-format]'); if (fm) { ytPipe.format = fm.dataset.ypFormat; ytPipe.ideaId = ''; ytPipe.url = ''; ytPipe.ranges = ''; render(); return; }
   const pk = e.target.closest('button[data-yp-pick]'); if (pk) { ytPick(pk.dataset.ypPick); render(); document.querySelector('.yp')?.scrollIntoView({ behavior: 'smooth' }); return; }
-  const j = e.target.closest('button[data-yp-jump]'); if (j) { const d = document.getElementById(j.dataset.ypJump); if (d) { d.open = true; d.scrollIntoView({ behavior: 'smooth' }); } return; }
+  const j = e.target.closest('button[data-yp-jump]'); if (j) { const d = document.getElementById(j.dataset.ypJump); if (d) { const disclosure = d.closest('details'); if (disclosure) disclosure.open = true; d.scrollIntoView({ behavior: 'smooth' }); } return; }
   const b = e.target.closest('button[data-yp-copy]'); if (!b) return;
   const ok = await copyText(ytPipeText(b.dataset.ypCopy));
   toast(ok ? (b.dataset.ypCopy === 'research-chat' ? 'claude.ai 채팅에 붙여 넣으세요.' : b.dataset.ypCopy === 'download-term' ? '터미널에 붙여 넣으세요.' : 'Claude Code 새 대화에 붙여 넣으세요.') : '복사에 실패했어요.');
@@ -1413,7 +1422,7 @@ document.addEventListener('click', e => {
   const b = e.target.closest('button[data-yp-src]'); if (!b) return;
   ytPipe.url = b.dataset.ypSrc; ytPipe.ranges = '';
   navigate('youtube');
-  setTimeout(() => { document.querySelector('[data-yp-field="ranges"]')?.focus(); document.querySelectorAll('.yp-stage')[1]?.scrollIntoView({ behavior: 'smooth', block: 'center' }); toast('소스 다운로드 칸에 영상을 넣었어요. 구간을 적고 명령을 복사하세요.'); }, 50);
+  setTimeout(() => { const manual = document.getElementById('ytManual'); if (manual) manual.open = true; document.querySelector('[data-yp-field="ranges"]')?.focus(); document.querySelectorAll('.yp-stage')[1]?.scrollIntoView({ behavior: 'smooth', block: 'center' }); toast('소스 다운로드 칸에 영상을 넣었어요. 구간을 적고 명령을 복사하세요.'); }, 50);
 });
 
 // ===== YouTube 음악 · 음성 가이드 =====
@@ -1698,7 +1707,7 @@ function ideaGenSave(text, c) {
   db.ideas.unshift(...items); log(`AI 아이디어 ${items.length}개 → ${p}`); persist(); closeModal(); render(); toast(`${p} 주제 ${items.length}개를 저장했어요.`);
 }
 document.addEventListener('click', async e => {
-  const t = e.target.closest('button[data-idea-gen]'); if (t) { const c = t.dataset.ideaGen; ideaGenOpen[c] = !ideaGenOpen[c]; render(); if (ideaGenOpen[c]) document.querySelector('.ig')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); return; }
+  const t = e.target.closest('button[data-idea-gen]'); if (t) { const c = t.dataset.ideaGen; ideaGenOpen[c] = !ideaGenOpen[c]; render(); if (ideaGenOpen[c]) { const panel = document.querySelector('.ig'); const disclosure = panel?.closest('details'); if (disclosure) disclosure.open = true; panel?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } return; }
   const r = e.target.closest('button[data-idea-gen-reroll]'); if (r) { const c = r.dataset.ideaGenReroll; ideaGenShown[c] = ideaGenShownNow[c] || []; ideaGenSeed[c] = (ideaGenSeed[c] || 0) + 1; render(); const left = (IDEA_BANK[PF_NAME[c]] || []).filter(b => !db.ideas.some(i => normTitle(i.title) === normTitle(b.title))).length; toast(left > 6 ? '새 아이디어로 바꿨어요.' : '준비된 아이디어가 적어요. AI로 더 받기를 써 보세요.'); return; }
   const a = e.target.closest('button[data-idea-gen-add]'); if (a) { const [c, k] = a.dataset.ideaGenAdd.split('|'); ideaFromBank(c, Number(k)); return; }
   const m = e.target.closest('button[data-idea-gen-ai]'); if (m) { ideaGenAIModal(m.dataset.ideaGenAi); return; }
