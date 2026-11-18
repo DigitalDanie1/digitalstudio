@@ -233,6 +233,26 @@
     let panel=c.querySelector('.ytf');
     if(!panel){panel=document.createElement('section');panel.className='ytf';nav.after(panel);wire(panel)}
     render(panel);
+    document.querySelectorAll('#sidebar .nav').forEach(n=>{n.classList.remove('active');n.removeAttribute('aria-current')});
+    const side=document.querySelector('#sidebar [data-ytf-side]');
+    if(side){side.classList.add('active');side.setAttribute('aria-current','page')}
+  }
+
+  function openFromSide(){
+    if(document.querySelector('#content nav.workspace-nav[aria-label="유튜브 메뉴"]')){addBtn();open();return}
+    document.querySelector('#sidebar .nav[data-view="youtube"]').click();
+    let n=0;const t=setInterval(()=>{if(document.querySelector('#content nav.workspace-nav[aria-label="유튜브 메뉴"]')||++n>20){clearInterval(t);addBtn();open()}},50);
+  }
+
+  function addSide(){
+    const side=document.querySelector('#sidebar [data-ytf-side]');
+    if(side){if(!document.querySelector('.ytf')){side.classList.remove('active');side.removeAttribute('aria-current')}return}
+    const ref=document.querySelector('#sidebar .nav[data-view="yt-politics"]');
+    if(!ref)return;
+    const b=document.createElement('button');b.className='nav pf-nav';b.dataset.ytfSide='1';b.style.setProperty('--pc','#ffd400');
+    b.innerHTML='<span class="navicon"><i class="pf-dot"></i></span>Youtube 조회수 공식';
+    b.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();openFromSide()},true);
+    ref.after(b);
   }
 
   function addBtn(){
@@ -243,6 +263,6 @@
     nav.appendChild(b);
   }
 
-  new MutationObserver(addBtn).observe(document.body,{childList:true,subtree:true});
-  addBtn();
+  new MutationObserver(()=>{addBtn();addSide()}).observe(document.body,{childList:true,subtree:true});
+  addBtn();addSide();
 })();
