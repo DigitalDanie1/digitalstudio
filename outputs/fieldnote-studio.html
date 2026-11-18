@@ -174,7 +174,8 @@
 <script src="./fieldnote-workflow.js?v=yt-sources"></script>
 <script src="./fieldnote-runner.js?v=steps-ui"></script>
 <script src="./fieldnote-manual-ai.js?v=yt-sources"></script>
-<script src="./fieldnote-pipeline.js?v=yt-fix"></script>
+<script src="./fieldnote-link.js?v=krsg-link"></script>
+<script src="./fieldnote-pipeline.js?v=krsg-link"></script>
 <script>
 'use strict';
 const $=s=>document.querySelector(s), KEY='fieldnote-studio-v1';
@@ -324,13 +325,13 @@ const YT_CHANNELS=[
 {id:'yt-program-review',name:'프로그램 리뷰 채널',tab:'프로그램 리뷰',persona:'리얼리티·연애·서바이벌·관찰 예능의 한 장면을 맥락과 편집 방식까지 분석한다. 출연자 개인을 조롱하거나 단정하지 않고, 방송에서 확인되는 장면·자막·인터뷰와 내 해석을 구분한다. 스포일러는 제목·썸네일·도입에서 명확히 알리고, 클립·이미지는 인용 범위와 사용 권리를 확인한다.'}
 ];
 const IG_ACCOUNTS=[
-{id:'insta-krsg',name:'KR Content for SG',tab:'Insta - KR Content for SG',lang:'en',role:'한국 콘텐츠(드라마·음식·뷰티·여행·K-pop·싱가포르 속 한국 브랜드)를 싱가포르 사람들에게 영어로 소개하는 계정',
+{id:'insta-krsg',name:'KR Content for SG',tab:'Insta - KR Content for SG',lang:'en',linkFirst:true,role:'한국 콘텐츠(드라마·음식·뷰티·여행·K-pop·싱가포르 속 한국 브랜드)를 싱가포르 사람들에게 영어로 소개하는 계정',
  persona:'ENGLISH-language account introducing Korean content (dramas, food, beauty, travel, K-pop, Korean brands in Singapore) to Singaporeans. Friendly, upbeat, plain English; Singapore-friendly references (SGD prices, MRT, hawker, Orchard). Explain Korean terms once. Never invent prices, dates or availability: mark anything unverified as [확인 필요].',
  flow:'Card-news: Card 1 hook · cards 2-6 one idea each · last card call-to-action. 5-7 cards. Then an English caption with hashtags.'},
 {id:'insta-sing',name:'싱달러 부부',tab:'Insta - 싱달러 부부',lang:'ko',role:'「싱부부의 외노자 일기」 인스타툰 — 싱가포르에서 일하는 한국인 부부의 일상 만화',
  persona:'싱가포르에서 일하는 한국인 부부의 일상을 담백하고 웃기게 그리는 한국어 인스타툰. 직접 겪은 일 중심, 과장·조롱 없이.',
  flow:'인스타툰: 이야기 → 컷 나누기 → 그림 → 캡션 → 게시. 카드뉴스·릴스도 만들 수 있음.'},
-{id:'insta-jury',name:'덧글배심원',tab:'Insta - 덧글배심원',lang:'ko',role:'화제의 온라인 논쟁(사연+갈린 댓글)을 배심원 판결처럼 보여 주는 한국어 카드뉴스 계정',
+{id:'insta-jury',name:'덧글배심원',tab:'Insta - 덧글배심원',lang:'ko',linkFirst:true,role:'화제의 온라인 논쟁(사연+갈린 댓글)을 배심원 판결처럼 보여 주는 한국어 카드뉴스 계정',
  persona:'화제가 된 온라인 논쟁(사연과 갈린 댓글)을 배심원 판결 형식의 한국어 카드뉴스로 정리한다. 구성: 사연 요약 → 쟁점 → 댓글 A측 대표 의견 → 댓글 B측 대표 의견 → 배심원 판결(내 결론과 근거) → 독자 투표 질문. 규칙: 모든 사람을 익명 처리(실명·아이디·프로필 사진 금지), 댓글은 짧게만 인용하고 출처를 적는다, 개인을 조롱하지 않는다, 판결은 "내 의견"임을 표시한다.',
  flow:'카드뉴스: 사연 요약 → 쟁점 → A측 → B측 → 배심원 판결 → 독자 투표 질문.'}
 ];
@@ -341,6 +342,7 @@ const igOf=x=>x&&IG_BY_ID[x.igAccount]?x.igAccount:IG_DEFAULT;
 const igName=id=>{const c=Array.isArray(db.igAccounts)&&db.igAccounts.find(k=>k&&k.id===id);return (c&&c.name)||(IG_BY_ID[id]||{}).name||''};
 const igVoice=id=>{const c=Array.isArray(db.igAccounts)&&db.igAccounts.find(k=>k&&k.id===id);return (c&&typeof c.voice==='string'&&c.voice.trim())?c.voice:(IG_BY_ID[id]||{}).persona||''};
 function igDirective(id){const a=IG_BY_ID[id];if(!a)return '';return a.lang==='en'?'Write ALL output in English (not Korean). Singapore-friendly tone for a Singaporean audience. Format: card-news with 5 to 7 cards, each labelled "Card N" with a short on-card text. After the cards, add an English caption with 5 to 10 relevant hashtags. Keep any fact you cannot verify marked [확인 필요].':id==='insta-jury'?'한국어 카드뉴스로 써 주세요. 카드 순서: 사연 요약 → 쟁점 → 댓글 A측 대표 의견 → 댓글 B측 대표 의견 → 배심원 판결(내 결론과 근거) → 독자 투표 질문. 모든 인물은 익명 처리(실명·아이디·프로필 사진 금지), 댓글 인용은 짧게 하고 출처를 적고, 개인을 조롱하지 말고, 판결은 "내 의견"이라고 표시하세요.':''}
+function igLinkDirective(idea){if(!idea||!idea.fromLink)return '';const a=igOf(idea);return a==='insta-jury'?'이 글은 소재 메모의 출처 링크를 바탕으로 합니다. 메모의 "핵심 사실"에 있는 것만 쓰고, 그 밖의 내용은 [확인 필요]로 표시하세요. 캡션 끝에 "출처: 사이트 이름 — 링크"를 적고, 판결은 "내 의견"임을 밝히세요. 실명·아이디·닉네임·프로필 사진은 쓰지 말고 댓글은 요약해서 쓰세요.':'This post is based on the source link in the notes. Use only the key facts listed in the notes; mark anything beyond them [check]. Credit the source at the end of the caption as "Source: <site name> — <link>". Do not copy long passages from the source.'}
 function igAccountsInit(x){const have=Array.isArray(x.igAccounts)?x.igAccounts.filter(c=>c&&typeof c==='object'&&IG_BY_ID[c.id]):[];x.igAccounts=IG_ACCOUNTS.map(d=>{const c=have.find(h=>h.id===d.id);return {id:d.id,name:c&&typeof c.name==='string'&&c.name.trim()?c.name:d.name,voice:c&&typeof c.voice==='string'?c.voice:d.persona}})}
 const YT_CH_BY_ID=Object.fromEntries(YT_CHANNELS.map(c=>[c.id,c])),YT_CH_IDS=YT_CHANNELS.map(c=>c.id);
 const YT_TOPICS=[
@@ -873,7 +875,7 @@ function createIdeaDraft(id){
 async function requestAiDraft(channel, categoryName, idea){
  const category=channel==='blog'?NAVER_BY_NAME[categoryName]:null;
  let voice=(channel==='blog'?db.profile.blogVoice||db.profile.tone:db.profile.tone).slice(0,4000);
- if(channel==='insta'){const ia=igOf(idea&&idea.igAccount?idea:{igAccount:igCur()});voice=[igVoice(ia),igDirective(ia)].filter(Boolean).join('\n\n').slice(0,4000)}
+ if(channel==='insta'){const ia=igOf(idea&&idea.igAccount?idea:{igAccount:igCur()});voice=[igVoice(ia),igDirective(ia),igLinkDirective(idea)].filter(Boolean).join('\n\n').slice(0,4000)}
  const payload={
   channel,
   ...(category?{category:catPayload(category)}:{}),

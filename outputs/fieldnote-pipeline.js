@@ -28,7 +28,7 @@
     if (!IG_BY_ID[S.igLoaded]) S.igLoaded = 'insta-sing';
     if (want === S.igLoaded) return;
     S.igSel[S.igLoaded] = S.sel.insta; S.sel.insta = S.igSel[want] || {}; S.igLoaded = want;
-    for (const k of ['view', 'pick', 'custom', 'page', 'manual', 'err', 'askCopied', 'busy', 'answer', 'url', 'seen']) { const o = T0()[k]; if (o) delete o.insta; }
+    for (const k of ['view', 'pick', 'custom', 'page', 'manual', 'err', 'askCopied', 'busy', 'answer', 'url', 'seen', 'link']) { const o = T0()[k]; if (o) delete o.insta; }
     save();
   }
   // 오늘 할 일: 다른 계정·채널의 진행 상황을 잠깐 그쪽 기준으로 계산
@@ -42,7 +42,7 @@
     } finally { igLock = pIg; db.profile.ytChannelTab = pYt; }
   }
   // ----- 잠깐 쓰는 상태 -----
-  const T = { view: {}, manual: {}, busy: {}, err: {}, askCopied: {}, answer: {}, pick: {}, custom: {}, page: {}, url: {}, seen: {}, caption: {}, logOpen: null, ytFmt: null };
+  const T = { view: {}, manual: {}, busy: {}, err: {}, askCopied: {}, answer: {}, pick: {}, custom: {}, page: {}, url: {}, seen: {}, link: {}, caption: {}, logOpen: null, ytFmt: null };
 
   const marksOf = body => {
     const b = String(body || '');
@@ -71,6 +71,7 @@
         idea.sources ? `${en ? 'Sources' : '참고 자료'}:\n${idea.sources}` : '',
         `${en ? 'Account voice' : '계정 소개·말투'}:\n${igVoice(a)}`,
         igDirective(a),
+        idea.fromLink ? igLinkDirective(idea) : '',
         (en ? 'Rules:\n' : '꼭 지켜 주세요:\n') + rules.map(r => '- ' + r).join('\n'),
         en ? 'Reply format: first line = title, blank line, then the cards and caption. No other commentary.' : '답은 이렇게만 주세요:\n첫 줄에 제목\n한 줄 비우고 본문\n(다른 설명은 붙이지 마세요)',
       ].filter(Boolean).join('\n\n');
@@ -250,6 +251,89 @@
       <li>그 봇을 내 채널 <b>관리자</b>로 추가해요 (글 올리기 권한 켜기).</li>
       <li>Vercel → Settings → Environment Variables에 <code>TELEGRAM_BOT_TOKEN</code>, <code>TELEGRAM_CHAT_ID</code>(<code>@채널아이디</code>)를 넣고 Redeploy 해요.</li></ol></details>`;
 
+
+  // ===== 링크 → 주제 (링크 먼저 계정: KR Content for SG · 덧글배심원) =====
+  const LK = c => T.link[c] || (T.link[c] = { url: '', busy: false, res: null, options: null, answer: '', copied: false, paste: '', pasteOpen: false });
+  const normUrl = raw => { const u = String(raw || '').trim(); return u && !/^[a-z][a-z0-9+.-]*:/i.test(u) ? 'https://' + u : u; };
+  const hostOf = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch (_) { return ''; } };
+  // 서버가 안 될 때: 링크(와 붙여 넣은 본문)만으로 부탁 글을 브라우저에서 만든다
+  function offlineRes(account, url, pasted) {
+    const source = { url, finalUrl: url, siteName: hostOf(url), host: hostOf(url), title: '', description: '', image: '', date: '', channel: '', textChars: (pasted || '').length, text: (pasted || '').slice(0, 12000), partial: !pasted, pasted: !!pasted, truncated: false };
+    return { ok: true, offline: true, mode: 'manual', source, prompt: FNLink.buildPrompt(account, source) };
+  }
+  async function linkRead(c, usePaste) {
+    const L = LK(c), a = igCur(), url = normUrl(L.url), pasted = usePaste ? String(L.paste || '').trim() : '';
+    if (!url) { T.err[c] = '링크를 먼저 붙여 넣어 주세요.'; repaint(c, true); return; }
+    try { const u = new URL(url); if (!/^https?:$/.test(u.protocol)) throw 0; } catch (_) { T.err[c] = '링크 형식이 올바르지 않아요. https:// 로 시작하는 주소를 붙여 넣어 주세요.'; repaint(c, true); return; }
+    if (usePaste && !pasted) { T.err[c] = '붙여 넣을 본문이나 댓글을 먼저 적어 주세요.'; repaint(c, true); return; }
+    L.url = url; L.busy = true; L.options = null; L.answer = ''; L.copied = false; if (!usePaste) L.res = null; T.err[c] = ''; repaint(c, true);
+    try {
+      let data = null, status = 0;
+      try {
+        const r = await jfetch('/api/generate/link', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, account: a, ...(pasted ? { pastedText: pasted.slice(0, 12000) } : {}) }) }, 90000);
+        status = r.status; data = await r.json().catch(() => null);
+      } catch (_) { data = null; }
+      if (!data || (typeof data.ok !== 'boolean')) {
+        L.res = offlineRes(a, url, pasted); T.err[c] = '이 화면에서는 서버가 링크를 읽을 수 없어요(서버 연결 없음). 링크만으로 Claude 채팅용 부탁 글을 만들었어요. 본문을 직접 붙여 넣어도 돼요.';
+      } else if (!data.ok) {
+        L.res = { ok: false, mode: 'manual', source: { ...offlineRes(a, url, pasted).source, ...(data.source || {}) }, prompt: data.prompt || offlineRes(a, url, pasted).prompt, failed: true };
+        T.err[c] = status === 401 ? data.message || '로그인이 필요해요. 다시 로그인하세요.' : data.message || '링크를 읽지 못했어요.'; if (status !== 401) L.pasteOpen = true;
+      } else {
+        L.res = data;
+        if (data.mode === 'ai' && Array.isArray(data.options)) L.options = data.options.map(o => ({ title: String(o.title || ''), angle: String(o.angle || ''), cardOutline: o.cardOutline || [], keyFacts: o.keyFacts || [], caution: String(o.caution || '') })).filter(o => o.title);
+        if (data.aiError) T.err[c] = data.aiError;
+        if (data.source && data.source.partial && !data.source.pasted) L.pasteOpen = true;
+      }
+    } finally { L.busy = false; repaint(c, true); }
+  }
+  async function linkCopy(c) {
+    const L = LK(c); if (!L.res) return;
+    const ok = await copyText(L.res.prompt); window.open(CLAUDE_URL, '_blank', 'noopener');
+    L.copied = ok ? true : 'fail';
+    toast(ok ? '복사했어요. Claude 입력칸에 붙여 넣고 보내세요.' : '복사하지 못했어요. "부탁 글 보기"를 열어 직접 복사해 주세요.'); repaint(c, true);
+  }
+  function linkParse(c) {
+    const L = LK(c);
+    try { L.options = FNLink.parseAnswer(L.answer); T.err[c] = ''; } catch (e) { T.err[c] = e.message; }
+    repaint(c, true);
+  }
+  function linkPick(c, i) {
+    const L = LK(c), o = L.options && L.options[i], a = igCur(); if (!o || !L.res) return;
+    const day = FNLink.today(), f = FNLink.ideaFields(a, o, L.res.source, day);
+    const idea = { id: uid(), title: f.title, note: f.note, sources: f.sources, platform: PF_NAME[c], sample: false, created: Date.now(), preferredChannel: 'insta', igAccount: a, fromLink: { url: L.res.source.url, account: a, checked: day } };
+    db.ideas.unshift(idea); log('링크로 만든 주제: ' + idea.title); persist();
+    S.sel[c] = { ideaId: idea.id }; save(); T.link[c] = null; T.err[c] = ''; T.view[c] = 1; toast('주제를 정했어요. 이제 초안을 만들어요.'); repaint(c, true);
+  }
+  function linkBody(c, it, pickerBody) {
+    if (it.post) return pickerBody(it);
+    const L = LK(c), a = igCur(), cfg = FNLink.ACCOUNTS[a], res = L.res, src = res && res.source;
+    const input = `<div class="pl-link-in"><label class="pl-own" for="plLinkUrl"><span class="pl-link-label">${esc(cfg.label)}</span><input id="plLinkUrl" class="pl-input pl-biginput" type="url" inputmode="url" autocomplete="off" placeholder="${esc(cfg.placeholder)}" value="${esc(L.url)}"></label>
+      <button type="button" class="pl-primary pl-bigbtn" data-pl-lkread ${L.busy ? 'disabled' : ''}>${L.busy ? '링크 읽는 중…' : '이 링크로 주제 만들기'}</button></div>`;
+    let read = '';
+    if (src) {
+      const thumb = src.image ? `<img class="pl-link-thumb" src="${esc(src.image)}" alt="" referrerpolicy="no-referrer" loading="lazy" onerror="this.remove()">` : '';
+      const warn = src.pasted ? '<p class="pl-warn">붙여 넣은 본문·댓글을 기준으로 해요.</p>' : src.partial ? '<p class="pl-warn">일부만 읽혔을 수 있어요. 사이트가 읽기를 막았다면 아래 "본문·댓글 직접 붙여 넣기"를 써 주세요.</p>' : '';
+      read = `<div class="pl-link-read">${thumb}<div class="pl-link-meta"><b>${esc(src.title || '(제목을 못 읽었어요)')}</b><span class="small">${esc([src.siteName, src.channel, src.date && String(src.date).slice(0, 10)].filter(Boolean).join(' · '))}</span><span class="small">읽은 내용 ${num(src.textChars || 0)}자${src.truncated ? ' · 너무 커서 앞부분만' : ''}</span></div></div>${warn}`;
+    }
+    let opts = '';
+    if (L.options && L.options.length) opts = `<div class="pl-link-opts" role="group" aria-label="주제 후보"><p class="pl-note">마음에 드는 주제를 누르세요.</p>${L.options.map((o, i) => `<button type="button" class="pl-link-opt" data-pl-lkpick="${i}"><b>${esc(o.title)}</b>${o.angle ? `<span class="pl-link-angle">${esc(o.angle)}</span>` : ''}${o.cardOutline.length ? `<ol class="pl-link-cards">${o.cardOutline.map(x => `<li>${esc(x)}</li>`).join('')}</ol>` : ''}${o.caution ? `<span class="pl-warn">확인: ${esc(o.caution)}</span>` : ''}</button>`).join('')}</div>`;
+    else if (res) opts = `<div class="pl-manual"><p class="pl-note">Claude 채팅(구독)으로 이어가요. 부탁 글을 복사해 Claude에 붙여 넣고, 받은 답을 아래에 붙여 넣으세요.</p>
+        <button type="button" class="pl-primary again" data-pl-lkcopy>Claude 채팅용으로 복사 · 열기</button>
+        ${L.copied === 'fail' ? '<p class="pl-error" role="alert">복사가 안 됐어요. 아래 "부탁 글 보기"를 열어 직접 복사해 주세요.</p>' : ''}
+        <label class="pl-own" for="plLinkAnswer"><span>Claude 답 붙여 넣기</span><textarea id="plLinkAnswer" class="pl-answer" placeholder="여기에 Claude의 답 붙여 넣기" aria-label="Claude의 답">${esc(L.answer)}</textarea></label>
+        <button type="button" class="pl-primary again" data-pl-lkparse>주제 만들기</button>
+        <details class="pl-peek"><summary>부탁 글 보기</summary><pre>${esc(res.prompt)}</pre></details></div>`;
+    const paste = res ? `<details class="pl-peek pl-paste" ${L.pasteOpen ? 'open' : ''}><summary>본문·댓글 직접 붙여 넣기</summary><p class="small">${esc(cfg.pasteHint)} 붙여 넣은 글이 있으면 사이트에서 읽은 내용 대신 이것을 써요.</p><textarea id="plLinkPaste" class="pl-answer" placeholder="여기에 붙여 넣기" aria-label="본문·댓글">${esc(L.paste)}</textarea><button type="button" class="pl-primary again" data-pl-lkpaste>이 내용으로 다시 만들기</button></details>` : '';
+    return input + read + opts + paste + `<details class="pl-peek pl-list"><summary>또는 목록에서 고르기</summary>${pickerBody(it)}<button type="button" class="pl-primary again" data-pl-lkcommit>이 주제로 정하기</button></details>`;
+  }
+  function linkStep1(c, S1) {
+    const S1body = S1.body;
+    return {
+      title: '링크로 주제 만들기', desc: '글 링크를 붙여 넣으면 주제 3개를 만들어 드려요. 링크가 안 읽히면 본문을 직접 붙여 넣을 수 있어요.',
+      noBtn: true, body: it => linkBody(c, it, S1body), run: () => {},
+    };
+  }
+
   function genericSteps(c) {
     const pf = PF_NAME[c], blog = c === 'blog', pbook = PLATFORM_PLAYBOOK[pf] || {};
     const S1 = {
@@ -261,6 +345,8 @@
       body: it => it.post ? '<p class="pl-note">원고가 이미 있어서 주제는 바꿀 수 없어요. 다른 글은 위의 <b>＋ 새 작업</b>으로 시작하세요.</p>' : pickerHtml(c, it),
       run: it => { if (commitTopic(c)) { T.view[c] = 0; repaint(c); } },
     };
+    const lf = c === 'insta' && !!IG_BY_ID[igCur()].linkFirst;
+    if (lf) Object.assign(S1, linkStep1(c, S1));
     const S2 = {
       id: 'draft', name: '초안', title: blog ? 'AI 초안 만들기' : '초안 만들기',
       desc: 'AI가 첫 초안을 써요. 직접 겪은 일은 [내 경험]으로 비워 두고, 확인 못 한 사실은 [확인 필요]로 표시해요.',
@@ -569,7 +655,7 @@
     }).join('')}</ol>`;
     const items = `<div class="pl-items"><label><span>작업 중</span><select data-pl-item aria-label="작업 중인 글">${list.length ? '' : '<option value="">작업 없음</option>'}${list.map(o => `<option value="${esc(o.key)}" ${o.key === cur ? 'selected' : ''}>${esc(o.label.length > 36 ? o.label.slice(0, 36) + '…' : o.label)}</option>`).join('')}</select></label><button type="button" class="pl-newbtn" data-pl-new>＋ 새 작업</button></div>`;
     const insta = c === 'insta' && igCur() === 'insta-sing' ? `<div class="pl-chips pl-instamode" role="group" aria-label="만들 것"><button type="button" class="pl-chip ${(it.kind || 'toon') === 'toon' ? 'on' : ''}" data-pl-instamode="toon">🎨 인스타툰</button><button type="button" class="pl-chip ${it.kind === 'post' ? 'on' : ''}" data-pl-instamode="post">🖼 카드뉴스·릴스</button></div>` : '';
-    const dis = !!(s.disabled && s.disabled(it)), hide = !!(s.hideBtn && s.hideBtn(it) && done[v]);
+    const dis = !!(s.disabled && s.disabled(it)), hide = !!(s.noBtn || (s.hideBtn && s.hideBtn(it) && done[v]));
     const attrs = s.attrs ? s.attrs(it) : 'data-pl-run';
     const btn = hide ? '' : `<button type="button" class="pl-primary ${done[v] ? 'again' : ''} ${s.cls || ''}" ${attrs} ${dis ? 'disabled' : ''}>${esc(val(s.btn, it))}</button>`;
     const res = s.result ? s.result(it) : '';
@@ -679,10 +765,16 @@
     const root = e.target.closest('#plRoot'); if (!root) return;
     const c = root.dataset.c, v = +root.dataset.v, t = e.target.closest('button, a'); if (!t) return;
     const ctx = () => evalSteps(c);
+    if (t.hasAttribute('data-pl-lkread')) { linkRead(c, false); return; }
+    if (t.hasAttribute('data-pl-lkpaste')) { linkRead(c, true); return; }
+    if (t.hasAttribute('data-pl-lkcopy')) { linkCopy(c); return; }
+    if (t.hasAttribute('data-pl-lkparse')) { linkParse(c); return; }
+    if (t.dataset.plLkpick !== undefined) { linkPick(c, +t.dataset.plLkpick); return; }
+    if (t.hasAttribute('data-pl-lkcommit')) { if (commitTopic(c)) { T.view[c] = 1; repaint(c, true); } return; }
     if (t.hasAttribute('data-pl-go')) { go(c, +t.dataset.plGo); return; }
     if (t.hasAttribute('data-pl-prev')) { go(c, Math.max(0, v - 1)); return; }
     if (t.hasAttribute('data-pl-next')) { go(c, v + 1); return; }
-    if (t.hasAttribute('data-pl-new')) { adapter(c).fresh(); T.view[c] = 0; T.err[c] = ''; T.manual[c] = false; T.askCopied[c] = false; repaint(c, true); return; }
+    if (t.hasAttribute('data-pl-new')) { adapter(c).fresh(); T.link[c] = null; T.view[c] = 0; T.err[c] = ''; T.manual[c] = false; T.askCopied[c] = false; repaint(c, true); return; }
     if (t.dataset.plPick) { T.pick[c] = t.dataset.plPick; T.custom[c] = ''; repaint(c, true); return; }
     if (t.hasAttribute('data-pl-more')) { T.page[c] = (T.page[c] || 0) + 1; repaint(c, true); return; }
     if (t.dataset.plYtpick) { selectYt(t.dataset.plYtpick); T.view.youtube = 0; repaint('youtube', true); return; }
@@ -723,12 +815,16 @@
   document.addEventListener('input', e => {
     const t = e.target, c = t.closest && t.closest('#plRoot') && t.closest('#plRoot').dataset.c;
     if (!c) return;
-    if (t.id === 'plCustom') T.custom[c] = t.value;
+    if (t.id === 'plLinkUrl') LK(c).url = t.value;
+    else if (t.id === 'plLinkPaste') LK(c).paste = t.value;
+    else if (t.id === 'plLinkAnswer') LK(c).answer = t.value;
+    else if (t.id === 'plCustom') T.custom[c] = t.value;
     else if (t.id === 'plAnswer') T.answer[c] = t.value;
     else if (t.dataset.plUrlinput) T.url[t.dataset.plUrlinput] = t.value;
     else if (t.hasAttribute('data-pl-caption')) { const p = c === 'insta' && window.InstaToon.current(); if (p) { p.caption = t.value; persist(); } }
     else if (t.dataset.yaNew) { if (t.dataset.yaNew === 'url') ytPipe.url = t.value; else ytPipe.ranges = t.value; }
   });
+  document.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing && e.target.id === 'plLinkUrl') { e.preventDefault(); const c = e.target.closest('#plRoot').dataset.c; linkRead(c, false); } });
   document.addEventListener('submit', e => { const f = e.target.closest('[data-pl-urlform]'); if (f) { e.preventDefault(); f.closest('#plRoot').querySelector('.pl-primary')?.click(); } });
 
   // ===== 스타일 =====
@@ -767,6 +863,22 @@
 .pl-card h2{font-size:24px;margin:4px 0 6px}
 .pl-desc{margin:0 0 16px;font-size:16px;color:#d5d9df}
 .pl-note{font-size:15px;color:#c3c8cf;margin:0 0 12px}
+.pl-link-in{display:grid;gap:10px;margin:0 0 14px}
+.pl-link-label{font-size:16px;font-weight:700;color:var(--text)}
+.pl-biginput{min-height:58px;font-size:18px}
+.pl-bigbtn{min-height:58px;font-size:19px;width:100%}
+.pl-link-read{display:flex;gap:14px;align-items:flex-start;border:1px solid var(--line);background:var(--panel2);border-radius:12px;padding:12px;margin:0 0 10px}
+.pl-link-thumb{width:112px;height:76px;object-fit:cover;border-radius:8px;flex:none;background:#0f1216}
+.pl-link-meta{display:grid;gap:3px;min-width:0;overflow-wrap:anywhere}
+.pl-warn{display:block;color:#ffd58a;background:#33291a;border:1px solid #5c4a24;border-radius:10px;padding:8px 12px;margin:8px 0;font-size:14px}
+.pl-link-opts{display:grid;gap:10px;margin:12px 0}
+.pl-link-opt{display:grid;gap:6px;text-align:left;padding:14px 16px;border-radius:12px;border:2px solid var(--line);background:var(--panel2);color:var(--text);font-size:16px;line-height:1.45;cursor:pointer}
+.pl-link-opt:hover,.pl-link-opt:focus-visible{border-color:var(--pc);outline:none}
+.pl-link-angle{font-size:14px;color:#c3c8cf}
+.pl-link-cards{margin:0;padding-left:20px;font-size:13px;color:var(--muted)}
+.pl-paste,.pl-list{margin-top:12px}
+.pl-paste textarea{margin:8px 0}
+@media(max-width:560px){.pl-link-read{flex-direction:column}.pl-link-thumb{width:100%;height:150px}}
 .pl-primary{display:flex;width:100%;align-items:center;justify-content:center;min-height:64px;padding:0 24px;margin:6px 0 4px;border-radius:14px;border:2px solid var(--lime);background:var(--lime);color:#14200e;font-size:20px;font-weight:800;cursor:pointer;text-align:center;line-height:1.3}
 .pl-primary:hover:not(:disabled){filter:brightness(1.07)}
 .pl-primary:disabled{opacity:.4;cursor:not-allowed}
