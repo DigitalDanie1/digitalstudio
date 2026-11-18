@@ -1,7 +1,9 @@
 // ===== YouTube 작업판: ⚡ 자동 실행 (맥 실행기 http://127.0.0.1:4777 와 연결) =====
 // 실행기는 ~/Desktop/유투브/실행기/실행기 켜기.command 로 켠다. 작업판은 버튼만 누르고, 실제 작업은 맥에서 돈다.
 const RUNNER = 'http://127.0.0.1:4777';
-let runnerData = null, runnerOnline = null, runnerBusy = false, runnerTimer = null, runnerOpenLog = null, runnerSelectedStep = null;
+const RUNNER_API_NEEDED = 3;  // 실행기 /health 의 api 가 이 숫자보다 작으면 예전 버전 안내
+const RUNNER_OLD_MSG = '<div class="ya-off pl-error" role="alert"><b>이 맥의 실행기가 예전 버전이에요.</b> 저장소를 <code>git pull</code> 한 뒤 <code>runner/설치·업데이트.command</code> 를 더블클릭하세요.</div>';
+let runnerData = null, runnerOnline = null, runnerOld = false, runnerBusy = false, runnerTimer = null, runnerOpenLog = null, runnerSelectedStep = null;
 // 주제 = 에피소드: 작업판에서 고른 주제(idea)에 연결된 에피소드만 보여 준다
 function runnerIdea() { return typeof ytPipeIdea === 'function' ? ytPipeIdea() : null; }
 function runnerEp() {
@@ -43,6 +45,9 @@ async function runnerFetch(p, body) {
   return data;
 }
 async function runnerRefresh() {
+  // 켜져는 있는데 예전 버전인지 확인 (api 숫자가 없거나 RUNNER_API_NEEDED 보다 작으면 예전 버전)
+  try { const h = await runnerFetch('/health'); runnerOld = !(Number.isInteger(h.api) && h.api >= RUNNER_API_NEEDED); }
+  catch (_) { runnerOld = false; }
   try { runnerData = await runnerFetch('/status'); runnerOnline = true; runnerSyncIdeas(); }
   catch (_) { runnerOnline = false; }
   const live = document.getElementById('ytAutoLive');
@@ -109,9 +114,11 @@ const RUN_LABEL = { done: '완료', running: '진행 중', failed: '실패', tod
 function runnerFileLink(ep, p, label) {
   return `<a class="btn ghost ya-file" href="${RUNNER}/file?ep=${encodeURIComponent(ep)}&path=${encodeURIComponent(p)}" target="_blank" rel="noopener noreferrer">${esc(label || p.split('/').pop())} ↗</a>`;
 }
-function ytAutoLive() {
+function ytAutoLive() { return (runnerOld && runnerOnline ? RUNNER_OLD_MSG : '') + ytAutoLiveBody(); }
+function ytAutoLiveBody() {
   if (runnerOnline === null) return '<p class="small">실행기 확인 중…</p>';
-  if (!runnerOnline) return `<div class="ya-off"><b>실행기가 꺼져 있어요.</b> 맥에서 <code>~/Desktop/유투브/실행기/실행기 켜기.command</code> 를 더블클릭하면 켜져요. 켜진 창은 닫지 마세요.<br><span class="small">다른 컴퓨터·휴대폰에서는 버튼이 동작하지 않아요(실행기는 이 맥에서만 돕니다). 크롬이 "로컬 네트워크 접근"을 물으면 허용을 누르세요.</span></div>`;
+  if (runnerOld && !runnerOnline) return RUNNER_OLD_MSG;
+  if (!runnerOnline) return `<div class="ya-off"><b>실행기가 꺼져 있어요.</b> 맥에서 <code>~/Desktop/유투브/실행기/실행기 켜기.command</code> 를 더블클릭하면 켜져요. 켜진 창은 닫지 마세요. 켜져 있는데도 이 글이 보이면 예전 버전일 수 있어요: <code>git pull</code> 후 <code>runner/설치·업데이트.command</code> 를 더블클릭하세요.<br><span class="small">다른 컴퓨터·휴대폰에서는 버튼이 동작하지 않아요(실행기는 이 맥에서만 돕니다). 크롬이 "로컬 네트워크 접근"을 물으면 허용을 누르세요.</span></div>`;
   const cur = runnerEp(), idea = runnerIdea();
   if (!idea) return runnerFlow(1) + '<p class="small">위에서 작업할 주제를 고르세요. 주제가 없으면 AI 주제 발굴이나 소스 탭에서 먼저 등록하세요.</p>';
   if (!cur) return runnerFlow(1) + `<div class="yaw-start"><b>이 주제는 아직 제작 전이에요.</b>
@@ -149,7 +156,7 @@ function ytAutoLive() {
       ${files.length ? `<ul class="ya-artifacts">${files.map(o => `<li>${runnerFileLink(cur.ep, o.path)}</li>`).join('')}</ul>` : '<p class="small">저장된 결과물이 없습니다.</p>'}
       ${runnerOpenLog === selected.id ? '<pre class="ya-log" id="yaLog">불러오는 중…</pre>' : ''}
     </section>` : '';
-  const fin = cur.steps.find(s => s.id === 'mix')?.outputs.find(o => o.exists) || cur.steps.find(s => s.id === 'finish')?.outputs.find(o => o.exists);
+  const fin = cur.steps.find(s => s.id === 'mix')?.outputs.find(o => o.exists) || cur.steps.find(s => s.id === 'fx')?.outputs.find(o => o.exists);
   const pack = cur.steps.find(s => s.id === 'upload')?.outputs.find(o => o.exists), script = cur.steps.find(s => s.id === 'script')?.outputs.find(o => o.exists);
   const result = `<section class="ya-result"><h3>③ 결과물 확인</h3>${fin ? `<div class="ya-result-grid"><video controls preload="metadata" playsinline src="${RUNNER}/file?ep=${encodeURIComponent(cur.ep)}&path=${encodeURIComponent(fin.path)}"></video>
       <div><p><b>${fin.path.includes('최종') ? '최종본 (목소리·음악 포함)' : '완성본 (목소리·음악 전)'}</b></p><ul class="ya-artifacts"><li>${runnerFileLink(cur.ep, fin.path, '영상 열기')}</li>${pack ? `<li>${runnerFileLink(cur.ep, pack.path, '업로드 패키지')}</li>` : ''}${script ? `<li>${runnerFileLink(cur.ep, script.path, '대본')}</li>` : ''}</ul>
@@ -237,6 +244,27 @@ document.addEventListener('click', async e => {
         if (!idea.ytStarted || idea.ytHidden) { idea.ytStarted = idea.ytStarted || Date.now(); delete idea.ytHidden; persist(); }
         runnerSelectedStep = runnerOpenLog = null;
         toast('에피소드를 만들었어요: ' + r.ep);
+      } else if (a === 'look') {
+        // ② 편집 레퍼런스: 에피소드가 없으면 만들고(구간은 컷 편집에서 정해요), 있으면 룩만 바꿔요
+        const look = act.dataset.yaLook || '', idea = runnerIdea(); if (!idea || !look) throw new Error('주제를 먼저 고르세요');
+        if (cur) { const r = await runnerFetch('/look', { ep: cur.ep, look }); toast(r.reset ? '룩을 바꿨어요. 컷 편집부터 다시 해 주세요.' : '룩을 정했어요.'); }
+        else {
+          let channel = ''; try { channel = (typeof ytValidCh === 'function' && ytValidCh(idea.ytChannel)) || (typeof ytChannelOfTopic === 'function' && ytChannelOfTopic(idea.topicId)) || (typeof ytTab === 'function' && ytTab()) || ''; } catch (e) { channel = ''; }
+          let voice = ''; try { voice = typeof ytChVoice === 'function' && channel ? ytChVoice(channel) : ''; } catch (e) { voice = ''; }
+          const url = (typeof ytPipe === 'object' && ytPipe.url) || ytFirstUrl(idea);
+          const r = await runnerFetch('/episodes', { title: idea.title, note: idea.note || '', url, deferRanges: true, ideaId: idea.id, channel, voice, format: idea.ytFormat === 'long' ? 'long' : 'shorts', look });
+          if (!idea.ytStarted || idea.ytHidden) { idea.ytStarted = idea.ytStarted || Date.now(); delete idea.ytHidden; persist(); }
+          runnerSelectedStep = runnerOpenLog = null; toast('룩을 정했어요: ' + r.ep);
+        }
+        if (typeof ytPipe === 'object') { ytPipe.look = ''; ytPipe.lookIdea = ''; }
+      } else if (a === 'cut') {
+        // ④ 컷 편집: 구간 저장 → 자르기·편집 계획·가편집
+        const val = (document.querySelector('[data-ya-new="ranges"]')?.value || '').trim();
+        if (!val && !(cur.sources[0] && cur.sources[0].ranges.length)) throw new Error('쓸 구간을 넣어 주세요. (예: 0:30-0:42)');
+        if (val) await runnerFetch('/ranges', { ep: cur.ep, ranges: val });
+        await runnerFetch('/run', { ep: cur.ep, steps: ['clip', 'plan', 'rough'] }); runnerOpenLog = 'clip';
+        if (typeof ytPipe === 'object') ytPipe.ranges = '';
+        toast('컷 편집을 시작했어요.');
       } else if (a === 'addsrc') {
         const v = k => document.querySelector(`[data-ya-src="${k}"]`)?.value || '';
         await runnerFetch('/source', { ep: cur.ep, url: v('url'), ranges: v('ranges') });
@@ -248,10 +276,10 @@ document.addEventListener('click', async e => {
         try {
           await runnerFetch('/script', { ep: cur.ep, text }).catch(e => { e.fromSave = true; throw e; });
           const r = await runnerFetch('/continue', { ep: cur.ep }); runnerSelectedStep = runnerOpenLog = r.from || null;
-          st.loaded = false; st.text = null; toast('대본을 저장했어요. 편집 단계부터 이어서 돌아요.');
+          st.loaded = false; st.text = null; toast('대본을 저장했어요. 이제 녹음할 수 있어요.');
         } finally { st.busy = false; }
       }
-      else if (a === 'continue') { const r = await runnerFetch('/continue', { ep: cur.ep }); runnerSelectedStep = runnerOpenLog = r.from || null; toast('편집 단계부터 이어서 돌아요.'); }
+      else if (a === 'continue') { const r = await runnerFetch('/continue', { ep: cur.ep }); runnerSelectedStep = runnerOpenLog = r.from || null; toast('대본을 확인했어요. 이제 녹음할 수 있어요.'); }
       else if (a === 'stop') { await runnerFetch('/stop', { ep: cur.ep }); toast('멈췄어요.'); }
       else if (a === 'open') { await runnerFetch('/open', { ep: cur.ep }); }
     }
@@ -276,7 +304,7 @@ async function recLoad() {
 }
 function recPanel() {
   const L = recState.lines, done = L.filter(l => l.file).length;
-  if (!L.length) return `<div class="ya-rec"><p class="small">6단계(자막·효과 완성본)가 끝나야 녹음할 줄이 생겨요.</p></div>`;
+  if (!L.length) return `<div class="ya-rec"><p class="small">대본을 확인하면 녹음할 줄이 생겨요.</p></div>`;
   const opt = (list, v) => `<option value="">없음</option>` + list.map(f => `<option value="${esc(f)}" ${f === v ? 'selected' : ''}>${esc(f)}</option>`).join('');
   return `<div class="ya-rec"><div class="ya-rec-head"><b>🎙 녹음 ${done}/${L.length}줄</b><span class="small">줄을 고르고 <kbd>스페이스</kbd> = 녹음 시작/멈춤 · 멈추면 다음 줄로 넘어가요 · 칸보다 길면 최대 1.25배까지 자동으로 맞춤</span></div>
     <ol class="ya-lines">${L.map((l, i) => { const rec = recState.idx === i; return `<li class="ya-line ${i === recState.sel ? 'sel' : ''} ${rec ? 'rec' : ''}" data-ya-sel="${i}">

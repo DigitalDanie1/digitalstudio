@@ -445,20 +445,26 @@
   }
 
   // ===== YouTube (맥 실행기 단계를 같은 틀에 그린다) =====
-  const YT_DESC = {
-    script: '대본을 만들어요. 다 되면 한 번 읽어 보고 계속 진행하세요.',
-    mix: '대본 줄마다 내 목소리를 녹음하고, 배경음악을 골라 합쳐요.',
-    finish: '자막과 효과를 얹은 완성본을 만들어요.',
-    upload: '제목·설명란·태그·썸네일 문구를 한 파일로 만들어요.',
-  };
+  // 유튜브 작업 순서 (모든 채널·형식 같음): 링크 제공 → 편집 레퍼런스 선택 → 링크 영상 다운 → 컷 편집 → 자막 자동화 → 이펙트 → 음악/녹음(대본 포함) → 업로드 패키지 → 올리기
+  // 편집 룩 목록: 실행기 /status 의 looks 와 같아요. 실행기가 꺼져 있어도 고를 수 있게 여기에도 둬요.
+  const YT_LOOKS = [
+    { id: 'yt-wrestling', name: '기본 룩', desc: '흰 자막 + 첫 1.5초 제목 카드 (레슬링 채널 기본)' },
+    { id: 'yt-christian', name: '배너 룩', desc: '남색 배너 + 민트 강조 + 흑백 인트로 + 한·영 자막 (기독교 채널 기본)' },
+    { id: 'yt-politics', name: '펀치 룩', desc: '첫 1초 훅 제목 + 굵은 자막 + 노란 강조 + 워터마크 (정치 채널 기본)' },
+  ];
+  const ytLooks = () => (runnerData && runnerData.looks && runnerData.looks.length ? runnerData.looks : YT_LOOKS);
+  const ytLookDefault = ch => (YT_LOOKS.some(l => l.id === ch) ? ch : 'yt-wrestling');
+  const ytLookPick = (it, ep) => (it.idea && ytPipe.lookIdea === it.idea.id && ytPipe.look) || (ep && ep.look) || ytLookDefault(ytCh(it.idea));
   const YT_GROUPS = [
-    { id: 'g-script', name: '대본', ids: ['research', 'download', 'script'], desc: '소스를 확인하고 받아서 대본을 만들어요. 다 되면 한 번 읽어 보고 계속 진행하세요.', go: '대본 만들기' },
-    { id: 'g-edit', name: '편집', ids: ['plan', 'rough', 'finish'], desc: '편집 계획을 짜고, 가편집한 뒤 자막과 효과를 얹어요. 끝나면 위에서 바로 볼 수 있어요.', go: '편집 실행' },
-    { id: 'g-mix', name: '녹음·음악', ids: ['mix'], desc: '대본 줄마다 내 목소리를 녹음하고, 배경음악을 골라 합쳐요.', go: '녹음·음악 열기' },
+    { id: 'g-dl', name: '링크 영상 다운', ids: ['research', 'download'], desc: '링크의 영상을 맥에 통째로 받아요. 영어 자막이 있으면 같이 받아요.', go: '영상 받기' },
+    { id: 'g-cut', name: '컷 편집', ids: ['clip', 'plan', 'rough'], desc: '쓸 구간을 넣으세요. 한 구간은 15초까지예요. 구간을 잘라 이어 붙여 가편집을 만들어요.', go: '컷 편집 실행' },
+    { id: 'g-subs', name: '자막 자동화', ids: ['subs'], desc: '영상 속 말을 자동 자막으로 입혀요. 소스 영상의 자막을 쓰고, AI 키가 있으면 한국어로 옮겨요.', go: '자막 넣기' },
+    { id: 'g-fx', name: '이펙트', ids: ['fx'], desc: '고른 룩의 배너·훅 제목·흑백 인트로·워터마크를 입혀요. 끝나면 위에서 바로 볼 수 있어요.', go: '이펙트 넣기' },
+    { id: 'g-voice', name: '음악/녹음', ids: ['script', 'mix'], desc: '대본을 만들고 한 번 읽어 본 뒤, 줄마다 내 목소리를 녹음하고 배경음악을 골라 합쳐요. 대본 자막도 이때 영상에 들어가요.', go: '대본 만들기' },
     { id: 'g-upload', name: '업로드 패키지', ids: ['upload'], desc: '제목·설명란·태그·썸네일 문구를 한 파일로 만들어요.', go: '업로드 패키지 만들기' },
   ];
-  const YT_STEP_NAME = { research: '소스 확인', download: '소스 받기', script: '대본', plan: '편집 계획', rough: '가편집', finish: '자막·효과', mix: '목소리·음악', upload: '업로드 패키지' };
-  const YT_PLACEHOLDER = ['링크 전달', '구간 정하기', ...YT_GROUPS.map(g => g.name), '올리기'];
+  const YT_STEP_NAME = { research: '소스 확인', download: '영상 받기', clip: '구간 자르기', plan: '편집 계획', rough: '가편집', subs: '자막 자동화', fx: '이펙트', script: '대본', mix: '목소리·음악', upload: '업로드 패키지' };
+  const YT_PLACEHOLDER = ['링크 제공', '편집 레퍼런스 선택', ...YT_GROUPS.map(g => g.name), '올리기'];
   // 실행기 단계들을 칸(그룹)으로 묶은 상태
   function ytGroupState(ep, g) {
     const sts = g.ids.map(id => (ep.steps || []).find(x => x.id === id)).filter(Boolean);
@@ -470,7 +476,7 @@
   // 편집 영상: 최종본 > 완성본 > 가편집
   function ytEditVideo(ep) {
     if (!ep) return null;
-    for (const [sid, file, label] of [['mix', '편집/최종본.mp4', '최종본'], ['finish', '편집/완성본.mp4', '완성본 (목소리 전)'], ['rough', '편집/가편집.mp4', '가편집 (자막 전)']]) {
+    for (const [sid, file, label] of [['mix', '편집/최종본.mp4', '최종본'], ['fx', '편집/완성본.mp4', '완성본 (목소리 전)'], ['subs', '편집/자막본.mp4', '자막본 (이펙트 전)'], ['rough', '편집/가편집.mp4', '가편집 (자막 전)']]) {
       const o = ((ep.steps || []).find(x => x.id === sid) || { outputs: [] }).outputs.find(x => x.path === file && x.exists);
       if (o) return { path: o.path, label, mtime: o.mtime };
     }
@@ -483,7 +489,7 @@
     const src = ytVideoSrc(it.ep, v);
     return `<section class="pl-player" id="ytPlayer" aria-label="편집본"><div class="pl-player-h"><b>편집본</b><span class="pl-player-v">${esc(v.label)}</span><a class="pl-link" href="${esc(src)}" target="_blank" rel="noopener noreferrer">새 창에서 열기 ↗</a></div><video id="ytPlayerVid" controls playsinline preload="metadata" src="${esc(src)}"></video></section>`;
   }
-  // ===== 링크 전달 (1단계): 유튜브 링크 → 제목 → 주제 =====
+  // ===== 링크 제공 (1단계): 유튜브 링크 → 제목 → 주제 =====
   const YL = { url: '', title: '', view: '', orig: '', author: '', state: '', vid: '', edited: false, timer: 0 };
   const YT_URL_RE = /^https?:\/\/(?:www\.|m\.)?(?:youtube\.com\/(?:watch\?(?:[^#]*&)?v=|shorts\/)|youtu\.be\/)([\w-]{6,})/;
   const ytVidOf = u => { const m = String(u || '').trim().match(YT_URL_RE); return m ? m[1] : ''; };
@@ -550,7 +556,7 @@
     const ep = it.ep, off = runnerOnline === false;
     const offMsg = '<p class="pl-error" role="alert"><b>실행기가 꺼져 있어요.</b> 맥에서 <code>~/Desktop/유투브/실행기/실행기 켜기.command</code> 를 더블클릭하세요. 켜진 창은 닫지 마세요.<br><span class="small">이 맥의 크롬에서만 돼요. "로컬 네트워크 접근"을 물으면 허용을 누르세요.</span></p>';
     const topic = {
-      id: 'topic', name: '링크 전달', title: '링크 전달', desc: '만들고 싶은 유튜브 영상 링크를 넣으세요. 그 영상으로 주제를 정해요.',
+      id: 'topic', name: '링크 제공', title: '링크 제공', desc: '만들고 싶은 유튜브 영상 링크를 넣으세요. 그 영상으로 주제를 정해요.',
       btn: '이 링크로 시작',
       hideBtn: it => !!it.idea,
       isDone: it => !!it.idea,
@@ -573,52 +579,65 @@
       },
       run: it => ytLinkStart(it),
     };
-    const src = {
-      id: 'src', name: '구간 정하기', title: '구간 정하기', desc: it => it.idea ? '쓸 구간을 넣으세요. 한 구간은 15초까지예요.' : '앞 단계를 끝내면 열려요.',
-      btn: '이 구간으로 제작 시작',
-      attrs: () => 'data-ya-act="create"',
-      disabled: it => !it.idea || off || runnerOnline === null,
-      hideBtn: it => !!it.ep,
-      isDone: it => !!it.ep,
-      result: it => it.ep ? `<b>${esc(it.ep.ep)}</b> 폴더 만듦 · 소스 ${it.ep.sources.length}개${it.ep.sources[0] ? ' · ' + esc(it.ep.sources[0].url) : ''}` : '',
+    const look = {
+      id: 'look', name: '편집 레퍼런스 선택', title: '편집 레퍼런스 선택', desc: it => it.idea ? '이 영상에 쓸 편집 룩을 고르세요. 처음엔 이 채널의 룩이 골라져 있어요.' : '앞 단계를 끝내면 열려요.',
+      btn: it => (it.ep ? '이 룩으로 바꾸기' : '이 룩으로 정하기'),
+      attrs: it => { const pick = ytLookPick(it, it.ep), ch = it.ep && it.ep.look && it.ep.look !== pick, cut = it.ep && (it.ep.steps || []).some(x => x.id === 'clip' && x.status === 'done');
+        return `data-ya-act="look" data-ya-look="${esc(pick)}"${ch && cut ? ' data-ya-confirm="룩을 바꾸면 컷 편집부터 다시 해야 해요. 대본과 받은 영상은 그대로예요. 계속할까요?"' : ''}`; },
+      disabled: it => !it.idea || off || runnerOnline === null || !!(it.ep && it.ep.running) || !!(it.ep && it.ep.look && it.ep.look === ytLookPick(it, it.ep)),
+      isDone: it => !!(it.ep && it.ep.look),
+      result: it => it.ep && it.ep.look ? `<b>${esc((ytLooks().find(l => l.id === it.ep.look) || { name: it.ep.look }).name)}</b>로 정했어요 · <span class="small">아래에서 다른 룩을 고르면 바꿀 수 있어요.</span>` : '',
       body: it => {
-        if (!it.idea || it.ep) return '';
-        const inputs = `<div class="pl-ya-form"><label>구간 (쉼표로 여러 개)<input class="pl-input" data-ya-new="ranges" placeholder="0:30-0:42, 1:05-1:12" value="${esc(ytPipe.ranges || '')}"></label><label class="small">소스 링크<input class="pl-input" data-ya-new="url" placeholder="https://www.youtube.com/watch?v=…" value="${esc(ytPipe.url || ytFirstUrl(it.idea))}"></label></div>`;
-        return (off ? offMsg : '') + inputs;
+        if (!it.idea) return '';
+        const pick = ytLookPick(it, it.ep), def = ytLookDefault(ytCh(it.idea));
+        const chips = `<div class="pl-looks" role="radiogroup" aria-label="편집 룩">${ytLooks().map(l => `<button type="button" role="radio" aria-checked="${pick === l.id}" class="pl-topic ${pick === l.id ? 'on' : ''}" data-ya-lookpick="${esc(l.id)}"><b>${esc(l.name)}${l.id === def ? ' · 이 채널 기본' : ''}</b><span class="small">${esc(l.desc)}</span></button>`).join('')}</div>`;
+        return (off ? offMsg : runnerOld ? RUNNER_OLD_MSG : '') + chips;
       },
       run: () => {},
     };
     const mid = YT_GROUPS.map(g => {
       const base = { id: g.id, name: g.name, title: g.name };
       if (!ep) return { ...base, desc: '앞 단계를 끝내면 열려요.', btn: g.go, disabled: () => true, isDone: () => false, result: () => '', run: () => {} };
-      const G = ytGroupState(ep, g), isMix = g.id === 'g-mix', scrPanel = g.id === 'g-script' && ytScriptShow(ep), saveMode = G.gate && scrPanel && ytScrBlocked(ep);
-      const stOf = id => ep.steps.find(x => x.id === id), scriptDone = stOf('script') && stOf('script').status === 'done' && !ep.gate;
-      const finishDone = stOf('finish') && stOf('finish').status === 'done';
+      const G = ytGroupState(ep, g), isVoice = g.id === 'g-voice', isCut = g.id === 'g-cut', scrPanel = isVoice && ytScriptShow(ep), saveMode = G.gate && scrPanel && ytScrBlocked(ep);
+      const stOf = id => ep.steps.find(x => x.id === id), okSt = id => !!stOf(id) && stOf(id).status === 'done';
+      const scriptDone = okSt('script') && !ep.gate, mixDone = okSt('mix');
       const todo = G.sts.filter(x => x.status !== 'done').map(x => x.id), all = g.ids.slice();
       const ids = G.done || !todo.length ? all : todo;
-      const locked = (g.id === 'g-edit' && !scriptDone) || (g.id === 'g-upload' && !finishDone);
+      // 앞 칸이 끝나야 열려요: 영상 다운 → 컷 편집 → 자막 → 이펙트 → (음악/녹음, 업로드 패키지)
+      const prev = { 'g-dl': null, 'g-cut': ['research', 'download'], 'g-subs': ['clip', 'plan', 'rough'], 'g-fx': ['subs'], 'g-voice': ['fx'], 'g-upload': ['fx'] }[g.id];
+      const locked = !!prev && !prev.every(okSt);
+      const lockMsg = { 'g-cut': '링크 영상을 먼저 받아 주세요.', 'g-subs': '컷 편집이 끝나면 열려요.', 'g-fx': '자막 자동화가 끝나면 열려요.', 'g-voice': '이펙트가 끝나면 열려요.', 'g-upload': '이펙트가 끝나면 열려요.' }[g.id];
       const desc = G.gate ? '대본이 만들어졌어요. 아래 결과에서 대본을 열어 읽어 보고, 괜찮으면 "대본 확인 완료 · 계속"을 누르세요.'
-        : g.id === 'g-edit' && ep.gate ? '먼저 앞 단계에서 대본을 읽고 확인해 주세요.' : g.id === 'g-edit' && !scriptDone ? '대본을 먼저 만들어 주세요.'
-        : g.id === 'g-upload' && !finishDone ? '편집이 끝나면 열려요.' : g.desc;
+        : locked ? lockMsg : isVoice && !scriptDone ? '먼저 대본을 만들어요. 다 되면 한 번 읽어 보고 계속 진행하세요.'
+        : isVoice ? '대본이 정해졌어요. "녹음·음악 열기"에서 줄마다 녹음하고 배경음악을 골라 "목소리·음악 넣기"를 누르세요.' : g.desc;
       const nameOf = id => (YT_STEP_NAME[id] || id);
+      const openRec = isVoice && scriptDone;
       return {
         ...base, desc,
-        btn: it => G.gate ? (saveMode ? '대본 저장하고 계속' : '대본 확인 완료 · 계속') : G.running ? '실행 멈춤' : isMix ? '녹음·음악 열기' : G.done ? '다시 실행' : G.failed ? '다시 실행' : g.go,
-        attrs: it => G.gate ? (saveMode ? 'data-ya-act="scriptsave"' : 'data-ya-act="continue"') : G.running ? 'data-ya-act="stop"' : isMix ? 'data-ya-recopen' : `data-ya-steps="${esc(ids.join(','))}"${G.done && g.ids.includes('script') ? ' data-ya-confirm="대본까지 처음부터 다시 만들어요. 직접 고친 대본은 사라져요. 계속할까요?"' : ''}`,
+        btn: it => G.gate ? (saveMode ? '대본 저장하고 계속' : '대본 확인 완료 · 계속') : G.running ? '실행 멈춤' : openRec ? (recState.open ? '녹음·음악 닫기' : '녹음·음악 열기') : G.done ? '다시 실행' : G.failed ? '다시 실행' : g.go,
+        attrs: it => G.gate ? (saveMode ? 'data-ya-act="scriptsave"' : 'data-ya-act="continue"') : G.running ? 'data-ya-act="stop"' : openRec ? 'data-ya-recopen' : isCut ? 'data-ya-act="cut"' : `data-ya-steps="${esc((isVoice ? ['script'] : ids).join(','))}"`,
         cls: G.running ? 'danger' : '',
         disabled: it => (!!ep.running && !G.running && !G.gate) || (locked && !G.running) || (G.gate && scrPanel && ytScrWaiting(ep)),
         isDone: it => G.done,
         statusLine: () => G.running ? `실행 중… (${nameOf(G.running.id)}) 끝나면 자동으로 바뀌어요.` : G.failed ? '실패했어요. 아래 로그를 보고 다시 실행하세요.' : '',
         result: it => {
           const parts = [];
-          if (G.failed && G.failed.error) parts.push(`<p class="pl-error"><b>${esc(G.failed.name)}</b> · ${esc(runnerFriendly(G.failed.error))}${g.id !== 'g-script' && /여기에 대사/.test(G.failed.error) ? ' <button type="button" class="pl-link" data-ya-goscript>대본 단계로 가기</button>' : ''}</p>`);
+          if (G.failed && G.failed.error) parts.push(`<p class="pl-error"><b>${esc(G.failed.name)}</b> · ${esc(runnerFriendly(G.failed.error))}${!isVoice && /여기에 대사/.test(G.failed.error) ? ' <button type="button" class="pl-link" data-ya-goscript>대본 단계로 가기</button>' : ''}</p>`);
           parts.push(`<p class="small pl-subs">${G.sts.map(x => `${esc(x.name)} ${x.status === 'done' ? '✓' : x.status === 'running' ? '…' : x.status === 'failed' ? '✕' : '·'}`).join(' · ')}</p>`);
           const files = G.sts.flatMap(x => x.outputs.filter(o => o.exists));
           parts.push(files.length ? `<ul class="pl-files">${files.map(o => `<li>${ytFileLink(ep.ep, o)}</li>`).join('')}</ul>` : (G.running ? '' : '<span class="small">아직 결과 파일이 없어요.</span>'));
+          if (isVoice && scriptDone && !G.running) parts.push('<p class="small"><button type="button" class="pl-link" data-ya-steps="script" data-ya-confirm="대본을 처음부터 다시 만들어요. 직접 고친 대본은 사라지고, 녹음한 줄은 글이 바뀐 줄만 다시 녹음해야 해요. 계속할까요?">대본 다시 만들기</button></p>');
           parts.push(`<div class="pl-logs">${G.sts.map(x => `<button type="button" class="pl-link" data-pl-log="${esc(x.id)}" aria-expanded="${T.logOpen === x.id}">${esc(x.name)} 로그${T.logOpen === x.id ? ' 닫기' : ''}</button>`).join('')}</div>${G.sts.some(x => x.id === T.logOpen) ? '<pre class="pl-log" id="plLog">불러오는 중…</pre>' : ''}`);
           return parts.join('');
         },
-        body: it => (scrPanel ? ytScriptPanel(ep, saveMode) : '') + (isMix && recState.open ? `<div id="yaRec">${recPanel()}</div>` : ''),
+        body: it => {
+          let b = '';
+          if (isCut && !locked && !G.running) {
+            const cur = ((ep.sources && ep.sources[0] && ep.sources[0].ranges) || []).join(', ');
+            b += `<div class="pl-ya-form"><label>쓸 구간 (쉼표로 여러 개 · 한 구간은 15초까지)<input class="pl-input" data-ya-new="ranges" placeholder="0:30-0:42, 1:05-1:12" value="${esc(ytPipe.ranges || cur)}"></label></div>`;
+          }
+          return b + (scrPanel ? ytScriptPanel(ep, saveMode) : '') + (isVoice && recState.open ? `<div id="yaRec">${recPanel()}</div>` : '');
+        },
         run: () => {},
       };
     });
@@ -639,7 +658,7 @@
         recordUrl('youtube', it.key, it.idea, it.idea.title);
       },
     };
-    return [topic, src, ...mid, last];
+    return [topic, look, ...mid, last];
   }
   // ===== 유튜브 "작업 중" 카드 띠 =====
   const ytThumb = idea => { const v = ytVidOf(ytFirstUrl(idea)); return v ? `https://i.ytimg.com/vi/${v}/mqdefault.jpg` : ''; };
@@ -648,15 +667,15 @@
   function ytWipStatus(i) {
     const ep = ytEp(i);
     if (ep) {
-      const gs = YT_GROUPS.map(g => ({ g, G: ytGroupState(ep, g) })), n = 2 + gs.filter(x => x.G.done).length, nx = gs.find(x => !x.G.done);
+      const gs = YT_GROUPS.map(g => ({ g, G: ytGroupState(ep, g) })), n = 1 + (ep.look ? 1 : 0) + gs.filter(x => x.G.done).length, nx = gs.find(x => !x.G.done);
       const b = [];
       if (ep.running) b.push('<i class="b run">실행 중</i>');
       if (ep.gate) b.push('<i class="b gate">대본 확인 필요</i>');
       if ((ep.steps || []).some(x => x.status === 'failed')) b.push('<i class="b fail">실패</i>');
       if (ytEditVideo(ep)) b.push('<i class="b vid">▶ 편집본</i>');
-      return `${n}/7 단계 · ${esc(nx ? nx.g.name : '올리기')}${b.length ? `<span class="pl-wbs">${b.join('')}</span>` : ''}`;
+      return `${n}/9 단계 · ${esc(nx ? nx.g.name : '올리기')}${b.length ? `<span class="pl-wbs">${b.join('')}</span>` : ''}`;
     }
-    return runnerOnline === false && !runnerData ? '실행기 꺼짐 · 상태 모름' : '구간 정하기 전';
+    return runnerOnline === false && !runnerData ? '실행기 꺼짐 · 상태 모름' : '편집 레퍼런스 선택 전';
   }
   function ytWipHtml(curId) {
     const list = ytWipList();
@@ -885,7 +904,7 @@
     afterPaint(root.dataset.c);
   }
   // 대본 단계로 돌아가기 (빈 대본 오류가 났을 때)
-  window.ytGoScript = function () { const { steps } = evalSteps('youtube'), k = steps.findIndex(x => x.id === 'g-script'); if (k >= 0) { T.view.youtube = k; repaint('youtube', true); } };
+  window.ytGoScript = function () { const { steps } = evalSteps('youtube'), k = steps.findIndex(x => x.id === 'g-voice'); if (k >= 0) { T.view.youtube = k; repaint('youtube', true); } };
   window.ytRepaint = function () { repaint('youtube'); };
   function afterPaint(c) {
     if (window.CodexImg) setTimeout(() => CodexImg.hydrate(), 0);
@@ -981,6 +1000,7 @@
     if (t.dataset.plWiphide) { const i = db.ideas.find(x => x.id === t.dataset.plWiphide); if (i && confirm('작업 중 목록에서 뺄까요?\n(영상과 작업 내용은 지워지지 않아요)')) { delete i.ytStarted; i.ytHidden = Date.now(); persist(); const sel = S.sel.youtube; if (sel && sel.ideaId === i.id) { S.sel.youtube = { empty: true }; ytPipe.ideaId = ''; T.ytSkipAdopt = false; T.ytPick = ''; save(); } render(); } return; }
     if (t.dataset.plYtpick) { selectYt(t.dataset.plYtpick); T.view.youtube = null; repaint('youtube', true); return; }
     if (t.dataset.plYlchip) { ylSetUrl(t.dataset.plYlchip, true); return; }
+    if (t.dataset.yaLookpick) { const { it } = ctx(); ytPipe.look = t.dataset.yaLookpick; ytPipe.lookIdea = it.idea ? it.idea.id : ''; repaint('youtube', true); return; }
     if (t.hasAttribute('data-pl-ytchange')) { ytLinkReset(); adapter('youtube').fresh(); T.view.youtube = 0; repaint('youtube', true); return; }
     if (t.dataset.plYsrc) { const u = t.dataset.plYsrc, i = document.querySelector('#plRoot [data-ya-new="url"]'); ytPipe.url = u; if (i) i.value = u; return; }
     if (t.dataset.plInstamode) { S.instaMode = t.dataset.plInstamode; save(); adapter('insta').fresh(); T.view.insta = 0; repaint('insta', true); return; }
