@@ -4,3 +4,4 @@ work/
 .git/
 .env
 .env.*
+runner/

@@ -1,0 +1,5 @@
+anthropic-key.txt
+version.txt
+backup-*/
+*.log
+.DS_Store

@@ -1,0 +1,62 @@
+{
+  "otter-c": {
+    "name": "싱달러 수달 부부 (C · 확정)",
+    "desc": "Daily-life webtoon page of an otter couple in Singapore: wife otter with a pink bow, husband otter with a yellow miner helmet and an S$ badge. Clean thin dark outlines, soft flat pastel colours, cute round faces with blush, three stacked horizontal panels per page with thin black frames, Singapore backdrops (HDB, Marina Bay, hawker/office lunch). Korean handwritten-style speech bubbles, small label tags, light-hearted tone. This is the version the owner chose."
+  },
+  "otter-a": {
+    "name": "싱달러 수달 부부 A",
+    "desc": "Earlier otter-couple variant (A) of the same Singapore daily-life toon: otter couple, soft pastel flat colour, thin outlines, speech bubbles in Korean."
+  },
+  "otter-b": {
+    "name": "싱달러 수달 부부 B",
+    "desc": "Earlier otter-couple variant (B) of the same Singapore daily-life toon: otter couple, soft pastel flat colour, thin outlines, speech bubbles in Korean."
+  },
+  "set-carousel-v2": {
+    "name": "TV 쇼 팝 (당신의 선택은?)",
+    "desc": "Community-story carousel in a retro TV-show frame: black TV set with antennae around the scene, bursting pink/yellow sunburst background, huge outlined yellow 'YOUR CHOICE?' lettering, two cartoon human characters (a couple) with expressive faces, EP badge pill, bold comic outlines, saturated pop colours."
+  },
+  "set-cute-carousel": {
+    "name": "귀여운 파스텔 (큰 제목)",
+    "desc": "Cute pastel carousel: sky-blue and pink flat background, giant bold white-filled cloud-shaped headline bubble with thick black outline, chibi couple with big round heads and blush, tiny sparkle/crack icons, rounded caption pill at the bottom, EP badge. English text."
+  },
+  "set-cute-carousel-kick": {
+    "name": "귀여운 + 장면 (킥)",
+    "desc": "Cute carousel with a full scene behind chibi characters: dusk city/mall backdrop in purple-pink gradient, big white headline in a spiky comic burst bubble, chibi couple with emotional expressions (tears, sweat drops), props like receipt, rounded caption bar. Thick outlines, bright colours."
+  },
+  "set-muted-carousel": {
+    "name": "차분한 뮤트 (감성)",
+    "desc": "Muted emotional carousel: warm cream/beige paper background, dark brown bold sans headline with a thin caption pill, softly drawn adult-proportion couple sitting apart, desaturated greens and tans, minimal props, lots of calm empty space. Quiet, grown-up tone."
+  },
+  "set-newborn-gym-video-carousel": {
+    "name": "영상 플레이어 프레임",
+    "desc": "Carousel made to look like a video player: scene art inside a rounded blue frame with a play button overlay, red progress bar and volume/fullscreen icons at the bottom, comment-box placeholders below, yellow headline banner, EP pill. Chibi family characters, bright colours."
+  },
+  "set-newborn-gym-signature-v2": {
+    "name": "시그니처 굵은 블루",
+    "desc": "Signature bold look: flat cornflower-blue background, huge white outlined comic headline ('NEWBORN AT HOME.') with a red tilted ribbon subtitle, chibi parents (mum holding baby, dad with gym bag) with big smiles and fists, alarm-clock icon, yellow EP burst, bottom red video progress bar. Thick black outlines, very graphic."
+  },
+  "set-newborn-gym-story-arc-v3": {
+    "name": "스토리 아크 (굵은 블루 · 연작)",
+    "desc": "Same bold blue signature look extended into an 8-card story arc: consistent chibi family cast, flat colour backgrounds that change by mood, huge outlined headlines, tilted ribbon subtitles, expressive faces, video-progress bar footer. Use for multi-card narratives with a clear beginning, conflict and twist."
+  },
+  "preview-a-cute": {
+    "name": "시안 A · 귀여움",
+    "desc": "Cute style: chibi couple at a Singapore hawker centre, soft sky background, huge white speech bubble with thick outline, bright pastel flat colours, cheerful tone."
+  },
+  "preview-b-emotional": {
+    "name": "시안 B · 감성 사실풍",
+    "desc": "Emotional semi-realistic illustration: adult-proportion couple at a hawker table, warm muted colours, detailed Singapore background (fans, stalls), rectangular caption box top-left, simple speech bubble. Soft film-like lighting."
+  },
+  "preview-c-hybrid": {
+    "name": "시안 C · 하이브리드",
+    "desc": "Hybrid: semi-realistic adults and detailed Singapore setting like B, but with the clean outline and flat shading of the cute style and a round comic speech bubble. Warm beige palette."
+  },
+  "toon-01-choice": {
+    "name": "배심원 · 당신의 선택은? 판",
+    "desc": "Single tall 'Your Choice?' vote page: dark TV-frame title bar at top, stacked comic panels telling the story (hawker date, rainy MRT regret), final black panel with PAUSE tag and 'WHAT WOULD YOU SAY?' with yellow and pink A/B answer buttons. Chibi couple, thick outlines, bright colours."
+  },
+  "toon-02-comment-jury": {
+    "name": "배심원 · 댓글 판결 판",
+    "desc": "Comment-jury page in the same 'Your Choice?' comic style: story recap panels, then a jury/comment section with A/B opinion cards and a final vote prompt. Chibi characters, thick outlines, bright flat colours."
+  }
+}
