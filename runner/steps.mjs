@@ -1,4 +1,4 @@
-// 8단계 구현. 각 단계는 (E, ctx) 를 받는다.
+// 10단계 구현. 각 단계는 (E, ctx) 를 받는다.
 //  E   = 에피소드 (E.dir, E.s = 저장되는 상태, E.p(...) = 폴더 안 경로)
 //  ctx = { log, aborted, setChild }
 import fs from 'node:fs';
@@ -10,14 +10,19 @@ import {
 
 export const STEP_DEFS = [
   { id: 'research', name: '소스 확인' },
-  { id: 'download', name: '소스 받기' },
-  { id: 'script', name: '대본', gate: true },
+  { id: 'download', name: '영상 받기' },
+  { id: 'clip', name: '구간 자르기' },
   { id: 'plan', name: '편집 계획' },
   { id: 'rough', name: '가편집' },
-  { id: 'finish', name: '자막·효과' },
+  { id: 'subs', name: '자막 자동화' },
+  { id: 'fx', name: '이펙트' },
+  { id: 'script', name: '대본', gate: true },
   { id: 'mix', name: '목소리·음악' },
   { id: 'upload', name: '업로드 패키지' },
 ];
+// 스튜디오 카드(9칸) 와 실행기 단계의 짝: 링크·룩 = 실행기 단계 없음 / 영상 다운 = research+download / 컷 편집 = 구간+clip+plan+rough /
+// 자막 = subs / 이펙트 = fx / 음악·녹음 = script(대본, 게이트) → 녹음 → mix / 업로드 패키지 = upload / 올리기 = 없음
+
 
 const SPEC = { shorts: { w: 1080, h: 1920, maxTotal: 58 }, long: { w: 1920, h: 1080, maxTotal: 600 } };
 const specOf = E => SPEC[E.s.format] || SPEC.shorts;
@@ -69,15 +74,23 @@ export const CHANNEL_PROFILES = {
   },
 };
 export const profileOf = E => CHANNEL_PROFILES[E?.s?.channel] || CHANNEL_PROFILES['yt-wrestling'];
+// 편집 룩: 영상마다 고를 수 있어요 (state.look). 비어 있으면 채널 자기 룩. 룩 이름 = 룩을 가진 채널 설정의 이름.
+export const LOOK_CHOICES = [
+  { id: 'yt-wrestling', name: '기본 룩', desc: '흰 자막 + 첫 1.5초 제목 카드 (레슬링 채널 기본)' },
+  { id: 'yt-christian', name: '배너 룩', desc: '남색 배너 + 민트 강조 + 흑백 인트로 + 한·영 자막 (기독교 채널 기본)' },
+  { id: 'yt-politics', name: '펀치 룩', desc: '첫 1초 훅 제목 + 굵은 자막 + 노란 강조 + 워터마크 (정치 채널 기본)' },
+];
+export const lookKeyOf = E => (CHANNEL_PROFILES[E?.s?.look] ? E.s.look : CHANNEL_PROFILES[E?.s?.channel] ? E.s.channel : 'yt-wrestling');
 // 배너 룩 기본값 (채널의 look 이 덮어써요). 글자 크기는 1080x1920 기준 px.
 export const LOOK_DEFAULTS = { kind: 'banner', bg: '#0E1B33', accent: '#3DE0C0', bannerH: 440, introBW: true, bilingual: true,
-  smallFs: 74, bigFs: 138, narrFs: 100, koFs: 76, enFs: 52, subTop: 1160 };
+  smallFs: 74, bigFs: 138, narrFs: 100, koFs: 76, enFs: 52, subTop: 1160,
+  subBox: true, boxAlpha: 0x1A, boxPad: 26, boxMinW: 1000, boxMinH: 330, subCy: 1215, boxR: 30, boxLineH: 1.12 };  // subBox: 자막 뒤 어두운 상자 (영상에 박힌 영어 자막 가리기)
 // 펀치 룩 기본값: 훅(처음 hookDur초, 화면 hookScale 크기) / 자막 / 펀치 한 단어 / 워터마크
 export const PUNCH_DEFAULTS = { kind: 'punch', accent: '#FFD400', hookFs: 140, hookScale: 0.78, hookDur: 1.3, hookY: 0.72, hookBord: 8,
-  capFs: 84, capY: 0.68, capBord: 6, punchFs: 160, punchY: 0.60, punchRot: -4, watermark: 'FIELDNOTE', wmFs: 68, wmX: 60, wmY: 140, font: '', punchFont: '' };
+  capFs: 84, capY: 0.68, capBord: 6, punchFs: 160, punchY: 0.60, punchRot: -4, subBox: false, boxAlpha: 0x1A, boxPad: 24, boxMinW: 1000, boxMinH: 260, boxR: 28, boxLineH: 1.12, watermark: 'FIELDNOTE', wmFs: 68, wmX: 60, wmY: 140, font: '', punchFont: '' };
 export const resolveLook = look => (look ? { ...(look.kind === 'punch' ? PUNCH_DEFAULTS : LOOK_DEFAULTS), ...look } : null);
 // 쇼츠일 때만 적용
-export const lookOf = E => (E?.s?.format === 'long' ? null : resolveLook(profileOf(E).look));
+export const lookOf = E => (E?.s?.format === 'long' ? null : resolveLook(CHANNEL_PROFILES[lookKeyOf(E)].look));
 
 // ---------- 영어 자막(VTT) 읽기 ----------
 const vttSecs = t => { const p = t.replace(',', '.').split(':').map(Number); return p.reduce((a, n) => a * 60 + n, 0); };
@@ -106,8 +119,8 @@ export function transcriptFor(cues, ranges) {
     return { range, text: parts.join(' ').replace(/\s+/g, ' ').trim() };
   });
 }
-// 영어 자막 받기. 실패해도 단계는 멈추지 않고 로그만 남겨요 (사용자가 멈춘 경우만 예외)
-async function fetchTranscript(E, url, id, ranges, ctx) {
+// 영어 자막(VTT) 받기. 못 받아도 단계는 멈추지 않고 로그만 남겨요 (사용자가 멈춘 경우만 예외). 돌려주는 값 = 에피소드 폴더 안 상대 경로 ('' = 없음)
+async function fetchSubs(E, url, id, ctx) {
   const dir = E.p('원본/자막');
   try {
     fs.mkdirSync(dir, { recursive: true });
@@ -117,27 +130,44 @@ async function fetchTranscript(E, url, id, ranges, ctx) {
     const files = fs.readdirSync(dir).filter(f => f.startsWith(id + '.') && f.endsWith('.vtt'));
     const pick = files.find(f => f === `${id}.en.vtt`) || files.find(f => /\.en-orig\.vtt$/.test(f)) || files[0];
     if (!pick) throw new Error('자막 파일 없음');
-    const tr = transcriptFor(parseVtt(fs.readFileSync(path.join(dir, pick), 'utf8')), ranges);
-    if (!tr.some(t => t.text)) throw new Error('구간에 자막 없음');
-    ctx.log(`  영어 자막 ${tr.reduce((a, t) => a + t.text.length, 0)}자를 읽었어요.`);
-    return tr;
+    ctx.log(`  영어 자막을 받았어요: ${pick}`);
+    return `원본/자막/${pick}`;
   } catch (e) {
     if (e instanceof StopError) throw e;
-    ctx.log('  영어 자막을 못 받았어요 → 대본은 제목·메모로만 써요');
-    return [];
+    ctx.log('  영어 자막을 못 받았어요 → 자막 자동화는 자막 없이 넘어가요');
+    return '';
   }
 }
+// 내 파일(video.mp4) 옆의 자막 파일: video.vtt / video.en.vtt / video.srt
+function sidecarSubs(file) {
+  const base = file.replace(/\.[^./]+$/, '');
+  return [base + '.vtt', base + '.en.vtt', base + '.srt'].find(exists) || '';
+}
+// 소스 하나의 영어 자막 줄들 [{start,end,text}] (없으면 [])
+export function cuesOf(E, s) {
+  const f = s.local ? sidecarSubs(localPath(s.url)) : (s.subFile ? E.p(s.subFile) : '');
+  try { return f && exists(f) ? parseVtt(fs.readFileSync(f, 'utf8')) : []; } catch { return []; }
+}
+// 쓸 구간은 에피소드 상태가 기준 (컷 편집에서 바뀔 수 있어요). 예전 소스.json 의 구간은 대신 쓰는 값.
+export const rangesFor = (E, si, s) => (E.s.sources[si]?.ranges?.length ? E.s.sources[si].ranges : (s?.ranges || []));
+// 대본 프롬프트용: 쓸 구간의 영어 발언
+const withTranscripts = (E, info) => info.map((s, si) => {
+  const tr = transcriptFor(cuesOf(E, s), rangesFor(E, si, s)).filter(t => t.text);
+  return tr.length ? { ...s, transcript: tr } : s;
+});
 
 // ---------- 결과 파일 목록 (client: outputs:[{path,exists}]) ----------
 export function outputsFor(id, E) {
   const list = (dir, re) => { try { return fs.readdirSync(E.p(dir)).filter(f => re.test(f)).sort().map(f => `${dir}/${f}`); } catch { return []; } };
   switch (id) {
     case 'research': return ['소스.json'];
-    case 'download': return list('클립', /\.mp4$/i);
+    case 'download': return list('원본', /^full_\d+\.[a-z0-9]+$/i);
+    case 'clip': return list('클립', /\.mp4$/i);
     case 'script': return ['편집/대본.md', ...(exists(E.p('편집/대본-요청.txt')) ? ['편집/대본-요청.txt'] : [])];
     case 'plan': return ['편집/편집계획.json'];
     case 'rough': return ['편집/가편집.mp4'];
-    case 'finish': return ['편집/완성본.mp4'];
+    case 'subs': return ['편집/자막본.mp4', ...(exists(E.p('편집/원본자막.ass')) ? ['편집/원본자막.ass'] : [])];
+    case 'fx': return ['편집/완성본.mp4'];
     case 'mix': return ['편집/최종본.mp4'];
     case 'upload': return ['업로드/업로드.txt', '업로드/업로드.json', '업로드/영상.mp4', '업로드/썸네일.jpg'];
     default: return [];
@@ -198,14 +228,14 @@ export function checkScript(E) {
   return lines;
 }
 
-// ---------- 1. 소스 확인 ----------
+// ---------- 1. 소스 확인 (스튜디오 ③ 링크 영상 다운) ----------
 async function research(E, ctx) {
   const srcs = E.s.sources;
   if (!srcs.length) throw new StepError('등록된 소스가 없어요. "이 에피소드에 소스 추가"로 영상 주소를 넣어 주세요.');
   const out = [];
   for (const [i, src] of srcs.entries()) {
     ctx.log(`소스 ${i + 1}/${srcs.length} 확인 중: ${src.url}`);
-    const ranges = parseRanges(src.ranges.length ? src.ranges : ['0:00-0:' + MAX_RANGE]);
+    const ranges = src.ranges.length ? parseRanges(src.ranges) : [];   // 구간은 ④ 컷 편집에서 정해요 (아직 없을 수 있어요)
     let info;
     if (isLocalSource(src.url)) {
       const f = localPath(src.url);
@@ -224,16 +254,38 @@ async function research(E, ctx) {
       const [, e] = rangeSecs(r);
       if (info.duration && e > info.duration + 0.5) throw new StepError(`구간 ${r} 이(가) 영상 길이(${fmtTime(info.duration)})를 넘어요.`);
     }
-    ctx.log(`  제목: ${info.title} · 길이 ${info.duration ? fmtTime(info.duration) : '?'} · 구간 ${ranges.join(', ')}`);
-    const item = { ...info, ranges };
-    if (!info.local && profileOf(E).transcript) item.transcript = await fetchTranscript(E, src.url, info.id, ranges, ctx);
-    out.push(item);
+    ctx.log(`  제목: ${info.title} · 길이 ${info.duration ? fmtTime(info.duration) : '?'}${ranges.length ? ' · 구간 ' + ranges.join(', ') : ' · 구간은 컷 편집에서 정해요'}`);
+    out.push({ ...info, ranges });
   }
   writeJson(E.p('소스.json'), out);
   ctx.log(`소스 ${out.length}개 확인 끝. 소스.json 저장.`);
 }
 
-// ---------- 2. 소스 받기 + 구간 자르기 ----------
+// ---------- 2. 영상 받기: 링크 영상을 통째로 (+ 영어 자막) ----------
+const SRC_FORMAT = 'bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080][ext=mp4]/b[ext=mp4]/b';
+async function download(E, ctx) {
+  const info = readJson(E.p('소스.json'));
+  if (!info) throw new StepError('소스 확인이 먼저예요. "소스 확인" 단계를 실행하세요.');
+  fs.mkdirSync(E.p('원본'), { recursive: true });
+  for (const [si, s] of info.entries()) {
+    if (s.local) { ctx.log(`소스 ${si + 1}/${info.length}: 내 파일이라 따로 받지 않아요.`); continue; }
+    const prefix = `full_${si + 1}`;
+    for (const f of fs.readdirSync(E.p('원본'))) if (f.startsWith(prefix + '.')) fs.rmSync(E.p('원본', f));
+    ctx.log(`소스 ${si + 1}/${info.length} 영상 받는 중: ${s.title}${s.duration ? ` (${fmtTime(s.duration)})` : ''}`);
+    try {
+      await run(YTDLP, ['--no-playlist', '--no-warnings', '--newline', '-f', SRC_FORMAT, '--merge-output-format', 'mp4',
+        '--ffmpeg-location', path.dirname(FFMPEG), '-o', E.p('원본', `${prefix}.%(ext)s`), s.url], { ...ctx, log: l => l && /download|Merg|ERROR/i.test(l) && ctx.log('  ' + l) }, { tee: true });
+    } catch (e) { if (e instanceof StopError) throw e; throw new StepError(`yt-dlp가 이 영상을 받지 못했어요: ${lastLines(e.err) || e.message}`); }
+    const got = fs.readdirSync(E.p('원본')).find(f => f.startsWith(prefix + '.') && !/\.part$|\.ytdl$/.test(f));
+    if (!got) throw new StepError('받은 파일을 찾지 못했어요.');
+    s.full = `원본/${got}`;
+    s.subFile = await fetchSubs(E, s.url, s.id, ctx);
+  }
+  writeJson(E.p('소스.json'), info);
+  ctx.log('영상 받기 끝.');
+}
+
+// ---------- 3. 구간 자르기 (스튜디오 ④ 컷 편집의 첫 단계) ----------
 function clipFilter(E) {
   const { w, h } = specOf(E);
   const look = lookOf(E);
@@ -243,46 +295,51 @@ function clipFilter(E) {
   return `[0:v]split=2[a][b];[a]scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},boxblur=40:6,eq=brightness=-0.12[bg];` +
     `[b]scale=${w}:${h}:force_original_aspect_ratio=decrease[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2,fps=30,format=yuv420p,setsar=1[v]`;
 }
-async function download(E, ctx) {
+// 클립 번호(clip_NN) 순서 = 소스 순서 × 구간 순서. 이 목록으로 클립이 어느 소스의 어디였는지 알아요.
+export const clipMap = E => E.s.sources.flatMap((s, si) => s.ranges.map(range => { const [a, b] = rangeSecs(range); return { si, range, a, b }; }));
+async function clip(E, ctx) {
   const info = readJson(E.p('소스.json'));
   if (!info) throw new StepError('소스 확인이 먼저예요. "소스 확인" 단계를 실행하세요.');
+  const map = clipMap(E);
+  if (!map.length) throw new StepError('구간이 아직 없어요. 컷 편집에서 쓸 구간을 먼저 넣어 주세요. (한 구간은 15초까지)');
+  if (info.length !== E.s.sources.length) throw new StepError('소스가 바뀌었어요. 소스 확인부터 다시 실행하세요.');
   fs.mkdirSync(E.p('원본'), { recursive: true });
   fs.mkdirSync(E.p('클립'), { recursive: true });
   for (const f of fs.readdirSync(E.p('클립'))) if (/^clip_\d+\.mp4$/.test(f)) fs.rmSync(E.p('클립', f));
-  let n = 0; const total = info.reduce((a, s) => a + s.ranges.length, 0);
-  for (const [si, s] of info.entries()) {
-    for (const [ri, r] of s.ranges.entries()) {
-      n++;
-      const [a, b] = rangeSecs(r), d = b - a, clip = E.p('클립', `clip_${String(n).padStart(2, '0')}.mp4`);
-      ctx.log(`[${n}/${total}] ${s.title} ${r} 받는 중…`);
-      let input, offset;
-      if (s.local) { input = localPath(s.url); offset = a; }
-      else {
-        const ps = Math.max(0, a - 1), pe = (s.duration ? Math.min(s.duration, b + 1) : b + 1), prefix = `s${si + 1}_${ri + 1}`;
-        for (const f of fs.readdirSync(E.p('원본'))) if (f.startsWith(prefix + '.')) fs.rmSync(E.p('원본', f));
-        try {
-          await run(YTDLP, ['--no-playlist', '--no-warnings', '--newline', '-f', 'bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080][ext=mp4]/b[ext=mp4]/b',
-            '--merge-output-format', 'mp4', '--download-sections', `*${ps}-${pe}`, '--force-keyframes-at-cuts',
-            '--ffmpeg-location', path.dirname(FFMPEG), '-o', E.p('원본', `${prefix}.%(ext)s`), s.url], { ...ctx, log: l => l && /download|Merg|ERROR/i.test(l) && ctx.log('  ' + l) }, { tee: true });
-        } catch (e) { if (e instanceof StopError) throw e; throw new StepError(`yt-dlp가 이 영상을 받지 못했어요: ${lastLines(e.err) || e.message}`); }
-        const got = fs.readdirSync(E.p('원본')).find(f => f.startsWith(prefix + '.') && !/\.part$|\.ytdl$/.test(f));
-        if (!got) throw new StepError('받은 파일을 찾지 못했어요.');
-        input = E.p('원본', got); offset = a - ps;
-      }
-      ctx.log(`  자르는 중 → ${path.basename(clip)} (${d}초, ${E.s.format === 'long' ? '가로' : '세로'})`);
+  const total = map.length;
+  for (const [n0, m] of map.entries()) {
+    const n = n0 + 1, s = info[m.si], a = m.a, b = m.b, d = b - a, clipFile = E.p('클립', `clip_${String(n).padStart(2, '0')}.mp4`);
+    if (s.duration && b > s.duration + 0.5) throw new StepError(`구간 ${m.range} 이(가) 영상 길이(${fmtTime(s.duration)})를 넘어요.`);
+    ctx.log(`[${n}/${total}] ${s.title} ${m.range} 자르는 중…`);
+    let input, offset;
+    const fullF = s.local ? localPath(s.url) : (s.full && exists(E.p(s.full)) ? E.p(s.full) : '');
+    if (fullF) { input = fullF; offset = a; }
+    else {   // 예전 에피소드: 통영상이 없으니 구간 앞뒤 1초만 받아요
+      const ps = Math.max(0, a - 1), pe = (s.duration ? Math.min(s.duration, b + 1) : b + 1), prefix = `s${m.si + 1}_${n}`;
+      for (const f of fs.readdirSync(E.p('원본'))) if (f.startsWith(prefix + '.')) fs.rmSync(E.p('원본', f));
+      ctx.log('  통영상이 없어서 이 구간만 받아요.');
       try {
-        await ff(['-ss', String(offset), '-t', String(d), '-i', input, '-filter_complex', clipFilter(E), '-map', '[v]', '-an',
-          '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', clip], ctx);
-      } catch (e) { if (e instanceof StopError) throw e; throw new StepError(`ffmpeg가 영상을 자르지 못했어요: ${lastLines(e.err)}`); }
-      if (!exists(clip)) throw new StepError('구간을 자르지 못했어요(영상이 짧은가요?).');
+        await run(YTDLP, ['--no-playlist', '--no-warnings', '--newline', '-f', SRC_FORMAT,
+          '--merge-output-format', 'mp4', '--download-sections', `*${ps}-${pe}`, '--force-keyframes-at-cuts',
+          '--ffmpeg-location', path.dirname(FFMPEG), '-o', E.p('원본', `${prefix}.%(ext)s`), s.url], { ...ctx, log: l => l && /download|Merg|ERROR/i.test(l) && ctx.log('  ' + l) }, { tee: true });
+      } catch (e) { if (e instanceof StopError) throw e; throw new StepError(`yt-dlp가 이 영상을 받지 못했어요: ${lastLines(e.err) || e.message}`); }
+      const got = fs.readdirSync(E.p('원본')).find(f => f.startsWith(prefix + '.') && !/\.part$|\.ytdl$/.test(f));
+      if (!got) throw new StepError('받은 파일을 찾지 못했어요.');
+      input = E.p('원본', got); offset = a - ps;
     }
+    ctx.log(`  자르는 중 → ${path.basename(clipFile)} (${d}초, ${E.s.format === 'long' ? '가로' : '세로'})`);
+    try {
+      await ff(['-ss', String(offset), '-t', String(d), '-i', input, '-filter_complex', clipFilter(E), '-map', '[v]', '-an',
+        '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', clipFile], ctx);
+    } catch (e) { if (e instanceof StopError) throw e; throw new StepError(`ffmpeg가 영상을 자르지 못했어요: ${lastLines(e.err)}`); }
+    if (!exists(clipFile)) throw new StepError('구간을 자르지 못했어요(영상이 짧은가요?).');
   }
-  ctx.log(`클립 ${n}개 완성.`);
+  ctx.log(`클립 ${total}개 완성.`);
 }
 
-// ---------- 3. 대본 (게이트) ----------
+// ---------- 대본 (게이트, 스튜디오 ⑦ 음악/녹음 안) ----------
 async function clipDurations(E, ctx) {
-  const files = outputsFor('download', E);
+  const files = outputsFor('clip', E);
   const out = [];
   for (const f of files) { const pr = await probe(E.p(f), ctx); out.push({ file: f, duration: pr.duration || 0 }); }
   return out;
@@ -300,23 +357,21 @@ export const promptFor = (E, info, clips, T) => {
   ];
   const look = lookOf(E);
   if (look?.kind === 'punch') {
-    // 펀치 룩: 한국어 자막만 + 훅 제목 + "!" 펀치 줄
+    // 펀치 룩: 한국어 자막만 + "!" 펀치 줄 (훅 제목은 이펙트 단계)
     rules.splice(0, rules.length, rules[0], rules[1], rules[2], rules[3], ...P.rules,
       '정책·주장·행동은 날카롭게 비판해도 되지만, 특정 국적·인종·종교의 사람들을 집단으로 조롱하거나 비하하지 마.',
-      '맨 앞에 훅 제목 한 줄: "> 훅: 훅 제목". 16자 이내, 두 줄로 나뉘어도 되게 짧고 세게. (처음 1초 동안 화면 위에 크게 나와요)',
       '대사 줄은 모두 한국어 자막이야. 영어 줄은 쓰지 마. 한 줄은 두 줄로 나뉘어 보여도 되게 24자 이내.',
       '장면이 확 바뀌는 순간에는 줄 맨 앞에 "!" 를 붙여 한 단어 펀치로 써 (예: "!그 순간!"). 전체에서 1~3개, 6자 이내.',
       '줄마다 핵심 단어 1~2개를 *별표*로 감싸 (노란색으로 강조돼요). 펀치 줄에는 안 써도 돼.',
-      '번호, 따옴표, 머리말, 설명 없이 훅 줄과 대사 줄만 출력해.');
+      '번호, 따옴표, 머리말, 설명 없이 대사 줄만 출력해. (훅 제목은 이펙트 단계에서 영상 제목으로 따로 만들어요)');
   } else if (look) {
     // 배너 룩: 한국어·영어 두 줄 자막 형식으로 받아요
     rules.splice(0, rules.length, rules[0], rules[1], rules[2], rules[3],
       ...P.rules.map(r => (r.startsWith('나레이션과 자막은 모두 한국어로만') ? '나레이션과 한국어 자막은 모두 한국어로만 써. 영어는 "|" 뒤 영어 원문 칸에만 써.' : r)),
-      '맨 앞에 배너 한 줄: "> 배너: 작은 줄 / 큰 줄". 작은 줄은 12자 이내(이 설교의 메시지를 던지는 훅), 큰 줄은 10자 이내(한 방 문장).',
       '그다음 "나레이션: " 으로 시작하는 줄 1~2개. 설교자가 누구인지(이름·직함)와 이 영상이 말하는 핵심을 한국어로 소개해.',
       '그다음부터는 "한국어 | English original" 형식. 한국어는 설교자의 말을 뜻이 바뀌지 않게 충실히 옮기고, | 뒤 영어는 영어 원문 자막에 나온 문장 그대로 써. 영어를 지어내지 마. 영어 원문이 없으면 | 와 영어는 빼고 한국어만.',
       '줄마다 핵심 단어 1~2개를 *별표*로 감싸 (한국어·영어 모두).',
-      '번호, 따옴표, 머리말, 설명 없이 배너 줄과 대사 줄만 출력해.');
+      '번호, 따옴표, 머리말, 설명 없이 대사 줄만 출력해. (배너 문구는 이펙트 단계에서 영상 제목으로 따로 만들어요)');
   }
   let said = '';
   if (P.transcript) {
@@ -351,19 +406,19 @@ async function callClaude(prompt, log) {
   return (j.content || []).map(c => c.text || '').join('\n');
 }
 async function script(E, ctx) {
-  const info = readJson(E.p('소스.json'), []), clips = exists(E.p('클립')) ? await clipDurations(E, ctx) : [];
+  const info0 = readJson(E.p('소스.json'), []), info = profileOf(E).transcript ? withTranscripts(E, info0) : info0;
+  const clips = exists(E.p('클립')) ? await clipDurations(E, ctx) : [];
   const T = Math.min(clips.reduce((a, c) => a + c.duration, 0) || 30, specOf(E).maxTotal);
   const f = E.p('편집/대본.md');
   fs.mkdirSync(E.p('편집'), { recursive: true });
   if (exists(f)) { fs.copyFileSync(f, E.p('편집/대본.bak.md')); ctx.log('이전 대본은 편집/대본.bak.md 로 백업했어요.'); }
   const prompt = promptFor(E, info, clips, T);
-  let lines = null, bannerRaw = '';
+  let lines = null;
   if (process.env.ANTHROPIC_API_KEY) {
     ctx.log('Claude에게 대본을 부탁하는 중…');
     try {
       const txt = await callClaude(prompt);
       lines = parseScript(txt.replace(/^["“”]|["“”]$/gm, '')).slice(0, 14);
-      const lk = lookOf(E); if (lk) bannerRaw = (lk.kind === 'punch' ? parseHook(txt) : parseBanner(txt))?.raw || '';
       if (!lines.length) throw new Error('빈 응답');
       ctx.log(`대본 ${lines.length}줄을 받았어요.`);
       fs.rmSync(E.p('편집/대본-요청.txt'), { force: true });
@@ -372,24 +427,22 @@ async function script(E, ctx) {
   const head = `# ${E.s.title}\n> 한 줄 = 자막 한 장면(25자 안팎). "#"·">" 로 시작하는 줄은 무시돼요.\n` +
     (E.s.note ? E.s.note.split(/\r?\n/).filter(Boolean).map(l => `> 메모: ${l}`).join('\n') + '\n' : '') + '\n';
   const look = lookOf(E);
-  if (lines) fs.writeFileSync(f, head + (bannerRaw ? `> ${look.kind === 'punch' ? '훅' : '배너'}: ${bannerRaw}\n` : '') + lines.join('\n') + '\n');
+  if (lines) fs.writeFileSync(f, head + lines.join('\n') + '\n');
   else if (look?.kind === 'punch') {
     const n = Math.max(4, Math.min(8, Math.round(T / 4)));
-    fs.writeFileSync(f, head + '> 아래 형식으로 채우세요. 훅 줄: "> 훅: 훅 제목" (16자 안팎, 처음 1초 동안 크게 나와요)\n' +
-      '> 자막 줄: 한국어 한 줄(24자 안팎). 강조할 단어는 *별표*로 감싸요 (노란색).\n' +
+    fs.writeFileSync(f, head + '> 아래 형식으로 채우세요. 자막 줄: 한국어 한 줄(24자 안팎). 강조할 단어는 *별표*로 감싸요 (노란색).\n' +
       '> 펀치 줄: 맨 앞에 !  (예: !그 순간!) → 한 단어를 크게 보여 줘요. 1~3개, 6자 안팎.\n' +
-      '> 예시: 이 *정책*, 정말 괜찮을까요?\n> 예시: !그 순간!\n' +
-      '> 훅: [여기에 훅 제목]\n' + Array(n).fill(PLACEHOLDER).join('\n') + '\n');
-    fs.writeFileSync(E.p('편집/대본-요청.txt'), prompt + '\n\n(받은 줄을 편집/대본.md 에 붙여 넣으세요. "> 훅:" 줄도 함께요.)\n');
+      '> 예시: 이 *정책*, 정말 괜찮을까요?\n> 예시: !그 순간!\n' + Array(n).fill(PLACEHOLDER).join('\n') + '\n');
+    fs.writeFileSync(E.p('편집/대본-요청.txt'), prompt + '\n\n(받은 줄을 편집/대본.md 에 붙여 넣으세요.)\n');
     ctx.log('편집/대본-요청.txt 에 Claude 채팅용 요청문을 적어 뒀어요.');
   } else if (look) {
     const n = Math.max(3, Math.min(6, Math.round(T / 4)));
-    fs.writeFileSync(f, head + '> 아래 형식으로 채우세요. 배너 줄: "> 배너: 작은 줄 / 큰 줄" (작은 줄 12자, 큰 줄 10자 안팎)\n' +
+    fs.writeFileSync(f, head + '> 아래 형식으로 채우세요.\n' +
       '> 나레이션 줄: "나레이션: 설교자 소개" (처음 1~2줄, 흑백 화면에 큰 글씨로 나와요)\n' +
       '> 자막 줄: "한국어 | English original" (영어는 영상 속 실제 발언). 강조할 단어는 *별표*로 감싸요.\n' +
       '> 예시: 나레이션: 미국의 *목사* 팀 켈러가 말해요\n> 예시: 고통 속에서도 *하나님*은 함께하세요 | Even in suffering, *God* is with you.\n' +
-      '> 배너: [여기에 작은 줄] / [여기에 큰 줄]\n나레이션: ' + PLACEHOLDER + '\n' + Array(n).fill(PLACEHOLDER + ' | [English original]').join('\n') + '\n');
-    fs.writeFileSync(E.p('편집/대본-요청.txt'), prompt + '\n\n(받은 줄을 편집/대본.md 에 붙여 넣으세요. "> 배너:" 줄도 함께요.)\n');
+      '나레이션: ' + PLACEHOLDER + '\n' + Array(n).fill(PLACEHOLDER + ' | [English original]').join('\n') + '\n');
+    fs.writeFileSync(E.p('편집/대본-요청.txt'), prompt + '\n\n(받은 줄을 편집/대본.md 에 붙여 넣으세요.)\n');
     ctx.log('편집/대본-요청.txt 에 Claude 채팅용 요청문을 적어 뒀어요.');
   } else {
     const n = Math.max(3, Math.min(8, Math.round(T / 4)));
@@ -401,7 +454,7 @@ async function script(E, ctx) {
   ctx.log('대본 확인 대기: 편집/대본.md 를 읽고 고친 뒤 "대본 확인 완료 · 계속"을 누르세요.');
 }
 
-// ---------- 4. 편집 계획 ----------
+// ---------- 4. 편집 계획 (대본 없이: 구간·클립만) ----------
 // 나레이션 줄이 보이는 구간들 (이어진 줄은 하나로 합쳐요) → [[시작,끝],...]
 export function bwSpans(L) {
   const out = [];
@@ -409,43 +462,53 @@ export function bwSpans(L) {
   return out;
 }
 async function plan(E, ctx) {
-  const lines = checkScript(E), look = lookOf(E);
-  const items = look ? lines.map(l => parseLine(l, look.kind)) : lines.map(text => ({ text }));
-  const clips = await clipDurations(E, ctx);
-  if (!clips.length) throw new StepError('클립이 없어요. "소스 받기"를 먼저 실행하세요.');
-  const max = specOf(E).maxTotal;
+  const look = lookOf(E), clips = await clipDurations(E, ctx);
+  if (!clips.length) throw new StepError('클립이 없어요. "구간 자르기"를 먼저 실행하세요.');
+  const map = clipMap(E), max = specOf(E).maxTotal;
   let T = 0; const used = [];
   for (const c of clips) {
     if (T >= max - 0.05) break;
     const d = Math.min(c.duration, max - T); if (d < 0.2) continue;
-    used.push({ file: c.file, start: +T.toFixed(3), duration: +d.toFixed(3) }); T += d;
+    const m = map[(+/clip_(\d+)/.exec(c.file)?.[1] || 0) - 1];   // 이 클립이 소스의 어디였는지 (자막 자동화가 써요)
+    used.push({ file: c.file, start: +T.toFixed(3), duration: +d.toFixed(3), ...(m ? { si: m.si, range: m.range, a: m.a, b: m.b } : {}) }); T += d;
   }
-  // 글자 수에 비례해 줄마다 시간 배분(최소 1.2초), 마지막 줄은 영상 끝까지
-  const weights = items.map(l => Math.max(4, [...l.text].length)), sumW = weights.reduce((a, b) => a + b, 0);
-  const minD = Math.min(1.2, T / items.length);
-  const spare = Math.max(0, T - minD * items.length);
-  let t = 0;
-  const L = items.map((it, i) => {
-    const d = minD + spare * weights[i] / sumW, start = t; t += d;
-    const end = i === items.length - 1 ? T : t;
-    const clip = used.findIndex(u => start >= u.start - 1e-6 && start < u.start + u.duration - 1e-6);
-    const o = { i, text: it.text, start: +start.toFixed(2), end: +end.toFixed(2), clip: Math.max(0, clip) };
-    if (look) Object.assign(o, { ko: it.ko, en: it.en, narr: it.narr, ...(look.kind === 'punch' ? { punch: !!it.punch } : {}) });  // 강조 별표가 남은 원문 (자막용)
+  const P = { title: E.s.title, format: E.s.format, width: specOf(E).w, height: specOf(E).h, total: +T.toFixed(2), clips: used, lines: [] };
+  if (look) P.look = look;
+  writeJson(E.p('편집/편집계획.json'), P);
+  for (const u of used) ctx.log(`  ${u.start.toFixed(1)}~${(u.start + u.duration).toFixed(1)}초 · ${path.basename(u.file)}${u.range ? ' · 원본 ' + u.range : ''}`);
+  ctx.log(`편집 계획 완성: 클립 ${used.length}개 · 총 ${T.toFixed(1)}초${look ? ' · ' + (look.kind === 'punch' ? '펀치 룩' : '배너 룩') : ' · 기본 룩'}`);
+  relayout(E, ctx);
+}
+
+// ---------- 대본 줄 → 시간표 (대본을 확인한 뒤, 녹음 전에) ----------
+const spread = (items, t0, t1) => {   // 글자 수에 비례해 줄마다 시간 배분(최소 1.2초), 마지막 줄은 끝까지
+  if (!items.length) return [];
+  const weights = items.map(l => Math.max(4, [...l.text].length)), sumW = weights.reduce((a, b) => a + b, 0), span = t1 - t0;
+  const minD = Math.min(1.2, span / items.length), spare = Math.max(0, span - minD * items.length);
+  let t = t0;
+  return items.map((it, i) => { const d = minD + spare * weights[i] / sumW, start = t; t += d; return { start, end: i === items.length - 1 ? t1 : t }; });
+};
+export function layoutLines(E, ctx) {
+  const lines = checkScript(E), look = lookOf(E), P = readJson(E.p('편집/편집계획.json'));
+  if (!P) throw new StepError('컷 편집이 먼저예요. "편집 계획"을 만들어 주세요.');
+  const items = look ? lines.map(l => parseLine(l, look.kind)) : lines.map(text => ({ text })), T = P.total;
+  const intro = look?.kind === 'banner' && P.bw?.[0] ? P.bw[0][1] : 0;   // 이펙트의 흑백 인트로 안에 나레이션 줄을 먼저 보여 줘요
+  let lead = 0; if (intro) while (lead < items.length && items[lead].narr) lead++;
+  const timed = lead && lead < items.length ? [...spread(items.slice(0, lead), 0, intro), ...spread(items.slice(lead), intro, T)] : spread(items, 0, T);
+  P.lines = items.map((it, i) => {
+    const { start, end } = timed[i], clipI = P.clips.findIndex(u => start >= u.start - 1e-6 && start < u.start + u.duration - 1e-6);
+    const o = { i, text: it.text, start: +start.toFixed(2), end: +end.toFixed(2), clip: Math.max(0, clipI) };
+    if (look) Object.assign(o, { ko: it.ko, en: it.en, narr: it.narr, ...(look.kind === 'punch' ? { punch: !!it.punch } : {}) });
     return o;
   });
-  const plan = { title: E.s.title, format: E.s.format, width: specOf(E).w, height: specOf(E).h, total: +T.toFixed(2), clips: used, lines: L };
-  if (look?.kind === 'punch') {
-    const h = parseHook(fs.readFileSync(E.p('편집/대본.md'), 'utf8')) || hookFromTitle(E.s.title);
-    plan.look = look; plan.hook = { text: h.text, dur: +Math.min(look.hookDur, T * 0.3).toFixed(2) }; plan.bw = [];
-    ctx.log(`  훅 제목: ${h.text} (처음 ${plan.hook.dur}초) · 펀치 ${L.filter(l => l.punch).length}줄`);
-  } else if (look) {
-    const b = parseBanner(fs.readFileSync(E.p('편집/대본.md'), 'utf8')) || bannerFromTitle(E.s.title);
-    plan.look = look; plan.banner = { small: b.small, big: b.big }; plan.bw = look.introBW ? bwSpans(L) : [];
-    ctx.log(`  배너: ${b.small || '(없음)'} / ${b.big}${plan.bw.length ? ` · 흑백 구간 ${plan.bw.map(([a, e]) => a + '~' + e + '초').join(', ')}` : ''}`);
-  }
-  writeJson(E.p('편집/편집계획.json'), plan);
-  for (const l of L) ctx.log(`  ${String(l.i + 1).padStart(2, '0')} ${l.start.toFixed(1)}~${l.end.toFixed(1)}초 · 클립${l.clip + 1} · ${l.text}`);
-  ctx.log(`편집 계획 완성: 클립 ${used.length}개 · 대사 ${L.length}줄 · 총 ${T.toFixed(1)}초`);
+  writeJson(E.p('편집/편집계획.json'), P);
+  ctx?.log?.(`대본 ${P.lines.length}줄을 영상(${T.toFixed(1)}초)에 배분했어요.`);
+  return P.lines;
+}
+// 대본이 이미 확인돼 있으면(예전 에피소드·다시 실행) 시간표를 자동으로 다시 짜요
+function relayout(E, ctx) {
+  if (E.s.steps?.script?.status !== 'done' || E.s.gate) return;
+  try { layoutLines(E, ctx); } catch (e) { ctx.log(`  대본 시간표는 나중에 다시 짜요: ${e.message}`); }
 }
 
 // ---------- 5. 가편집 ----------
@@ -453,7 +516,7 @@ async function rough(E, ctx) {
   const P = readJson(E.p('편집/편집계획.json'));
   if (!P) throw new StepError('편집 계획이 먼저예요.');
   const listFile = E.p('편집/concat.txt');
-  fs.writeFileSync(listFile, P.clips.map(c => `file '${E.p(c.file).replace(/'/g, "'\\''")}'\n` + (c.duration ? '' : '')).join(''));
+  fs.writeFileSync(listFile, P.clips.map(c => `file '${E.p(c.file).replace(/'/g, "'\\''")}'\n`).join(''));
   ctx.log(`클립 ${P.clips.length}개를 이어 붙이는 중…`);
   try {
     await ff(['-f', 'concat', '-safe', '0', '-i', listFile, '-t', String(P.total), '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-an', '-movflags', '+faststart', E.p('편집/가편집.mp4')], ctx);
@@ -479,19 +542,44 @@ function hlText(raw, wrapAt, accent) {
   const marked = String(raw || '').replace(/\*([^*\n]+)\*/g, '\u0001$1\u0002').replace(/\*/g, '');
   return assEsc(wrapKo(marked, wrapAt).join('\n')).replace(/\u0001/g, `{\\c&H${hexBgr(accent)}&}`).replace(/\u0002/g, '{\\c&HFFFFFF&}');
 }
-function buildBannerAss(P) {
+// 자막 뒤 상자: 글자 폭을 어림해서 크기를 정하고, 둥근 모서리 ASS 도형으로 그려요. 색은 look.bg(또는 검정) + 투명도 boxAlpha
+const chW = (c, fs) => (/\s/.test(c) ? 0.3 : c.charCodeAt(0) > 0x2e80 ? 0.95 : /[A-Z]/.test(c) ? 0.68 : 0.58) * fs;
+const lineW = (t, fs) => [...t].reduce((a, c) => a + chW(c, fs), 0);
+const plainLines = (raw, wrapAt) => wrapKo(String(raw || '').replace(/\*/g, ''), wrapAt);
+function boxEv(L, a, e, cx, y0, w, h, color) {
+  const x = Math.round(cx - w / 2), y = Math.round(y0), W = Math.round(w), H = Math.round(h), r = Math.min(L.boxR, Math.floor(H / 2));
+  const d = `m ${x + r} ${y} l ${x + W - r} ${y} b ${x + W} ${y} ${x + W} ${y} ${x + W} ${y + r} l ${x + W} ${y + H - r} b ${x + W} ${y + H} ${x + W} ${y + H} ${x + W - r} ${y + H} l ${x + r} ${y + H} b ${x} ${y + H} ${x} ${y + H} ${x} ${y + H - r} l ${x} ${y + r} b ${x} ${y} ${x} ${y} ${x + r} ${y}`;
+  return `Dialogue: 0,${assTime(a)},${assTime(e)},Bar,,0,0,0,,{\\p1\\pos(0,0)\\bord0\\shad0\\1c&H${hexBgr(color)}&\\1a&H${L.boxAlpha.toString(16).toUpperCase().padStart(2, '0')}&}${d}`;
+}
+// part: 'all' = 전부(예전과 같음) / 'fx' = 배너·훅·워터마크·제목 카드(이펙트 단계) / 'lines' = 대본 줄 자막(음악·녹음 단계)
+function buildBannerAss(P, part = 'all') {
   const L = P.look, W = P.width, H = P.height, BH = L.bannerH, ac = L.accent, midY = Math.round(BH + (H - BH) / 2), C = Math.round(W / 2);
   const fit = (text, fs) => Math.max(36, Math.min(fs, Math.floor((W - 120) / Math.max(1, [...text].length))));
   const ev = [], end = assTime(P.total), b = P.banner || { small: '', big: '' };
-  const bar = Math.round(BH * 0.47);
-  if (b.small) ev.push(`Dialogue: 2,${assTime(0)},${end},BanS,,0,0,0,,{\\an5\\pos(${C},${Math.round(BH * 0.30)})\\fs${fit(b.small, L.smallFs)}}${assEsc(b.small)}`);
-  ev.push(`Dialogue: 2,${assTime(0)},${end},Bar,,0,0,0,,{\\p1\\pos(0,0)\\bord0\\shad0}m ${C - 80} ${bar} l ${C + 80} ${bar} l ${C + 80} ${bar + 3} l ${C - 80} ${bar + 3}`);
-  if (b.big) ev.push(`Dialogue: 2,${assTime(0)},${end},BanB,,0,0,0,,{\\an5\\pos(${C},${Math.round(BH * 0.72)})\\fs${fit(b.big, L.bigFs)}}${assEsc(b.big)}`);
-  for (const l of P.lines) {
-    if (l.narr) ev.push(`Dialogue: 0,${assTime(l.start)},${assTime(l.end)},Narr,,0,0,0,,{\\an5\\pos(${C},${midY})}${hlText(l.ko ?? l.text, 9, ac)}`);
-    else {
-      const en = L.bilingual && l.en ? `\\N{\\fs${L.enFs}\\b0\\bord3\\shad1}${hlText(l.en, 34, ac)}` : '';
-      ev.push(`Dialogue: 0,${assTime(l.start)},${assTime(l.end)},Sub,,0,0,0,,${hlText(l.ko ?? l.text, 13, ac)}${en}`);
+  const bar = Math.round(BH * 0.47), fxOn = part !== 'lines', lnOn = part !== 'fx';
+  if (fxOn && b.small) ev.push(`Dialogue: 2,${assTime(0)},${end},BanS,,0,0,0,,{\\an5\\pos(${C},${Math.round(BH * 0.30)})\\fs${fit(b.small, L.smallFs)}}${assEsc(b.small)}`);
+  if (fxOn) ev.push(`Dialogue: 2,${assTime(0)},${end},Bar,,0,0,0,,{\\p1\\pos(0,0)\\bord0\\shad0}m ${C - 80} ${bar} l ${C + 80} ${bar} l ${C + 80} ${bar + 3} l ${C - 80} ${bar + 3}`);
+  if (fxOn && b.big) ev.push(`Dialogue: 2,${assTime(0)},${end},BanB,,0,0,0,,{\\an5\\pos(${C},${Math.round(BH * 0.72)})\\fs${fit(b.big, L.bigFs)}}${assEsc(b.big)}`);
+  for (const l of lnOn ? P.lines : []) {
+    const ly = L.subBox ? 1 : 0;  // 상자가 있으면 상자는 0층, 글자는 1층
+    if (l.narr) {
+      if (L.subBox) {
+        const ls = plainLines(l.ko ?? l.text, 9), h = Math.max(L.boxMinH, ls.length * L.narrFs * L.boxLineH + 2 * L.boxPad);
+        ev.push(boxEv(L, l.start, l.end, C, midY - h / 2, Math.max(L.boxMinW, Math.max(...ls.map(t => lineW(t, L.narrFs))) + 2 * L.boxPad), h, L.bg));
+      }
+      ev.push(`Dialogue: ${ly},${assTime(l.start)},${assTime(l.end)},Narr,,0,0,0,,{\\an5\\pos(${C},${midY})}${hlText(l.ko ?? l.text, 9, ac)}`);
+    } else {
+      const showEn = L.bilingual && l.en && !P.srcSubs;
+      let at = '';
+      const en = showEn ? `\\N{\\fs${L.enFs}\\b0\\bord3\\shad1}${hlText(l.en, 28, ac)}` : '';
+      if (L.subBox) {  // 한국어 + 영어를 상자 하나로
+        const ks = plainLines(l.ko ?? l.text, 13), es = showEn ? plainLines(l.en, 28) : [];
+        const th = (ks.length * L.koFs + es.length * L.enFs) * L.boxLineH, tw = Math.max(...ks.map(t => lineW(t, L.koFs)), ...es.map(t => lineW(t, L.enFs)));
+        const h = Math.max(L.boxMinH, th + 2 * L.boxPad);  // 최소 높이: 영상에 박힌 자막 두 줄쯤은 덮어요
+        ev.push(boxEv(L, l.start, l.end, C, L.subCy - h / 2, Math.max(L.boxMinW, tw + 2 * L.boxPad), h, L.bg));
+        at = `{\\an8\\pos(${C},${Math.round(L.subCy - th / 2)})}`;  // 글자는 상자 안 세로 가운데
+      }
+      ev.push(`Dialogue: ${ly},${assTime(l.start)},${assTime(l.end)},Sub,,0,0,0,,${at}${hlText(l.ko ?? l.text, 13, ac)}${en}`);
     }
   }
   const sty = (n, fs, col, bold, bord, sh, al, mv) => `Style: ${n},${FONT_NAME},${fs},&H00${col},&H000000FF,&H00000000,&H80000000,${bold},0,0,0,100,100,0,0,1,${bord},${sh},${al},60,60,${mv},1`;
@@ -515,17 +603,23 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 ${ev.join('\n')}
 `;
 }
-function buildPunchAss(P) {
+function buildPunchAss(P, part = 'all') {
   const L = P.look, W = P.width, H = P.height, C = Math.round(W / 2), ac = L.accent, y = f => Math.round(H * f);
   const font = L.font || FONT_NAME, pfont = L.punchFont || font, end = assTime(P.total), hd = P.hook?.dur || 0;
-  const ev = [];
-  if (P.hook?.text && hd > 0) ev.push(`Dialogue: 2,${assTime(0)},${assTime(hd)},Hook,,0,0,0,,{\\an5\\pos(${C},${y(L.hookY)})}${assEsc(wrapKo(P.hook.text, 7).slice(0, 2).join('\n'))}`);
-  for (const l of P.lines) {
+  const ev = [], fxOn = part !== 'lines', lnOn = part !== 'fx';
+  if (fxOn && P.hook?.text && hd > 0) ev.push(`Dialogue: 2,${assTime(0)},${assTime(hd)},Hook,,0,0,0,,{\\an5\\pos(${C},${y(L.hookY)})}${assEsc(wrapKo(P.hook.text, 7).slice(0, 2).join('\n'))}`);
+  for (const l of lnOn ? P.lines : []) {
     const a = Math.max(l.start, hd); if (a >= l.end - 0.01) continue;  // 훅이 나오는 동안은 자막을 쉬어요
     if (l.punch) ev.push(`Dialogue: 1,${assTime(a)},${assTime(l.end)},Punch,,0,0,0,,{\\an5\\pos(${C},${y(L.punchY)})\\frz${L.punchRot}\\fscx130\\fscy130\\t(0,120,\\fscx100\\fscy100)}${hlText(l.ko ?? l.text, 6, ac)}`);
-    else ev.push(`Dialogue: 0,${assTime(a)},${assTime(l.end)},Cap,,0,0,0,,{\\an5\\pos(${C},${y(L.capY)})}${hlText(l.ko ?? l.text, 11, ac)}`);
+    else {
+      if (L.subBox) {
+        const ls = plainLines(l.ko ?? l.text, 11), h = Math.max(L.boxMinH, ls.length * L.capFs * L.boxLineH + 2 * L.boxPad);
+        ev.push(boxEv(L, a, l.end, C, y(L.capY) - h / 2, Math.max(L.boxMinW, Math.max(...ls.map(t => lineW(t, L.capFs))) + 2 * L.boxPad), h, L.bg || '#000000'));
+      }
+      ev.push(`Dialogue: ${L.subBox ? 1 : 0},${assTime(a)},${assTime(l.end)},Cap,,0,0,0,,{\\an5\\pos(${C},${y(L.capY)})}${hlText(l.ko ?? l.text, 11, ac)}`);
+    }
   }
-  if (L.watermark) ev.push(`Dialogue: 3,${assTime(0)},${end},WM,,0,0,0,,{\\an7\\pos(${L.wmX},${L.wmY})\\frz4\\alpha&H40&}${assEsc(L.watermark)}`);
+  if (fxOn && L.watermark) ev.push(`Dialogue: 3,${assTime(0)},${end},WM,,0,0,0,,{\\an7\\pos(${L.wmX},${L.wmY})\\frz4\\alpha&H40&}${assEsc(L.watermark)}`);
   const sty = (n, f, fs, col, bord, sh, al) => `Style: ${n},${f},${fs},&H00${col},&H000000FF,&H00000000,&H96000000,1,0,0,0,100,100,0,0,1,${bord},${sh},${al},60,60,0,1`;
   return `[Script Info]
 ScriptType: v4.00+
@@ -546,14 +640,14 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 ${ev.join('\n')}
 `;
 }
-export function buildAss(P) {
-  if (P.look?.kind === 'punch' && P.height > P.width) return buildPunchAss(P);
-  if (P.look && P.height > P.width) return buildBannerAss(P);
+export function buildAss(P, part = 'all') {
+  if (P.look?.kind === 'punch' && P.height > P.width) return buildPunchAss(P, part);
+  if (P.look && P.height > P.width) return buildBannerAss(P, part);
   const W = P.width, H = P.height, short = H > W;
   const fs1 = short ? 84 : 58, marginV = short ? 460 : 70, wrapAt = short ? 12 : 30, tfs = short ? 92 : 64;
   const ev = [];
-  ev.push(`Dialogue: 1,${assTime(0)},${assTime(Math.min(1.5, P.total))},Title,,0,0,0,,{\\fad(150,300)}${assEsc(wrapKo(P.title, short ? 11 : 28).join('\n'))}`);
-  for (const l of P.lines) {
+  if (part !== 'lines') ev.push(`Dialogue: 1,${assTime(0)},${assTime(Math.min(1.5, P.total))},Title,,0,0,0,,{\\fad(150,300)}${assEsc(wrapKo(P.title, short ? 11 : 28).join('\n'))}`);
+  for (const l of part === 'fx' ? [] : P.lines) {
     ev.push(`Dialogue: 0,${assTime(l.start)},${assTime(l.end)},Cap,,0,0,0,,${assEsc(wrapKo(l.text, wrapAt).join('\n'))}`);
   }
   return `[Script Info]
@@ -574,13 +668,109 @@ ${ev.join('\n')}
 `;
 }
 const escFilterPath = p => p.replace(/\\/g, '\\\\').replace(/'/g, "\\\\\\'").replace(/:/g, '\\:').replace(/,/g, '\\,').replace(/\[/g, '\\[').replace(/\]/g, '\\]');
-async function finish(E, ctx) {
+
+// ---------- 6. 자막 자동화: 소스 영상 속 말(영어 자막)을 편집 타임라인에 맞춰 입혀요 ----------
+// 클립마다: 소스 구간과 겹치는 자막 줄 → 편집본 시간으로 옮기기
+export function srcCues(E, P, info) {
+  const out = [], cache = new Map();
+  for (const c of P.clips) {
+    if (c.si == null || c.a == null) continue;
+    if (!cache.has(c.si)) cache.set(c.si, info[c.si] ? cuesOf(E, info[c.si]) : []);
+    for (const q of cache.get(c.si)) {
+      const t = q.text.replace(/^>>+\s*/, '').trim();
+      if (!t || /^[\[(♪].*[\])♪]$/.test(t) || q.start >= c.b || q.end <= c.a) continue;
+      const start = c.start + Math.max(q.start, c.a) - c.a, end = Math.min(c.start + Math.min(q.end, c.b) - c.a, c.start + c.duration);
+      if (end - start < 0.2) continue;
+      out.push({ start: +start.toFixed(2), end: +end.toFixed(2), en: t });
+    }
+  }
+  return out.sort((x, y) => x.start - y.start);
+}
+// 영어 줄 → 한국어 번역 (키가 있을 때만). call(prompt) → 글. 실패하면 영어만 써요.
+export async function translateCues(cues, call, ctx) {
+  const out = cues.map(c => ({ ...c })); let done = 0;
+  for (let i = 0; i < out.length; i += 40) {
+    const chunk = out.slice(i, i + 40);
+    const prompt = `아래는 영상 속 영어 자막 ${chunk.length}줄이야. 줄마다 뜻이 바뀌지 않게 쉬운 한국어로 옮겨 줘. 설교·연설 말투는 그대로 두고, 없는 말을 지어내지 마.\n` +
+      `JSON 문자열 배열 하나만 출력해. 길이는 정확히 ${chunk.length}.\n\n${JSON.stringify(chunk.map(c => c.en))}`;
+    try {
+      const txt = await call(prompt), arr = JSON.parse((/\[[\s\S]*\]/.exec(txt) || [''])[0]);
+      if (!Array.isArray(arr) || arr.length !== chunk.length) throw new Error('줄 수가 안 맞아요');
+      chunk.forEach((c, k) => { if (typeof arr[k] === 'string' && arr[k].trim()) c.ko = arr[k].trim(); }); done += chunk.length;
+    } catch (e) { ctx?.log?.(`  번역 실패(${e.message}) → 이 부분은 영어로 둬요`); }
+  }
+  return out;
+}
+// 원본 자막 ASS: 룩에 맞는 모양, 화면 아래쪽 (대본 자막은 화면 가운데쪽이라 겹치지 않아요)
+export function buildSrcAss(P, cues) {
+  const short = P.height > P.width, look = P.look && short ? P.look : null, W = P.width, H = look?.kind === 'banner' ? P.height - look.bannerH : P.height;
+  const fs = short ? 56 : 42, mv = short ? 110 : 60, wrap = short ? 18 : 40, bil = look?.kind === 'banner' && look.bilingual;
+  const col = look?.kind === 'punch' ? hexBgr(look.accent) : 'FFFFFF', font = look?.font || FONT_NAME;
+  const ev = cues.map(c => {
+    const main = c.ko || c.en, sub = c.ko && bil ? c.en : '';
+    return `Dialogue: 0,${assTime(c.start)},${assTime(c.end)},Src,,0,0,0,,${assEsc(wrapKo(main, wrap).join('\n'))}${sub ? `\\N{\\fs${Math.round(fs * 0.7)}\\b0}${assEsc(wrapKo(sub, Math.round(wrap * 1.4)).join('\n'))}` : ''}`;
+  });
+  return `[Script Info]
+ScriptType: v4.00+
+PlayResX: ${W}
+PlayResY: ${H}
+WrapStyle: 2
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Src,${font},${fs},&H00${col},&H000000FF,&H00000000,&H96000000,1,0,0,0,100,100,0,0,1,5,2,2,60,60,${mv},1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+${ev.join('\n')}
+`;
+}
+async function subs(E, ctx) {
   const P = readJson(E.p('편집/편집계획.json'));
   if (!P) throw new StepError('편집 계획이 먼저예요.');
   if (!exists(E.p('편집/가편집.mp4'))) throw new StepError('가편집이 먼저예요.');
-  const assFile = E.p('편집/자막.ass');
-  fs.writeFileSync(assFile, buildAss(P));
+  const info = readJson(E.p('소스.json'), []), out = E.p('편집/자막본.mp4');
+  fs.rmSync(E.p('편집/원본자막.ass'), { force: true });
+  let cues = srcCues(E, P, info);
+  if (cues.length && process.env.ANTHROPIC_API_KEY) { ctx.log(`영어 자막 ${cues.length}줄을 한국어로 옮기는 중…`); cues = await translateCues(cues, callClaude, ctx); }
+  else if (cues.length && lookOf(E)?.kind === 'punch') ctx.log('  AI 키가 없어서 한국어로 못 옮겨요 → 영어 자막 그대로 넣어요.');
+  P.srcSubs = cues.length > 0; writeJson(E.p('편집/편집계획.json'), P);
+  try {
+    if (!cues.length) {
+      ctx.log('소스 영상에서 쓸 자막을 못 찾았어요. 자막 없이 넘어가요. (내 파일은 같은 이름의 .vtt/.srt 를 옆에 두면 읽어요)');
+      await ff(['-i', E.p('편집/가편집.mp4'), '-c', 'copy', '-an', '-movflags', '+faststart', out], ctx);
+    } else {
+      const assFile = E.p('편집/원본자막.ass'); fs.writeFileSync(assFile, buildSrcAss(P, cues));
+      ctx.log(`원본 자막 ${cues.length}줄을 입혀요${cues.some(c => c.ko) ? ' (한국어)' : ' (영어)'}…`);
+      await ff(['-i', E.p('편집/가편집.mp4'), '-vf', `ass='${escFilterPath(assFile)}':fontsdir='${FONT_DIR}'`, '-an', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '19', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', out], ctx);
+    }
+  } catch (e) { if (e instanceof StopError) throw e; throw new StepError(`ffmpeg가 자막을 입히지 못했어요: ${lastLines(e.err)}`); }
+  ctx.log('자막본.mp4 완성.');
+}
+
+// ---------- 7. 이펙트: 룩에 맞는 배너·훅·흑백 인트로·제목 카드·워터마크 ----------
+async function fx(E, ctx) {
+  const P = readJson(E.p('편집/편집계획.json'));
+  if (!P) throw new StepError('편집 계획이 먼저예요.');
+  const base = exists(E.p('편집/자막본.mp4')) ? '편집/자막본.mp4' : exists(E.p('편집/가편집.mp4')) ? '편집/가편집.mp4' : null;
+  if (!base) throw new StepError('가편집이 먼저예요.');
+  delete E.s.legacyBurn;   // 이 단계가 새 완성본을 만들면 예전 방식(대본 자막 포함)은 끝나요
   const look = P.look && P.height > P.width ? P.look : null, W = P.width, H = P.height;
+  // 문구는 영상 제목에서 (대본에 "> 배너:"/"> 훅:" 줄이 있으면 그걸 먼저 써요)
+  const txt = exists(E.p('편집/대본.md')) ? fs.readFileSync(E.p('편집/대본.md'), 'utf8') : '';
+  if (look?.kind === 'punch') {
+    const h = parseHook(txt) || hookFromTitle(E.s.title);
+    P.hook = { text: h.text, dur: +Math.min(look.hookDur, P.total * 0.3).toFixed(2) }; P.bw = [];
+    ctx.log(`  훅 제목: ${h.text} (처음 ${P.hook.dur}초)`);
+  } else if (look) {
+    const b = parseBanner(txt) || bannerFromTitle(E.s.title), end = +Math.min(look.introDur ?? 4, P.total * 0.3).toFixed(2);
+    P.banner = { small: b.small, big: b.big }; P.bw = look.introBW && end > 0 ? [[0, end]] : [];
+    ctx.log(`  배너: ${b.small || '(없음)'} / ${b.big}${P.bw.length ? ` · 흑백 인트로 0~${end}초` : ''}`);
+  }
+  writeJson(E.p('편집/편집계획.json'), P);
+  const assFile = E.p('편집/효과.ass');
+  fs.writeFileSync(assFile, buildAss(P, 'fx'));
   let vf = `ass='${escFilterPath(assFile)}':fontsdir='${FONT_DIR}'`, vArgs = ['-vf', vf, '-map', '0:v'];
   if (look?.kind === 'punch') {
     // 처음 hook.dur초는 화면을 줄여 검은 바탕에 놓고(훅 제목), 그다음은 꽉 찬 화면
@@ -590,28 +780,35 @@ async function finish(E, ctx) {
       ? `${full},split=2[f][s];[s]scale=${w2}:${h2},pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2:color=black[sm];[f][sm]overlay=0:0:enable='lt(t,${hd})',${vf}[v]`
       : `${full},${vf}[v]`;
     vArgs = ['-filter_complex', fc, '-map', '[v]'];
-    ctx.log(`훅 제목(처음 ${hd}초) + 굵은 자막 ${P.lines.length}줄을 입혀요…`);
+    ctx.log(`훅 제목(처음 ${hd}초) + 워터마크를 입혀요…`);
   } else if (look) {
-    // 영상은 아래 칸(배너 빼고)에 꽉 차게 → 흑백(나레이션 구간) → 위에 배너색 띠 → 글자
+    // 영상은 아래 칸(배너 빼고)에 꽉 차게 → 흑백(인트로) → 위에 배너색 띠 → 글자
     const bw = (P.bw || []).filter(([a, b]) => b > a);
     vf = `scale=${W}:${H - look.bannerH}:force_original_aspect_ratio=increase,crop=${W}:${H - look.bannerH},setsar=1` +
       (bw.length ? `,hue=s=0:enable='${bw.map(([a, b]) => `between(t,${a},${b})`).join('+')}'` : '') +
       `,pad=${W}:${H}:0:${look.bannerH}:color=0x${String(look.bg).replace('#', '')},` + vf;
     vArgs = ['-vf', vf, '-map', '0:v'];
-    ctx.log(`배너 + 자막 ${P.lines.length}줄을 입혀요${bw.length ? ' (나레이션 구간은 흑백)' : ''}…`);
-  } else ctx.log(`자막 ${P.lines.length}줄 + 제목 카드(처음 1.5초)를 입혀요…`);
+    ctx.log(`배너를 입혀요${bw.length ? ' (인트로는 흑백)' : ''}…`);
+  } else ctx.log('제목 카드(처음 1.5초)를 입혀요…');
   try {
-    await ff(['-i', E.p('편집/가편집.mp4'), '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo', ...vArgs,
+    await ff(['-i', E.p(base), '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo', ...vArgs,
       '-map', '1:a', '-shortest', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '19', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', E.p('편집/완성본.mp4')], ctx);
-  } catch (e) { if (e instanceof StopError) throw e; throw new StepError(`ffmpeg가 자막을 입히지 못했어요: ${lastLines(e.err)}`); }
-  ctx.log('완성본.mp4 완성 (목소리·음악은 다음 단계에서).');
+  } catch (e) { if (e instanceof StopError) throw e; throw new StepError(`ffmpeg가 이펙트를 입히지 못했어요: ${lastLines(e.err)}`); }
+  ctx.log('완성본.mp4 완성 (대본 자막·목소리·음악은 다음 단계에서).');
+  relayout(E, ctx);
 }
 
-// ---------- 7. 목소리·음악 ----------
+// ---------- 9. 목소리·음악 (스튜디오 ⑦ 음악/녹음 의 마지막 단계) ----------
+// 대본 줄 자막(배너 룩의 나레이션·한영 자막, 펀치 룩의 굵은 자막 등)은 여기서 영상에 입혀요. 예전 방식(완성본에 이미 들어 있음)이면 건너뛰어요.
 export async function mix(E, ctx) {
   const P = readJson(E.p('편집/편집계획.json'));
-  if (!P || !exists(E.p('편집/완성본.mp4'))) throw new StepError('자막·효과(완성본)가 먼저예요.');
+  if (P) P.lines = P.lines || [];
+  if (!P || !exists(E.p('편집/완성본.mp4'))) throw new StepError('이펙트(완성본)가 먼저예요.');
   const T = P.total, inputs = ['-i', E.p('편집/완성본.mp4')], chains = []; let idx = 1;
+  const burn = !E.s.legacyBurn && P.lines?.length > 0, capAss = E.p('편집/대본자막.ass');
+  if (burn) { fs.writeFileSync(capAss, buildAss(P, 'lines')); ctx.log(`대본 자막 ${P.lines.length}줄을 영상에 입혀요.`); }
+  else if (!P.lines?.length) ctx.log('대본 줄이 없어서 자막은 넣지 않아요.');
+  const capVf = `ass='${escFilterPath(capAss)}':fontsdir='${FONT_DIR}'`;
   const voiceLabels = [];
   for (const l of P.lines) {
     const v = E.s.voices?.[l.i];
@@ -651,13 +848,15 @@ export async function mix(E, ctx) {
   let args;
   if (mixIn.length) {
     chains.push(`${mixIn.join('')}amix=inputs=${mixIn.length}:normalize=0:duration=longest,apad=whole_dur=${T},alimiter=limit=0.95[aout]`);
-    args = [...inputs, '-filter_complex', chains.join(';'), '-map', '0:v', '-map', '[aout]'];
+    if (burn) chains.push(`[0:v]${capVf}[vout]`);
+    args = [...inputs, '-filter_complex', chains.join(';'), '-map', burn ? '[vout]' : '0:v', '-map', '[aout]'];
   } else {
     ctx.log('  녹음도 음악도 없어서 소리 없는 트랙으로 만들어요.');
-    args = [...inputs, '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo', '-map', '0:v', '-map', `${idx}:a`];
+    args = [...inputs, '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo', ...(burn ? ['-vf', capVf] : []), '-map', '0:v', '-map', `${idx}:a`];
   }
+  const vcodec = burn ? ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '19', '-pix_fmt', 'yuv420p'] : ['-c:v', 'copy'];
   try {
-    await ff([...args, '-t', String(T), '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', E.p('편집/최종본.mp4')], ctx);
+    await ff([...args, '-t', String(T), ...vcodec, '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', E.p('편집/최종본.mp4')], ctx);
   } catch (e) { if (e instanceof StopError) throw e; throw new StepError(`ffmpeg가 소리를 합치지 못했어요: ${lastLines(e.err)}`); }
   ctx.log('최종본.mp4 완성.');
 }
@@ -676,17 +875,17 @@ function assetPath(E, kind, name) {
   return null;
 }
 
-// ---------- 8. 업로드 패키지 ----------
+// ---------- 10. 업로드 패키지 ----------
 async function upload(E, ctx) {
   const P = readJson(E.p('편집/편집계획.json')), info = readJson(E.p('소스.json'), []);
   const video = exists(E.p('편집/최종본.mp4')) ? '편집/최종본.mp4' : exists(E.p('편집/완성본.mp4')) ? '편집/완성본.mp4' : null;
-  if (!P || !video) throw new StepError('완성본이 먼저예요. "자막·효과" 단계를 끝내세요.');
+  if (!P || !video) throw new StepError('완성본이 먼저예요. "이펙트" 단계를 끝내세요.');
   fs.mkdirSync(E.p('업로드'), { recursive: true });
   const short = E.s.format !== 'long';
   const title = (E.s.title + (short ? ' #Shorts' : '')).slice(0, 100);
-  const credits = info.map(s => `- ${s.channel ? s.channel + ' · ' : ''}${s.title} (${s.local ? '내 파일' : s.url}) · 사용 구간 ${s.ranges.join(', ')}`);
+  const credits = info.map((s, si) => `- ${s.channel ? s.channel + ' · ' : ''}${s.title} (${s.local ? '내 파일' : s.url}) · 사용 구간 ${rangesFor(E, si, s).join(', ')}`);
   const music = [E.s.mix?.bgm && `배경음악: ${E.s.mix.bgm}`, E.s.mix?.sting && `효과음: ${E.s.mix.sting}`].filter(Boolean);
-  const desc = [E.s.note || P.lines.slice(0, 2).map(l => l.text).join(' '), '', '[소스]', ...(credits.length ? credits : ['- (없음)']),
+  const desc = [E.s.note || (P.lines || []).slice(0, 2).map(l => l.text).join(' ') || E.s.title, '', '[소스]', ...(credits.length ? credits : ['- (없음)']),
     ...(music.length ? ['', '[음악·효과음]', ...music.map(m => '- ' + m)] : []), '', profileOf(E).disclaimer].join('\n');
   const words = [...new Set(E.s.title.replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(w => w.length >= 2))].slice(0, 6);
   const tags = [...words, ...profileOf(E).tags, ...(short ? ['Shorts'] : [])];
@@ -695,10 +894,26 @@ async function upload(E, ctx) {
   let thumb = null;
   try { await ff(['-ss', '1', '-i', dest, '-frames:v', '1', '-q:v', '2', E.p('업로드/썸네일.jpg')], ctx); thumb = '업로드/썸네일.jpg'; }
   catch (e) { if (e instanceof StopError) throw e; ctx.log('썸네일을 못 뽑았어요: ' + lastLines(e.err)); }
-  const pack = { title, description: desc, tags, format: short ? 'shorts' : 'long', video: '업로드/영상.mp4', fromVideo: video, thumbnail: thumb, sources: info.map(s => ({ url: s.url, title: s.title, channel: s.channel, ranges: s.ranges })), script: P.lines.map(l => l.text), created: new Date().toISOString() };
+  const pack = { title, description: desc, tags, format: short ? 'shorts' : 'long', video: '업로드/영상.mp4', fromVideo: video, thumbnail: thumb, sources: info.map((s, si) => ({ url: s.url, title: s.title, channel: s.channel, ranges: rangesFor(E, si, s) })), script: (P.lines || []).map(l => l.text), created: new Date().toISOString() };
   writeJson(E.p('업로드/업로드.json'), pack);
   fs.writeFileSync(E.p('업로드/업로드.txt'), `제목\n${title}\n\n설명란\n${desc}\n\n태그\n${tags.join(', ')}\n\n형식: ${short ? '쇼츠' : '롱폼'}\n영상: 업로드/영상.mp4 (${video.includes('최종') ? '최종본' : '완성본 · 목소리·음악 전'})\n썸네일: ${thumb || '(없음)'}\n\n※ 실행기는 유튜브에 직접 올리지 않아요. YouTube Studio에서 위 내용을 복사해 올리세요.\n`);
   ctx.log(`업로드 패키지 완성 (${video.includes('최종') ? '최종본' : '완성본'} 사용).`);
 }
 
-export const STEP_FN = { research, download, script, plan, rough, finish, mix, upload };
+// ---------- 예전 에피소드(8단계) → 새 단계로 옮기기 ----------
+// download(구간만 받기) → download 그대로 / clip = download 가 끝났으면 끝남 / subs = 예전 finish 가 끝났으면 끝남(대본 자막이 이미 들어 있어서 legacyBurn)
+// fx = 예전 finish 의 상태·오류 그대로. 룩은 그때 쓰던 채널 룩을 그대로 못 박아요.
+export function migrateState(s) {
+  if (!s.steps) s.steps = {};
+  if (s.steps.finish || !s.steps.fx) {
+    const old = s.steps, fin = old.finish || { status: 'todo' };
+    if (!old.clip) old.clip = { status: old.download?.status === 'done' ? 'done' : 'todo' };
+    if (!old.subs) old.subs = { status: fin.status === 'done' ? 'done' : 'todo' };
+    if (!old.fx) old.fx = { ...fin };
+    if (fin.status === 'done') s.legacyBurn = true;
+    delete old.finish;
+    if (!s.look) s.look = CHANNEL_PROFILES[s.channel] ? s.channel : 'yt-wrestling';
+  }
+  return s;
+}
+export const STEP_FN = { research, download, clip, plan, rough, subs, fx, script, mix, upload };

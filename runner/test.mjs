@@ -6,14 +6,14 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { FFMPEG, probe, run } from './util.mjs';
-import { CHANNEL_PROFILES, profileOf, promptFor, parseVtt, transcriptFor, parseScript, parseHook, hookFromTitle, parseLine, parseBanner, bannerFromTitle, bwSpans, buildAss, resolveLook, lookOf } from './steps.mjs';
+import { CHANNEL_PROFILES, profileOf, promptFor, parseVtt, transcriptFor, parseScript, parseHook, hookFromTitle, parseLine, parseBanner, bannerFromTitle, bwSpans, buildAss, resolveLook, lookOf, LOOK_CHOICES, lookKeyOf, migrateState, srcCues, translateCues, buildSrcAss, STEP_DEFS } from './steps.mjs';
 // 옛 버전과 비교하는 검사: backup-20261118-banner 폴더가 있는 맥에서만 실행 (없으면 건너뜀)
 let oldBuildAss = null;
 try { ({ buildAss: oldBuildAss } = await import('./backup-20261118-banner/steps.mjs')); } catch {}
 const sameAsOld = P => { if (oldBuildAss) assert.equal(buildAss(P), oldBuildAss(P)); };
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'runner-test-'));
-const PORT = +(process.env.FIELDNOTE_TEST_PORT || 4790), B = `http://127.0.0.1:${PORT}`;
+const PORT = +(process.env.FIELDNOTE_TEST_PORT || process.env.TEST_PORT || 4790), B = `http://127.0.0.1:${PORT}`;
 const env = { ...process.env, FIELDNOTE_RUNNER_PORT: PORT, FIELDNOTE_RUNNER_DATA: path.join(tmp, 'data'), FIELDNOTE_RUNNER_HOME: path.join(tmp, 'home'), ANTHROPIC_API_KEY: '' };
 delete env.ANTHROPIC_API_KEY;
 
@@ -124,7 +124,17 @@ try {
     assert.match(a, /,Narr,[^\n]*\{\\c&HC0E03D&\}소개\{\\c&HFFFFFF&\}해요/);
     assert.match(a, /,Sub,[^\n]*고통에도 \{\\c&HC0E03D&\}의미\{\\c&HFFFFFF&\}가 있죠\\N\{\\fs52[^\n]*Suffering has \{\\c&HC0E03D&\}meaning\{\\c&HFFFFFF&\}\./);
     assert.ok(!a.includes('*') && !a.includes('Style: Title'));  // 제목 카드 없음
-    assert.ok(!a.includes('Dialogue: 1,'));
+  });
+  await check('자막 상자(subBox): 켜면 한국어+영어 한 상자 + 나레이션 상자, 끄면 없음', () => {
+    const L0 = CHANNEL_PROFILES['yt-christian'].look, count = a => (a.match(/\\1a&H1A&/g) || []).length;
+    const on = buildAss(plan(L0)), off = buildAss(plan({ ...L0, subBox: false }));
+    assert.equal(count(on), 2);  // 나레이션 1 + (한국어·영어 묶음) 1
+    assert.match(on, /Dialogue: 0,0:00:04\.00,0:00:12\.00,Bar,[^\n]*\\1c&H331B0E&\\1a&H1A&\}m /);   // 남색 #0E1B33, 투명도 20%
+    assert.match(on, /Dialogue: 1,0:00:04\.00,0:00:12\.00,Sub,/); assert.match(on, /m 4\d\d \d+ l 6\d\d /);  // 화면 가운데 860px 이상
+    assert.equal(count(off), 0); assert.match(off, /Dialogue: 0,0:00:04\.00,0:00:12\.00,Sub,/);
+    const pl = P => buildAss({ ...P, hook: { text: '훅', dur: 1 }, bw: [] }), pp = look => plan(look).lines && ({ ...plan(look), lines: plan(look).lines.map(l => ({ ...l, narr: false, punch: false })) });
+    const PL = CHANNEL_PROFILES['yt-politics'].look;
+    assert.equal(count(pl(pp(PL))), 0); assert.equal(count(pl(pp({ ...PL, subBox: true }))), 2);  // 펀치 룩은 기본 꺼짐, 켤 수도 있어요
   });
   await check('배너 룩: 다른 채널·롱폼·look 없는 계획은 예전과 똑같은 ASS', () => {
     for (const P of [plan(null), { ...plan(null), lines: plan(null).lines.map(({ i, text, start, end, clip }) => ({ i, text, start, end, clip })) }, { ...plan(CHANNEL_PROFILES['yt-christian'].look), width: 1920, height: 1080 }]) sameAsOld(P);
@@ -134,7 +144,7 @@ try {
   });
   await check('배너 룩: 크리스천 쇼츠 프롬프트에 형식 안내 (롱폼·다른 채널엔 없음)', () => {
     const p = prompt(fakeE('yt-christian'));
-    assert.match(p, /> 배너: 작은 줄 \/ 큰 줄/); assert.match(p, /나레이션: /); assert.match(p, /한국어 \| English original/); assert.match(p, /\*별표\*/);
+    assert.match(p, /이펙트 단계에서 영상 제목으로/); assert.match(p, /나레이션: /); assert.match(p, /한국어 \| English original/); assert.match(p, /\*별표\*/);
     assert.doesNotMatch(prompt(fakeE('yt-christian', { format: 'long' })), /배너/); assert.doesNotMatch(prompt(fakeE('yt-politics')), /배너/); assert.doesNotMatch(prompt(fakeE('')), /배너/);
   });
   await check('펀치 룩: 훅·! 펀치·강조 읽기 + ASS (영어 줄 없음, 배너 없음)', () => {
@@ -156,12 +166,14 @@ try {
     const P = { title: 'T', width: 1080, height: 1920, total: 10, lines: [{ i: 0, text: '가나다', start: 0, end: 5, clip: 0 }] };
     sameAsOld(P);
     const p = prompt(fakeE('yt-politics'));
-    assert.match(p, /> 훅: 훅 제목/); assert.match(p, /"!" 를 붙여/); assert.match(p, /집단으로 조롱하거나 비하하지 마/); assert.match(p, /모두 한국어로만/); assert.doesNotMatch(p, /English/);
+    assert.match(p, /이펙트 단계에서 영상 제목으로/); assert.match(p, /"!" 를 붙여/); assert.match(p, /집단으로 조롱하거나 비하하지 마/); assert.match(p, /모두 한국어로만/); assert.doesNotMatch(p, /English/);
     assert.doesNotMatch(prompt(fakeE('yt-politics', { format: 'long' })), /훅/); assert.doesNotMatch(prompt(fakeE('yt-wrestling')), /훅/);
   });
   // 합성 소스: 10초 가로 영상 + 소리
   const src = path.join(tmp, 'source.mp4');
   await run(FFMPEG, ['-hide_banner', '-y', '-loglevel', 'error', '-f', 'lavfi', '-i', 'testsrc=size=1280x720:rate=30:duration=10', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=10', '-c:v', 'libx264', '-c:a', 'aac', '-shortest', src]);
+  // 소스 옆 자막 파일 (자막 자동화가 읽어요): 소스 2~4초 / 4.5~5초 / 7.5~9초
+  fs.writeFileSync(path.join(tmp, 'source.vtt'), 'WEBVTT\n\n00:00:02.000 --> 00:00:04.000\nGod is love\n\n00:00:04.500 --> 00:00:05.000\nTruth\n\n00:00:07.500 --> 00:00:09.000\nBeyond\n\n00:00:09.200 --> 00:00:09.900\n[Music]\n');
   // 합성 음악
   fs.mkdirSync(path.join(tmp, 'home/소리/BGM'), { recursive: true });
   await run(FFMPEG, ['-hide_banner', '-y', '-loglevel', 'error', '-f', 'lavfi', '-i', 'sine=frequency=220:duration=5', path.join(tmp, 'home/소리/BGM/test-bgm.mp3')]);
@@ -179,17 +191,31 @@ try {
     const { r, d } = await J('/episodes', { title: '테스트: 그레코로만 던지기?', note: '허리 던지기 한 장면\n상대 균형을 먼저 무너뜨린다', url: src, ranges: '0:01-0:07, 0:03-0:08', ideaId: 'idea-1' });
     assert.equal(r.status, 200); E = d.ep; assert.ok(E);
     const e = await ep(); assert.equal(e.ideaId, 'idea-1'); assert.deepEqual(e.sources[0].ranges, ['0:01-0:07', '0:03-0:08']);
-    assert.deepEqual(e.steps.map(s => s.id), ['research', 'download', 'script', 'plan', 'rough', 'finish', 'mix', 'upload']);
+    assert.deepEqual(e.steps.map(s => s.id), ['research', 'download', 'clip', 'plan', 'rough', 'subs', 'fx', 'script', 'mix', 'upload']);
+    assert.equal(e.look, ''); assert.equal(e.lookUsed, 'yt-wrestling');
     assert.ok(step(e, 'script').gate); assert.equal(e.gate, false);
   });
-  await check('/runall: 소스확인 → 받기 → 대본 에서 게이트에 멈춤', async () => {
+  await check('/runall: 소스확인 → 받기 → 자르기 → 계획 → 가편집 → 자막 → 이펙트 → 대본(게이트)', async () => {
     const { d } = await J('/runall', { ep: E }); assert.equal(d.from, 'research');
     const e = await waitIdle();
-    for (const id of ['research', 'download', 'script']) assert.equal(step(e, id).status, 'done', id + ' ' + step(e, id).error);
-    assert.equal(e.gate, true); assert.equal(step(e, 'plan').status, 'todo');
-    assert.equal(step(e, 'download').outputs.filter(o => o.exists).length, 2);
+    for (const id of ['research', 'download', 'clip', 'plan', 'rough', 'subs', 'fx', 'script']) assert.equal(step(e, id).status, 'done', id + ' ' + step(e, id).error);
+    assert.equal(e.gate, true); assert.equal(step(e, 'mix').status, 'todo');
+    assert.equal(step(e, 'clip').outputs.filter(o => o.exists).length, 2);
+    assert.ok(step(e, 'subs').outputs[0].exists); assert.ok(step(e, 'fx').outputs[0].exists);
     assert.ok(step(e, 'script').outputs[0].exists);
     assert.ok(fs.existsSync(path.join(tmp, 'data', E, '편집/대본-요청.txt')));
+    const pr = await probe(path.join(tmp, 'data', E, '편집/완성본.mp4'));
+    assert.equal(pr.width, 1080); assert.equal(pr.height, 1920); assert.ok(pr.hasAudio); assert.ok(Math.abs(pr.duration - 11) < 0.3, '길이 ' + pr.duration);
+    const P = JSON.parse(fs.readFileSync(path.join(tmp, 'data', E, '편집/편집계획.json'), 'utf8'));
+    assert.deepEqual(P.lines, []); assert.equal(P.clips.length, 2); assert.equal(P.clips[0].range, '0:01-0:07'); assert.equal(P.clips[1].si, 0); assert.equal(P.clips[1].a, 3); assert.equal(P.srcSubs, true);
+  });
+  await check('자막 자동화: 소스 자막이 편집 시간으로 옮겨져 입혀짐 ([Music] 같은 줄은 뺌)', async () => {
+    const P = JSON.parse(fs.readFileSync(path.join(tmp, 'data', E, '편집/편집계획.json'), 'utf8')), info = JSON.parse(fs.readFileSync(path.join(tmp, 'data', E, '소스.json'), 'utf8'));
+    const fakeEp = { p: (...a) => path.join(tmp, 'data', E, ...a), s: { sources: [{ url: src, ranges: ['0:01-0:07', '0:03-0:08'] }] } };
+    const cues = srcCues(fakeEp, P, info);
+    assert.deepEqual(cues.map(c => [c.start, c.end, c.en]), [[1, 3, 'God is love'], [3.5, 4, 'Truth'], [6, 7, 'God is love'], [7.5, 8, 'Truth'], [10.5, 11, 'Beyond']]);
+    const ass = fs.readFileSync(path.join(tmp, 'data', E, '편집/원본자막.ass'), 'utf8'); assert.match(ass, /Style: Src,/); assert.match(ass, /Dialogue: 0,0:00:01\.00,0:00:03\.00,Src,,0,0,0,,God is love/); assert.ok(!ass.includes('Music'));
+    const log = fs.readFileSync(path.join(tmp, 'data', E, '로그/subs.log'), 'utf8'); assert.match(log, /원본 자막 5줄/);
   });
   await check('/runall, /continue: 게이트 중에는 막고, 빈 양식 대본은 거절', async () => {
     assert.equal((await J('/runall', { ep: E })).r.status, 400);
@@ -212,16 +238,15 @@ try {
     const g2 = (await J('/script?ep=' + encodeURIComponent(E))).d; assert.equal(g2.hasPlaceholder, false); assert.equal(g2.lines.length, 3);
     const e = await ep(); assert.equal(e.gate, true); assert.equal(step(e, 'script').status, 'done');
   });
-  await check('대본 채우고 계속 → 계획·가편집·자막·효과', async () => {
+  await check('대본 확인 → 줄마다 시간표 (영상은 다시 안 돌림)', async () => {
     const f = path.join(tmp, 'data', E, '편집/대본.md');
     fs.writeFileSync(f, '# 제목\n> 메모\n허리 던지기, 이렇게 시작해요\n상대의 균형을 먼저 무너뜨려요\n1. 허리를 깊게 넣고 끝까지 돌려요\n마무리는 이렇게!\n');
-    const { r, d } = await J('/continue', { ep: E }); assert.equal(r.status, 200); assert.equal(d.from, 'plan');
-    const e = await waitIdle();
-    for (const id of ['plan', 'rough', 'finish']) assert.equal(step(e, id).status, 'done', id + ' ' + step(e, id).error);
-    assert.equal(e.gate, false); assert.equal(step(e, 'mix').status, 'todo');
-    const pr = await probe(path.join(tmp, 'data', E, '편집/완성본.mp4'));
-    assert.equal(pr.width, 1080); assert.equal(pr.height, 1920); assert.ok(pr.hasAudio); assert.ok(Math.abs(pr.duration - 11) < 0.3, '길이 ' + pr.duration);
+    const before = fs.statSync(path.join(tmp, 'data', E, '편집/완성본.mp4')).mtimeMs;
+    const { r, d } = await J('/continue', { ep: E }); assert.equal(r.status, 200); assert.equal(d.from, 'mix');
+    const e = await ep(); assert.ok(!e.running); assert.equal(e.gate, false); assert.equal(step(e, 'mix').status, 'todo');
+    assert.equal(fs.statSync(path.join(tmp, 'data', E, '편집/완성본.mp4')).mtimeMs, before);
     const plan = JSON.parse(fs.readFileSync(path.join(tmp, 'data', E, '편집/편집계획.json'), 'utf8')); assert.equal(plan.lines.length, 4);
+    assert.equal(plan.lines[0].start, 0); assert.ok(Math.abs(plan.lines[3].end - 11) < 0.02); assert.ok(plan.lines.every((l, i) => i === 0 || Math.abs(l.start - plan.lines[i - 1].end) < 0.02));
   });
   let lines;
   await check('/lines: 줄·길이·음악 목록', async () => {
@@ -253,6 +278,9 @@ try {
     const vol = await run(FFMPEG, ['-hide_banner', '-nostdin', '-i', f, '-vn', '-af', 'volumedetect', '-f', 'null', '-']).catch(e => e);
     const m = /mean_volume: (-?[\d.]+) dB/.exec((vol.err || '')); assert.ok(m && +m[1] > -60, '무음이에요: ' + (m && m[1]));
     assert.ok(fs.statSync(f).size > 50000);
+    assert.ok(fs.existsSync(path.join(tmp, 'data', E, '편집/대본자막.ass')));
+    assert.match(fs.readFileSync(path.join(tmp, 'data', E, '로그/mix.log'), 'utf8'), /대본 자막 4줄을 영상에 입혀요/);
+    assert.match(fs.readFileSync(path.join(tmp, 'data', E, '편집/대본자막.ass'), 'utf8'), /Dialogue: 0,0:00:00\.00,[^\n]*Cap,[^\n]*허리 던지기/);
   });
   await check('/run upload → 업로드 패키지', async () => {
     await J('/run', { ep: E, step: 'upload' }); const e = await waitIdle(); assert.equal(step(e, 'upload').status, 'done', step(e, 'upload').error);
@@ -270,18 +298,18 @@ try {
     assert.equal((await J('/run', { ep: E, steps: ['plan', 5] })).r.status, 400);
     assert.equal((await J('/run', { ep: E })).r.status, 400);
     const before = fs.statSync(path.join(tmp, 'data', E, '편집/완성본.mp4')).mtimeMs;
-    const { r, d } = await J('/run', { ep: E, steps: ['finish', 'rough', 'finish'] });   // 순서·중복은 서버가 정리
-    assert.equal(r.status, 200); assert.deepEqual(d.steps, ['rough', 'finish']);
+    const { r, d } = await J('/run', { ep: E, steps: ['fx', 'rough', 'fx'] });   // 순서·중복은 서버가 정리
+    assert.equal(r.status, 200); assert.deepEqual(d.steps, ['rough', 'fx']);
     assert.equal((await J('/run', { ep: E, steps: ['plan'] })).r.status, 409);   // 도는 중엔 막음
     const e = await waitIdle();
-    assert.equal(step(e, 'rough').status, 'done', step(e, 'rough').error); assert.equal(step(e, 'finish').status, 'done', step(e, 'finish').error);
+    assert.equal(step(e, 'rough').status, 'done', step(e, 'rough').error); assert.equal(step(e, 'fx').status, 'done', step(e, 'fx').error);
     const after = fs.statSync(path.join(tmp, 'data', E, '편집/완성본.mp4')).mtimeMs; assert.ok(after > before, '완성본이 새로 만들어져야 해요');
-    assert.ok(step(e, 'finish').outputs[0].mtime > before - 1);
-    const lr = fs.readFileSync(path.join(tmp, 'data', E, '로그/rough.log'), 'utf8'), lf = fs.readFileSync(path.join(tmp, 'data', E, '로그/finish.log'), 'utf8');
+    assert.ok(step(e, 'fx').outputs[0].mtime > before - 1);
+    const lr = fs.readFileSync(path.join(tmp, 'data', E, '로그/rough.log'), 'utf8'), lf = fs.readFileSync(path.join(tmp, 'data', E, '로그/fx.log'), 'utf8');
     assert.ok(lr && lf);
   });
   await check('/run steps 에 대본이 있으면 게이트가 다시 열리고 거기서 멈춤', async () => {
-    const { d } = await J('/run', { ep: E, steps: ['script', 'plan'] }); assert.deepEqual(d.steps, ['script', 'plan']);
+    const { d } = await J('/run', { ep: E, steps: ['script', 'plan'] }); assert.deepEqual(d.steps, ['plan', 'script']);   // 계획이 대본보다 앞
     const e = await waitIdle(); assert.equal(step(e, 'script').status, 'done', step(e, 'script').error); assert.equal(e.gate, true);
     assert.notEqual(step(e, 'plan').status, 'running');
   });
@@ -314,6 +342,103 @@ try {
     assert.ok(['failed', 'done'].includes(step(e, 'download').status));
   });
 
+  // ---------- 새 순서 (링크 → 룩 → 영상 → 컷 → 자막 → 이펙트 → 대본·녹음 → 패키지) ----------
+  let L1;
+  await check('룩: 편집 레퍼런스 목록 + 기본 = 채널 룩 (영상마다 고를 수 있음)', async () => {
+    assert.deepEqual(LOOK_CHOICES.map(l => l.id), ['yt-wrestling', 'yt-christian', 'yt-politics']);
+    assert.ok(LOOK_CHOICES.every(l => /룩/.test(l.name) && l.desc));
+    assert.deepEqual((await J('/status')).d.looks.map(l => l.id), ['yt-wrestling', 'yt-christian', 'yt-politics']);
+    assert.equal(lookKeyOf(fakeE('yt-politics')), 'yt-politics'); assert.equal(lookKeyOf(fakeE('yt-politics', { look: 'yt-christian' })), 'yt-christian');
+    assert.equal(lookKeyOf(fakeE('yt-politics', { look: 'nope' })), 'yt-politics'); assert.equal(lookKeyOf(fakeE('')), 'yt-wrestling');
+    assert.equal(lookOf(fakeE('yt-politics', { look: 'yt-christian' })).kind, 'banner'); assert.equal(lookOf(fakeE('yt-christian', { look: 'yt-wrestling' })), null);
+    assert.equal(lookOf(fakeE('yt-christian', { look: 'yt-politics', format: 'long' })), null);
+  });
+  await check('링크 영상 다운 → 구간 없이도 소스 확인·영상 받기가 되고, 자르기는 구간을 요구', async () => {
+    const { r, d } = await J('/episodes', { title: '룩 테스트', url: src, deferRanges: true, channel: 'yt-politics' }); assert.equal(r.status, 200); L1 = d.ep;
+    const get = async () => (await J('/status')).d.episodes.find(x => x.ep === L1);
+    let e = await get(); assert.deepEqual(e.sources[0].ranges, []); assert.equal(e.look, ''); assert.equal(e.lookUsed, 'yt-politics');
+    await J('/run', { ep: L1, steps: ['research', 'download'] });
+    for (let i = 0; i < 100 && (await get()).running; i++) await new Promise(r => setTimeout(r, 200));
+    e = await get(); assert.equal(step(e, 'research').status, 'done', step(e, 'research').error); assert.equal(step(e, 'download').status, 'done', step(e, 'download').error);
+    await J('/run', { ep: L1, step: 'clip' });
+    for (let i = 0; i < 100 && (await get()).running; i++) await new Promise(r => setTimeout(r, 200));
+    e = await get(); assert.equal(step(e, 'clip').status, 'failed'); assert.match(step(e, 'clip').error, /구간이 아직 없어요/);
+  });
+  await check('/ranges: 15초 규칙·빈 구간 거절, 바뀌면 자르기부터 되돌림', async () => {
+    assert.equal((await J('/ranges', { ep: L1, ranges: '0:00-0:20' })).r.status, 400);
+    assert.equal((await J('/ranges', { ep: L1, ranges: '' })).r.status, 400);
+    assert.equal((await J('/ranges', { ep: 'nope', ranges: '0:00-0:05' })).r.status, 404);
+    assert.equal((await J('/ranges', { ep: L1, ranges: '0:01-0:05', source: 3 })).r.status, 400);
+    const ok = await J('/ranges', { ep: L1, ranges: '0:01-0:06' }); assert.equal(ok.r.status, 200); assert.deepEqual(ok.d.ranges, ['0:01-0:06']); assert.equal(ok.d.reset, true);
+    assert.equal((await J('/ranges', { ep: L1, ranges: '0:01-0:06' })).d.reset, false);
+    assert.deepEqual((await J('/status')).d.episodes.find(x => x.ep === L1).sources[0].ranges, ['0:01-0:06']);
+  });
+  await check('/look: 모르는 룩 거절 · 같은 룩이면 그대로 · 다른 룩이면 영상 단계만 되돌림 (소스·대본은 그대로)', async () => {
+    assert.equal((await J('/look', { ep: L1, look: 'nope' })).r.status, 400); assert.equal((await J('/look', { ep: 'nope', look: 'yt-christian' })).r.status, 404);
+    const same = await J('/look', { ep: L1, look: 'yt-politics' }); assert.equal(same.d.reset, false); assert.equal((await J('/status')).d.episodes.find(x => x.ep === L1).look, 'yt-politics');
+    const ch = await J('/look', { ep: L1, look: 'yt-christian' }); assert.equal(ch.r.status, 200); assert.equal(ch.d.reset, true); assert.equal(ch.d.lookUsed, 'yt-christian');
+    // 고른 룩(배너)으로 컷 → 자막 → 이펙트: 채널(정치)이 아니라 고른 룩을 써요
+    await J('/run', { ep: L1, steps: ['clip', 'plan', 'rough', 'subs', 'fx'] });
+    let e; for (let i = 0; i < 300; i++) { e = (await J('/status')).d.episodes.find(x => x.ep === L1); if (!e.running) break; await new Promise(r => setTimeout(r, 200)); }
+    for (const id of ['clip', 'plan', 'rough', 'subs', 'fx']) assert.equal(step(e, id).status, 'done', id + ' ' + step(e, id).error);
+    const P = JSON.parse(fs.readFileSync(path.join(tmp, 'data', L1, '편집/편집계획.json'), 'utf8'));
+    assert.equal(P.look.kind, 'banner'); assert.equal(P.banner.big.length > 0, true); assert.deepEqual(P.bw, [[0, 1.5]]); assert.ok(!P.hook);   // 5초 영상: 인트로 = 30% = 1.5초
+    const pr = await probe(path.join(tmp, 'data', L1, '편집/완성본.mp4')); assert.equal(pr.width, 1080); assert.equal(pr.height, 1920);
+    const back = await J('/look', { ep: L1, look: 'yt-wrestling' }); assert.equal(back.d.reset, true);
+    e = (await J('/status')).d.episodes.find(x => x.ep === L1);
+    for (const id of ['clip', 'plan', 'rough', 'subs', 'fx', 'mix', 'upload']) assert.equal(step(e, id).status, 'todo', id);
+    for (const id of ['research', 'download']) assert.equal(step(e, id).status, 'done', id);
+  });
+  await check('룩: 기본 룩은 look 없는 계획 + 펀치 룩은 훅·워터마크가 이펙트에 (대본 줄은 따로)', async () => {
+    await J('/run', { ep: L1, steps: ['clip', 'plan'] });
+    let e; for (let i = 0; i < 300; i++) { e = (await J('/status')).d.episodes.find(x => x.ep === L1); if (!e.running) break; await new Promise(r => setTimeout(r, 200)); }
+    assert.ok(!JSON.parse(fs.readFileSync(path.join(tmp, 'data', L1, '편집/편집계획.json'), 'utf8')).look);
+    const P = { title: 'T', width: 1080, height: 1920, total: 10, look: resolveLook(CHANNEL_PROFILES['yt-politics'].look), hook: { text: '훅 문구', dur: 1.3 }, bw: [],
+      lines: [{ i: 0, text: '이 정책', ko: '이 *정책*', en: '', narr: false, punch: false, start: 2, end: 6, clip: 0 }] };
+    const fxA = buildAss(P, 'fx'), lnA = buildAss(P, 'lines'), all = buildAss(P);
+    assert.match(fxA, /,Hook,[^\n]*훅 문구/); assert.match(fxA, /,WM,/); assert.ok(!/,Cap,/.test(fxA.split('[Events]')[1]));
+    assert.match(lnA, /,Cap,[^\n]*이 /); assert.ok(!/,Hook,|,WM,/.test(lnA.split('[Events]')[1]));
+    assert.equal(all.split('[Events]')[1].split('\n').filter(l => l.startsWith('Dialogue')).length, fxA.split('[Events]')[1].split('\n').filter(l => l.startsWith('Dialogue')).length + lnA.split('[Events]')[1].split('\n').filter(l => l.startsWith('Dialogue')).length);
+    const B = { ...P, look: resolveLook(CHANNEL_PROFILES['yt-christian'].look), banner: { small: '작은', big: '큰' }, lines: [{ i: 0, text: '고통에도 의미가', ko: '고통에도 *의미*가', en: 'Suffering has *meaning*.', narr: false, start: 2, end: 6, clip: 0 }] };
+    assert.match(buildAss(B, 'fx'), /,BanB,[^\n]*큰/); assert.ok(!/,Sub,/.test(buildAss(B, 'fx').split('[Events]')[1])); assert.match(buildAss(B, 'lines'), /,Sub,[^\n]*Suffering/);
+    assert.ok(!/,BanB,/.test(buildAss(B, 'lines').split('[Events]')[1]));
+    assert.ok(!/Suffering/.test(buildAss({ ...B, srcSubs: true }, 'lines')), '원본 자막이 영어 원문을 이미 보여 주면 영어 줄은 빼요');
+  });
+  await check('자막 자동화: 영어 → 한국어 번역(키 있을 때) · 실패하면 영어 그대로 · 룩별 모양', async () => {
+    const cues = [{ start: 0, end: 1, en: 'a' }, { start: 1, end: 2, en: 'b' }, { start: 2, end: 3, en: 'c' }];
+    const ok = await translateCues(cues, async () => '여기 JSON: ["에이","비","씨"]'); assert.deepEqual(ok.map(c => c.ko), ['에이', '비', '씨']);
+    const bad = await translateCues(cues, async () => '["하나만"]', { log() {} }); assert.ok(bad.every(c => !c.ko));
+    const thr = await translateCues(cues, async () => { throw new Error('x'); }, { log() {} }); assert.ok(thr.every(c => c.en));
+    const wide = { title: 'T', width: 1080, height: 1920, total: 5, lines: [] };
+    assert.match(buildSrcAss(wide, ok), /PlayResY: 1920/); assert.match(buildSrcAss(wide, ok), /Src,,0,0,0,,에이/);
+    const ban = { ...wide, look: resolveLook(CHANNEL_PROFILES['yt-christian'].look) };
+    assert.match(buildSrcAss(ban, ok), /PlayResY: 1480/); assert.match(buildSrcAss(ban, ok), /Src,,0,0,0,,에이\\N\{\\fs39\\b0\}a/);   // 배너 룩 = 한·영 두 줄, 영상 칸 높이 기준
+    assert.match(buildSrcAss({ ...wide, look: resolveLook(CHANNEL_PROFILES['yt-politics'].look) }, ok), /Style: Src,[^,]*,56,&H0000D4FF,/);
+    assert.match(buildSrcAss({ ...wide, width: 1920, height: 1080 }, cues), /Style: Src,[^,]*,42,/);
+  });
+  await check('예전 에피소드(8단계) → 새 단계로 옮기기', async () => {
+    const legacy = (channel, st) => ({ ep: 'x', channel, format: 'shorts', sources: [{ url: 'u', ranges: ['0:00-0:15'] }], steps: Object.fromEntries(['research', 'download', 'script', 'plan', 'rough', 'finish', 'mix', 'upload'].map(id => [id, { status: st[id] || 'todo' }])) });
+    const a = migrateState(legacy('yt-politics', { research: 'done', download: 'done', script: 'done', plan: 'done', rough: 'done', finish: 'done' }));
+    assert.deepEqual(STEP_DEFS.map(d => a.steps[d.id]?.status), ['done', 'done', 'done', 'done', 'done', 'done', 'done', 'done', 'todo', 'todo']);
+    assert.equal(a.look, 'yt-politics'); assert.equal(a.legacyBurn, true); assert.ok(!a.steps.finish);
+    const b = migrateState(legacy('yt-christian', { research: 'done', download: 'todo' })); assert.equal(b.steps.clip.status, 'todo'); assert.equal(b.steps.subs.status, 'todo'); assert.equal(b.steps.fx.status, 'todo'); assert.ok(!b.legacyBurn);
+    const c = legacy('', { research: 'done', download: 'done', finish: 'failed' }); c.steps.finish.error = '실패 사유';
+    const cm = migrateState(c); assert.equal(cm.steps.fx.status, 'failed'); assert.equal(cm.steps.fx.error, '실패 사유'); assert.equal(cm.steps.subs.status, 'todo'); assert.equal(cm.look, 'yt-wrestling');
+    assert.equal(migrateState(structuredClone(a)).legacyBurn, true);   // 두 번 해도 같음
+    const fresh = { channel: 'yt-politics', look: '', steps: Object.fromEntries(STEP_DEFS.map(d => [d.id, { status: 'todo' }])) };
+    assert.equal(migrateState(fresh).look, '');   // 새 에피소드는 룩을 직접 고를 때까지 비워 둠
+    // 실제로 폴더에 놓인 예전 state.json 도 재시작 때 옮겨져요 (아래 '재시작 복구' 에서 확인)
+    const dir = path.join(tmp, 'data', 'legacy-ep'); fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'state.json'), JSON.stringify({ ...legacy('yt-christian', { research: 'done', download: 'done', script: 'done', plan: 'done', rough: 'done', finish: 'done' }), ep: 'legacy-ep', title: '예전 영상', created: 1, gate: false, mix: {}, voices: {} }));
+  });
+  await check('예전 에피소드: 대본 자막이 이미 들어 있으면 음악 단계가 자막을 또 입히지 않음', async () => {
+    const dir = path.join(tmp, 'data', 'legacy-ep');
+    await run(FFMPEG, ['-hide_banner', '-y', '-loglevel', 'error', '-f', 'lavfi', '-i', 'color=c=blue:s=1080x1920:r=30:d=3', '-pix_fmt', 'yuv420p', '-c:v', 'libx264', '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo', '-shortest', '-c:a', 'aac', '-t', '3', (fs.mkdirSync(path.join(dir, '편집'), { recursive: true }), path.join(dir, '편집/완성본.mp4'))]).catch(async () => {
+      await run(FFMPEG, ['-hide_banner', '-y', '-loglevel', 'error', '-f', 'lavfi', '-i', 'color=c=blue:s=1080x1920:r=30:d=3', '-pix_fmt', 'yuv420p', '-c:v', 'libx264', path.join(dir, '편집/완성본.mp4')]);
+    });
+    fs.writeFileSync(path.join(dir, '편집/편집계획.json'), JSON.stringify({ title: 'x', width: 1080, height: 1920, total: 3, clips: [], lines: [{ i: 0, text: '예전 줄', start: 0, end: 3, clip: 0 }] }));
+    fs.writeFileSync(path.join(dir, 'state.json'), JSON.stringify({ ...JSON.parse(fs.readFileSync(path.join(dir, 'state.json'), 'utf8')) }));
+  });
   // ---------- Codex 그림 ----------
   const gen1 = b => J('/img/generate', { account: 'insta-sing', projectId: 'p1', styleId: 'otter-c', lang: 'ko', ...b });
   const jobsOf = async pid => (await J('/img/jobs?projectId=' + pid)).d.jobs;
@@ -394,17 +519,26 @@ try {
     assert.equal(f(a).channel, 'yt-christian'); assert.equal(f(b).channel, ''); assert.equal(f(c).channel.length, 40);
     assert.equal(st(a).voice.length, 2000); assert.equal(st(b).voice, '');
   });
-  await check('/health: 버전(version)과 기능 수준(api)', async () => {
+  await check('/health: 버전(version)과 기능 수준(api = 3)', async () => {
     const { r, d } = await J('/health');
     assert.equal(r.status, 200); assert.equal(d.ok, true);
+    assert.equal(d.api, 3);
     assert.equal(typeof d.version, 'string'); assert.ok(d.version.length > 0);
-    assert.ok(Number.isInteger(d.api) && d.api >= 2);
   });
   await check('재시작 복구: running → failed(한국어)', async () => {
     await stop();
-    const sf = path.join(tmp, 'data', E, 'state.json'), s = JSON.parse(fs.readFileSync(sf, 'utf8')); s.steps.finish = { status: 'running' }; fs.writeFileSync(sf, JSON.stringify(s));
+    const sf = path.join(tmp, 'data', E, 'state.json'), s = JSON.parse(fs.readFileSync(sf, 'utf8')); s.steps.fx = { status: 'running' }; fs.writeFileSync(sf, JSON.stringify(s));
     await start(); const e = (await J('/status')).d.episodes.find(x => x.ep === E);
-    assert.equal(step(e, 'finish').status, 'failed'); assert.match(step(e, 'finish').error, /다시 실행/); assert.ok(step(e, 'mix').outputs[0].exists);
+    assert.equal(step(e, 'fx').status, 'failed'); assert.match(step(e, 'fx').error, /다시 실행/); assert.ok(step(e, 'mix').outputs[0].exists);
+    const lg = (await J('/status')).d.episodes.find(x => x.ep === 'legacy-ep'); assert.ok(lg, '예전 에피소드가 읽혀야 해요');
+    assert.deepEqual(lg.steps.map(x => x.id), STEP_DEFS.map(d => d.id)); assert.equal(lg.look, 'yt-christian');
+    assert.deepEqual(lg.steps.map(x => x.status), ['done', 'done', 'done', 'done', 'done', 'done', 'done', 'done', 'todo', 'todo']);
+    assert.ok(step(lg, 'fx').outputs[0].exists);
+    // 예전 방식 완성본에는 대본 자막이 이미 들어 있어서 음악 단계는 자막을 또 입히지 않아요
+    await J('/run', { ep: 'legacy-ep', step: 'mix' });
+    for (let i = 0; i < 100; i++) { const x = (await J('/status')).d.episodes.find(y => y.ep === 'legacy-ep'); if (!x.running) break; await new Promise(r => setTimeout(r, 200)); }
+    const lg2 = (await J('/status')).d.episodes.find(x => x.ep === 'legacy-ep'); assert.equal(step(lg2, 'mix').status, 'done', step(lg2, 'mix').error);
+    const mlog = fs.readFileSync(path.join(tmp, 'data', 'legacy-ep', '로그/mix.log'), 'utf8'); assert.ok(!/대본 자막/.test(mlog), mlog);
   });
   console.log(`\n전부 통과 (${ok}개)  · 산출물: ${tmp}`);
 } catch (e) { console.error('\n테스트 실패:', e.message); process.exitCode = 1; }

@@ -6,12 +6,11 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { HOME, StepError, StopError, sanitize, exists, parseRanges, isLocalSource, localPath, run, FFMPEG, lastLines } from './util.mjs';
 import { listStyles, saveStyle, enqueue, cancelJob, listJobs, resolveReadable, thumbOf, shutdownImages, ImgError } from './images.mjs';
-import { STEP_DEFS, STEP_FN, outputsFor, listAssets, checkScript, cleanPasted, parseScript, parseBanner, parseHook, PLACEHOLDER, SCRIPT_MAX_LINES } from './steps.mjs';
+import { STEP_DEFS, STEP_FN, outputsFor, listAssets, checkScript, cleanPasted, parseScript, parseBanner, parseHook, PLACEHOLDER, SCRIPT_MAX_LINES, CHANNEL_PROFILES, LOOK_CHOICES, lookKeyOf, migrateState, layoutLines } from './steps.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-// 작업판이 쓰는 기능 수준. 작업판에 새 기능이 생겨 실행기도 바뀌어야 하면 숫자를 올린다.
-// (2 = /run 단계 실행, 수정 시각(mtime), 채널)
-const API_LEVEL = 2;
+// 작업판이 쓰는 기능 수준. 3 = 새 9칸 순서 (/look, /ranges, deferRanges, 단계 clip·subs·fx)
+const API_LEVEL = 3;
 let VERSION = 'dev';
 try { VERSION = fs.readFileSync(path.join(HERE, 'version.txt'), 'utf8').trim() || 'dev'; } catch {}
 const PORT = +(process.env.FIELDNOTE_RUNNER_PORT || 4777);
@@ -41,7 +40,7 @@ function loadAll() {
     const dir = path.join(DATA, name), f = path.join(dir, 'state.json');
     if (!exists(f)) continue;
     try {
-      const s = JSON.parse(fs.readFileSync(f, 'utf8'));
+      const s = migrateState(JSON.parse(fs.readFileSync(f, 'utf8')));   // 예전 8단계 에피소드는 새 단계로 옮겨요
       const E = makeEpisode(dir, s);
       for (const d of STEP_DEFS) {
         const st = s.steps[d.id] ||= { status: 'todo' };
@@ -55,6 +54,7 @@ function loadAll() {
 function view(E) {
   return {
     ep: E.s.ep, title: E.s.title, note: E.s.note || '', ideaId: E.s.ideaId || '', format: E.s.format, channel: E.s.channel || '',
+    look: E.s.look || '', lookUsed: lookKeyOf(E),
     sources: E.s.sources.map(x => ({ url: x.url, ranges: x.ranges })),
     steps: STEP_DEFS.map(d => {
       const st = E.s.steps[d.id], o = { id: d.id, name: d.name, status: st.status, outputs: outputsFor(d.id, E).map(p => { const ex = exists(E.p(p)), r = { path: p, exists: ex }; if (ex) { try { r.mtime = Math.round(fs.statSync(E.p(p)).mtimeMs); } catch {} } return r; }) };
@@ -102,7 +102,7 @@ function launch(E, ids, chain) {
     for (const id of ids) {
       if (E.ctrl.aborted) break;
       if (chain && E.s.steps[id].status === 'done' && id !== ids[0]) continue;
-      if (chain && id === 'mix') { makeCtx(E, 'mix').log('목소리 녹음 단계에서 멈췄어요. "녹음·음악 열기"에서 녹음하고 "목소리·음악 넣기"를 누르세요.'); break; }
+      if (chain && id === 'mix') { makeCtx(E, 'mix').log('목소리 녹음 단계에서 멈췄어요. "음악/녹음"에서 녹음하고 "목소리·음악 넣기"를 누르세요.'); break; }
       const ok = await runStep(E, id);
       if (!ok) break;
       if (id === 'script') break;  // 게이트
@@ -118,11 +118,11 @@ class HttpError extends Error { constructor(code, msg) { super(msg); this.code =
 const getEp = name => { const E = episodes.get(String(name || '')); if (!E) throw new HttpError(404, '에피소드를 찾을 수 없어요.'); return E; };
 const mustIdle = E => { if (E.running) throw new HttpError(409, '지금 다른 단계가 돌고 있어요. 끝나거나 멈춘 뒤에 눌러 주세요.'); };
 
-function addSource(E, url, ranges) {
+function addSource(E, url, ranges, defer = false) {
   url = String(url || '').trim(); if (!url) return;
   if (!isLocalSource(url) && !/^https?:\/\//i.test(url)) throw new HttpError(400, '소스 주소가 이상해요. https:// 로 시작하는 유튜브 주소를 넣어 주세요.');
   let rg; try { rg = parseRanges(ranges); } catch (e) { throw new HttpError(400, e.message); }
-  if (!rg.length) rg = ['0:00-0:15'];
+  if (!rg.length && !defer) rg = ['0:00-0:15'];   // defer: 구간은 컷 편집에서 나중에 정해요
   E.s.sources.push({ url, ranges: rg });
 }
 
@@ -134,18 +134,18 @@ const routes = {
   'GET /img/jobs': ({ q }) => ({ json: { jobs: listJobs(q.get('projectId') || '') } }),
   'POST /img/cancel': imgWrap(({ body }) => ({ json: { ok: true, job: cancelJob(body.id) } })),
   'GET /': () => ({ text: '실행기가 켜져 있어요.' }),
-  'GET /health': () => ({ json: { ok: true, ffmpeg: exists(FFMPEG), data: DATA, ai: !!process.env.ANTHROPIC_API_KEY, version: VERSION, api: API_LEVEL } }),
-  'GET /status': () => ({ json: { episodes: [...episodes.values()].sort((a, b) => b.s.created - a.s.created).map(view) } }),
+  'GET /health': () => ({ json: { ok: true, api: API_LEVEL, version: VERSION, ffmpeg: exists(FFMPEG), data: DATA, ai: !!process.env.ANTHROPIC_API_KEY } }),
+  'GET /status': () => ({ json: { looks: LOOK_CHOICES, episodes: [...episodes.values()].sort((a, b) => b.s.created - a.s.created).map(view) } }),
   'GET /episodes': () => routes['GET /status'](),
   'POST /episodes': ({ body }) => {
     const title = String(body.title || '').trim(); if (!title) throw new HttpError(400, '제목이 필요해요.');
     let ep = sanitize(title) || '새 주제', n = 1; const base = ep;
     while (exists(path.join(DATA, ep))) ep = `${base}-${++n}`;
     const s = { ep, title, note: String(body.note || ''), ideaId: body.ideaId || '', format: body.format === 'long' ? 'long' : 'shorts',
-      channel: String(body.channel || '').toLowerCase().replace(/[^a-z-]/g, '').slice(0, 40), voice: String(body.voice || '').slice(0, 2000), sources: [], created: Date.now(), gate: false, mix: {}, voices: {},
+      channel: String(body.channel || '').toLowerCase().replace(/[^a-z-]/g, '').slice(0, 40), look: CHANNEL_PROFILES[body.look] ? body.look : '', voice: String(body.voice || '').slice(0, 2000), sources: [], created: Date.now(), gate: false, mix: {}, voices: {},
       steps: Object.fromEntries(STEP_DEFS.map(d => [d.id, { status: 'todo' }])) };
     const E = makeEpisode(path.join(DATA, ep), s);
-    addSource(E, body.url, body.ranges);
+    addSource(E, body.url, body.ranges, !!body.deferRanges);
     for (const d of ['원본', '클립', '편집/녹음', '업로드', '로그']) fs.mkdirSync(E.p(d), { recursive: true });
     save(E); episodes.set(ep, E);
     return { json: { ok: true, ep } };
@@ -155,8 +155,30 @@ const routes = {
     if (!String(body.url || '').trim()) throw new HttpError(400, '영상 주소를 넣어 주세요.');
     addSource(E, body.url, body.ranges);
     // 소스가 바뀌면 소스에서 파생되는 단계는 다시 돌려야 해요 (대본은 그대로 둠)
-    for (const id of ['research', 'download', 'plan', 'rough', 'finish', 'mix', 'upload']) E.s.steps[id].status = 'todo';
+    for (const id of ['research', 'download', 'clip', 'plan', 'rough', 'subs', 'fx', 'mix', 'upload']) E.s.steps[id].status = 'todo';
     save(E); return { json: { ok: true, sources: E.s.sources.length } };
+  },
+  // ② 편집 레퍼런스(룩) 고르기. 룩이 바뀌면 영상 모양에 영향을 받는 단계(구간 자르기부터 업로드까지)를 다시 돌려야 해요. 대본·소스는 그대로.
+  'POST /look': ({ body }) => {
+    const E = getEp(body.ep); mustIdle(E);
+    const look = String(body.look || ''); if (!CHANNEL_PROFILES[look]) throw new HttpError(400, '모르는 편집 룩이에요: ' + look);
+    const was = lookKeyOf(E);
+    E.s.look = look;
+    if (look !== was) for (const id of ['clip', 'plan', 'rough', 'subs', 'fx', 'mix', 'upload']) { const st = E.s.steps[id]; if (st.status !== 'todo') { st.status = 'todo'; delete st.error; } }
+    if (look !== was) delete E.s.legacyBurn;
+    save(E); return { json: { ok: true, look, lookUsed: lookKeyOf(E), reset: look !== was } };
+  },
+  // ④ 컷 편집: 쓸 구간 정하기 (소스 하나의 구간 목록을 통째로 바꿔요). 구간이 바뀌면 자르기부터 다시 돌려야 해요.
+  'POST /ranges': ({ body }) => {
+    const E = getEp(body.ep); mustIdle(E);
+    const si = Number.isInteger(body.source) ? body.source : 0, src = E.s.sources[si]; if (!src) throw new HttpError(400, '소스가 없어요.');
+    let rg; try { rg = parseRanges(body.ranges); } catch (e) { throw new HttpError(400, e.message); }
+    if (!rg.length) throw new HttpError(400, '구간을 하나 이상 넣어 주세요. (예: 0:30-0:42)');
+    const changed = JSON.stringify(rg) !== JSON.stringify(src.ranges);
+    src.ranges = rg;
+    if (changed) for (const id of ['clip', 'plan', 'rough', 'subs', 'fx', 'mix', 'upload']) { const st = E.s.steps[id]; if (st.status !== 'todo') { st.status = 'todo'; delete st.error; } }
+    if (changed) delete E.s.legacyBurn;
+    save(E); return { json: { ok: true, ranges: rg, reset: changed } };
   },
   'POST /link': ({ body }) => { const E = getEp(body.ep); E.s.ideaId = String(body.ideaId || ''); save(E); return { json: { ok: true } }; },
   'POST /run': ({ body }) => {
@@ -178,7 +200,7 @@ const routes = {
     const E = getEp(body.ep); mustIdle(E);
     if (E.s.gate) throw new HttpError(400, '대본 확인이 먼저예요. 대본을 읽고 "계속"을 눌러 주세요.');
     const from = firstNotDone(E); if (!from) throw new HttpError(400, '모든 단계가 이미 끝났어요.');
-    if (from === 'mix') throw new HttpError(400, '다음은 목소리·음악 단계예요. "녹음·음악 열기"에서 녹음한 뒤 "목소리·음악 넣기"를 누르세요.');
+    if (from === 'mix') throw new HttpError(400, '다음은 목소리·음악 단계예요. "음악/녹음"에서 녹음한 뒤 "목소리·음악 넣기"를 누르세요.');
     launch(E, orderIds().slice(orderIds().indexOf(from)), true);
     return { json: { ok: true, from } };
   },
@@ -213,9 +235,10 @@ const routes = {
     const E = getEp(body.ep); mustIdle(E);
     if (E.s.steps.script.status !== 'done') throw new HttpError(400, '대본이 아직 안 만들어졌어요.');
     try { checkScript(E); } catch (e) { throw new HttpError(400, e.message); }
+    // 대본을 확인했어요 → 줄마다 시간표를 짜요 (영상은 이미 만들어져 있어서 더 돌릴 것 없이 녹음으로 넘어가요)
+    try { layoutLines(E); } catch (e) { throw new HttpError(400, e.message); }
     E.s.gate = false; save(E);
-    launch(E, ['plan', 'rough', 'finish'], true);
-    return { json: { ok: true, from: 'plan' } };
+    return { json: { ok: true, from: 'mix' } };
   },
   'POST /stop': ({ body }) => {
     const E = getEp(body.ep); E.ctrl.aborted = true;
@@ -276,7 +299,7 @@ function serveFile(req, res, E, rel) {
 async function saveVoice(E, q, req) {
   const idx = +q.get('idx'); let P = null;
   try { P = JSON.parse(fs.readFileSync(E.p('편집/편집계획.json'), 'utf8')); } catch {}
-  if (!P) throw new HttpError(400, '편집 계획이 아직 없어서 녹음을 받을 수 없어요.');
+  if (!P || !P.lines?.length) throw new HttpError(400, '대본을 확인한 뒤에 녹음할 수 있어요. 대본 단계에서 "대본 확인 완료 · 계속"을 눌러 주세요.');
   const line = P.lines[idx]; if (!Number.isInteger(idx) || !line) throw new HttpError(400, '줄 번호가 이상해요.');
   const buf = await readBody(req, 60e6); if (buf.length < 200) throw new HttpError(400, '녹음이 비어 있어요. 다시 녹음해 주세요.');
   fs.mkdirSync(E.p('편집/녹음'), { recursive: true });
