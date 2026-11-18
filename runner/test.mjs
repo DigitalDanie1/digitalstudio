@@ -6,7 +6,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { FFMPEG, probe, run } from './util.mjs';
-import { CHANNEL_PROFILES, profileOf, promptFor, parseVtt, transcriptFor, parseScript, parseHook, hookFromTitle, parseLine, parseBanner, bannerFromTitle, bwSpans, buildAss, resolveLook, lookOf, LOOK_CHOICES, lookKeyOf, migrateState, srcCues, translateCues, buildSrcAss, STEP_DEFS } from './steps.mjs';
+import { parseRanges, rangeSecs, rangeSpeed } from './util.mjs';
+import { matItems, splitAnswer, CHANNEL_PROFILES, profileOf, promptFor, parseVtt, transcriptFor, parseScript, parseHook, hookFromTitle, parseLine, parseBanner, bannerFromTitle, bwSpans, buildAss, resolveLook, lookOf, LOOK_CHOICES, lookKeyOf, migrateState, srcCues, translateCues, buildSrcAss, STEP_DEFS } from './steps.mjs';
 // 옛 버전과 비교하는 검사: backup-20261118-banner 폴더가 있는 맥에서만 실행 (없으면 건너뜀)
 let oldBuildAss = null;
 try { ({ buildAss: oldBuildAss } = await import('./backup-20261118-banner/steps.mjs')); } catch {}
@@ -178,6 +179,20 @@ try {
   fs.mkdirSync(path.join(tmp, 'home/소리/BGM'), { recursive: true });
   await run(FFMPEG, ['-hide_banner', '-y', '-loglevel', 'error', '-f', 'lavfi', '-i', 'sine=frequency=220:duration=5', path.join(tmp, 'home/소리/BGM/test-bgm.mp3')]);
 
+  await check('매트 스토리 룩: 슬로우 구간 x0.5 · [태그]/[점수] 줄 · ASS (제목 2줄·출처·SLOW / 자막·태그·도장)', () => {
+    assert.deepEqual(parseRanges('0:30-0:42, 1:05-1:09x0.5 2:00-2:04*0.4'), ['0:30-0:42', '1:05-1:09x0.5', '2:00-2:04x0.4']);
+    assert.deepEqual(rangeSecs('1:05-1:09x0.5'), [65, 69]); assert.equal(rangeSpeed('1:05-1:09x0.5'), 0.5); assert.equal(rangeSpeed('0:30-0:42'), 1);
+    assert.throws(() => parseRanges('0:30-0:34x2'), /0.25~1/);
+    const it = matItems(['[태그] 로페스 (쿠바) / 2016 리우', '첫 *자막*', '[점수] 4 : 0 / 쿠바 4 : 터키 0', '둘째']);
+    assert.equal(it.length, 2); assert.deepEqual(it[0].tag, { main: '로페스 (쿠바)', sub: '2016 리우' }); assert.equal(it[0].text, '첫 자막'); assert.equal(it[1].stamp.main, '4 : 0');
+    assert.deepEqual(splitAnswer('```\n구간: 0:01-0:05x0.5\n> 배너: a / b\n줄\n```'), { ranges: '0:01-0:05x0.5', text: '> 배너: a / b\n줄' });
+    const P = { width: 1080, height: 1920, total: 10, look: resolveLook(CHANNEL_PROFILES['yt-mat'].look), banner: { small: '위 줄', big: '아랫줄 ㄷㄷ' }, credit: 'UWW',
+      clips: [{ start: 0, duration: 4 }, { start: 4, duration: 6, speed: 0.5 }], lines: [{ start: 0, end: 5, text: '첫 자막', ko: '첫 *자막*', tag: { main: '로페스', sub: '리우' } }, { start: 5, end: 10, text: '둘째', ko: '둘째', stamp: { main: 'FALL', sub: '폴승' } }] };
+    const fx = buildAss(P, 'fx'), ln = buildAss(P, 'lines');
+    assert.match(fx, /위 줄/); assert.match(fx, /아랫줄 ㄷㄷ/); assert.match(fx, /영상: /); assert.match(fx, /SLOW 0\.5x/); assert.match(fx, /MAT/); assert.doesNotMatch(fx, /첫 /);
+    assert.match(ln, /Cap,,0,0,0,,.*첫 /); assert.match(ln, /Tag,,.*로페스/); assert.match(ln, /Stamp,,.*FALL/); assert.doesNotMatch(ln, /SLOW/);
+    assert.match(promptFor({ s: { title: 'T', note: '', format: 'shorts', channel: 'yt-wrestling', look: 'yt-mat' } }, [{ title: 'T', channel: 'C' }], [{ duration: 30 }], 30), /> 배너[\s\S]*\[태그\][\s\S]*\[점수\]/);
+  });
   await check('CORS: 허용 사이트 + 사설망 헤더', async () => {
     const r = await fetch(B + '/status', { method: 'OPTIONS', headers: { Origin: 'https://digitalstudio-eight.vercel.app', 'Access-Control-Request-Method': 'POST', 'Access-Control-Request-Private-Network': 'true' } });
     assert.equal(r.status, 204); assert.equal(r.headers.get('access-control-allow-origin'), 'https://digitalstudio-eight.vercel.app'); assert.equal(r.headers.get('access-control-allow-private-network'), 'true');
@@ -226,7 +241,7 @@ try {
     assert.equal(g.d.hasPlaceholder, true); assert.equal(g.d.ai, false); assert.deepEqual(g.d.lines, []); assert.match(g.d.request, /대사/);
     for (const text of ['', '# 제목\n> 메모\n\n', '첫 줄\n[여기에 대사]\n셋째']) { const r = await J('/script', { ep: E, text }); assert.equal(r.r.status, 400, text); }
     assert.match((await J('/script', { ep: E, text: '첫 줄\n[여기에 대사]' })).d.error, /2번째/);
-    assert.equal((await J('/script', { ep: E, text: Array(21).fill('가').join('\n') })).r.status, 400);
+    assert.equal((await J('/script', { ep: E, text: Array(31).fill('가').join('\n') })).r.status, 400);
     assert.equal((await J('/script', { ep: 'nope', text: 'a' })).r.status, 404);
     const f = path.join(tmp, 'data', E, '편집/대본.md'); assert.match(fs.readFileSync(f, 'utf8'), /여기에 대사/);  // 거절하면 파일은 그대로
     const ok = await J('/script', { ep: E, text: '# 무시\n1. 첫 대사예요\n- “둘째 대사예요”\n\n> 무시\n3) 셋째 대사예요\n' });
@@ -345,9 +360,9 @@ try {
   // ---------- 새 순서 (링크 → 룩 → 영상 → 컷 → 자막 → 이펙트 → 대본·녹음 → 패키지) ----------
   let L1;
   await check('룩: 편집 레퍼런스 목록 + 기본 = 채널 룩 (영상마다 고를 수 있음)', async () => {
-    assert.deepEqual(LOOK_CHOICES.map(l => l.id), ['yt-wrestling', 'yt-christian', 'yt-politics']);
+    assert.deepEqual(LOOK_CHOICES.map(l => l.id), ['yt-wrestling', 'yt-christian', 'yt-politics', 'yt-mat']);
     assert.ok(LOOK_CHOICES.every(l => /룩/.test(l.name) && l.desc));
-    assert.deepEqual((await J('/status')).d.looks.map(l => l.id), ['yt-wrestling', 'yt-christian', 'yt-politics']);
+    assert.deepEqual((await J('/status')).d.looks.map(l => l.id), ['yt-wrestling', 'yt-christian', 'yt-politics', 'yt-mat']);
     assert.equal(lookKeyOf(fakeE('yt-politics')), 'yt-politics'); assert.equal(lookKeyOf(fakeE('yt-politics', { look: 'yt-christian' })), 'yt-christian');
     assert.equal(lookKeyOf(fakeE('yt-politics', { look: 'nope' })), 'yt-politics'); assert.equal(lookKeyOf(fakeE('')), 'yt-wrestling');
     assert.equal(lookOf(fakeE('yt-politics', { look: 'yt-christian' })).kind, 'banner'); assert.equal(lookOf(fakeE('yt-christian', { look: 'yt-wrestling' })), null);
@@ -519,10 +534,10 @@ try {
     assert.equal(f(a).channel, 'yt-christian'); assert.equal(f(b).channel, ''); assert.equal(f(c).channel.length, 40);
     assert.equal(st(a).voice.length, 2000); assert.equal(st(b).voice, '');
   });
-  await check('/health: 버전(version)과 기능 수준(api = 3)', async () => {
+  await check('/health: 버전(version)과 기능 수준(api = 4)', async () => {
     const { r, d } = await J('/health');
     assert.equal(r.status, 200); assert.equal(d.ok, true);
-    assert.equal(d.api, 3);
+    assert.equal(d.api, 4);
     assert.equal(typeof d.version, 'string'); assert.ok(d.version.length > 0);
   });
   await check('재시작 복구: running → failed(한국어)', async () => {

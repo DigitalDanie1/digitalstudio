@@ -445,15 +445,16 @@
   }
 
   // ===== YouTube (맥 실행기 단계를 같은 틀에 그린다) =====
-  // 유튜브 작업 순서 (모든 채널·형식 같음): 링크 제공 → 편집 레퍼런스 선택 → 링크 영상 다운 → 컷 편집 → 자막 자동화 → 이펙트 → 음악/녹음(대본 포함) → 업로드 패키지 → 올리기
+  // 유튜브 작업 순서 (모든 채널·형식 같음, 7칸): 원본 링크 → 편집 스타일 선택 → 링크 영상 다운 → 1차 편집 → 피드백 → 2차 편집 → 최종 편집안 다운로드
   // 편집 룩 목록: 실행기 /status 의 looks 와 같아요. 실행기가 꺼져 있어도 고를 수 있게 여기에도 둬요.
   const YT_LOOKS = [
     { id: 'yt-wrestling', name: '기본 룩', desc: '흰 자막 + 첫 1.5초 제목 카드 (레슬링 채널 기본)' },
     { id: 'yt-christian', name: '배너 룩', desc: '남색 배너 + 민트 강조 + 흑백 인트로 + 한·영 자막 (기독교 채널 기본)' },
     { id: 'yt-politics', name: '펀치 룩', desc: '첫 1초 훅 제목 + 굵은 자막 + 노란 강조 + 워터마크 (정치 채널 기본)' },
+    { id: 'yt-mat', name: '매트 스토리 룩', desc: '검은 바탕 + 위 2줄 제목(노랑·빨강) + 굵은 자막 + 선수 태그·점수 도장·SLOW 표시 + 원본 경기 소리 (레슬링 추천)' },
   ];
   const ytLooks = () => (runnerData && runnerData.looks && runnerData.looks.length ? runnerData.looks : YT_LOOKS);
-  const ytLookDefault = ch => (YT_LOOKS.some(l => l.id === ch) ? ch : 'yt-wrestling');
+  const ytLookDefault = ch => (ch === 'yt-wrestling' || !ch ? 'yt-mat' : YT_LOOKS.some(l => l.id === ch) ? ch : 'yt-mat');
   const ytLookPick = (it, ep) => (it.idea && ytPipe.lookIdea === it.idea.id && ytPipe.look) || (ep && ep.look) || ytLookDefault(ytCh(it.idea));
   const YT_GROUPS = [
     { id: 'g-dl', name: '링크 영상 다운', ids: ['research', 'download'], desc: '링크의 영상을 맥에 통째로 받아요. 영어 자막이 있으면 같이 받아요.', go: '영상 받기' },
@@ -464,7 +465,7 @@
     { id: 'g-upload', name: '업로드 패키지', ids: ['upload'], desc: '제목·설명란·태그·썸네일 문구를 한 파일로 만들어요.', go: '업로드 패키지 만들기' },
   ];
   const YT_STEP_NAME = { research: '소스 확인', download: '영상 받기', clip: '구간 자르기', plan: '편집 계획', rough: '가편집', subs: '자막 자동화', fx: '이펙트', script: '대본', mix: '목소리·음악', upload: '업로드 패키지' };
-  const YT_PLACEHOLDER = ['링크 제공', '편집 레퍼런스 선택', ...YT_GROUPS.map(g => g.name), '올리기'];
+  const YT_PLACEHOLDER = ['원본 링크', '편집 스타일 선택', '링크 영상 다운', '1차 편집', '피드백', '2차 편집', '최종 편집안 다운로드'];
   // 실행기 단계들을 칸(그룹)으로 묶은 상태
   function ytGroupState(ep, g) {
     const sts = g.ids.map(id => (ep.steps || []).find(x => x.id === id)).filter(Boolean);
@@ -476,7 +477,7 @@
   // 편집 영상: 최종본 > 완성본 > 가편집
   function ytEditVideo(ep) {
     if (!ep) return null;
-    for (const [sid, file, label] of [['mix', '편집/최종본.mp4', '최종본'], ['fx', '편집/완성본.mp4', '완성본 (목소리 전)'], ['subs', '편집/자막본.mp4', '자막본 (이펙트 전)'], ['rough', '편집/가편집.mp4', '가편집 (자막 전)']]) {
+    for (const [sid, file, label] of [['mix', '편집/최종본.mp4', ep.round >= 2 ? `${ep.round}차 편집본` : ep.round === 1 ? '1차 편집본' : '최종본'], ['fx', '편집/완성본.mp4', '완성본 (목소리 전)'], ['subs', '편집/자막본.mp4', '자막본 (이펙트 전)'], ['rough', '편집/가편집.mp4', '가편집 (자막 전)']]) {
       const o = ((ep.steps || []).find(x => x.id === sid) || { outputs: [] }).outputs.find(x => x.path === file && x.exists);
       if (o) return { path: o.path, label, mtime: o.mtime };
     }
@@ -556,7 +557,7 @@
     const ep = it.ep, off = runnerOnline === false;
     const offMsg = '<p class="pl-error" role="alert"><b>실행기가 꺼져 있어요.</b> 맥에서 <code>~/Desktop/유투브/실행기/실행기 켜기.command</code> 를 더블클릭하세요. 켜진 창은 닫지 마세요.<br><span class="small">이 맥의 크롬에서만 돼요. "로컬 네트워크 접근"을 물으면 허용을 누르세요.</span></p>';
     const topic = {
-      id: 'topic', name: '링크 제공', title: '링크 제공', desc: '만들고 싶은 유튜브 영상 링크를 넣으세요. 그 영상으로 주제를 정해요.',
+      id: 'topic', name: '원본 링크', title: '원본 링크', desc: '만들고 싶은 유튜브 영상 링크를 넣으세요. 그 영상으로 주제를 정해요.',
       btn: '이 링크로 시작',
       hideBtn: it => !!it.idea,
       isDone: it => !!it.idea,
@@ -580,7 +581,7 @@
       run: it => ytLinkStart(it),
     };
     const look = {
-      id: 'look', name: '편집 레퍼런스 선택', title: '편집 레퍼런스 선택', desc: it => it.idea ? '이 영상에 쓸 편집 룩을 고르세요. 처음엔 이 채널의 룩이 골라져 있어요.' : '앞 단계를 끝내면 열려요.',
+      id: 'look', name: '편집 스타일 선택', title: '편집 스타일 선택', desc: it => it.idea ? '이 영상에 쓸 편집 스타일을 고르세요. 레슬링은 매트 스토리 룩이 골라져 있어요.' : '앞 단계를 끝내면 열려요.',
       btn: it => (it.ep ? '이 룩으로 바꾸기' : '이 룩으로 정하기'),
       attrs: it => { const pick = ytLookPick(it, it.ep), ch = it.ep && it.ep.look && it.ep.look !== pick, cut = it.ep && (it.ep.steps || []).some(x => x.id === 'clip' && x.status === 'done');
         return `data-ya-act="look" data-ya-look="${esc(pick)}"${ch && cut ? ' data-ya-confirm="룩을 바꾸면 컷 편집부터 다시 해야 해요. 대본과 받은 영상은 그대로예요. 계속할까요?"' : ''}`; },
@@ -595,7 +596,7 @@
       },
       run: () => {},
     };
-    const mid = YT_GROUPS.map(g => {
+    const mid = YT_GROUPS.filter(g => g.id === 'g-dl').map(g => {
       const base = { id: g.id, name: g.name, title: g.name };
       if (!ep) return { ...base, desc: '앞 단계를 끝내면 열려요.', btn: g.go, disabled: () => true, isDone: () => false, result: () => '', run: () => {} };
       const G = ytGroupState(ep, g), isVoice = g.id === 'g-voice', isCut = g.id === 'g-cut', scrPanel = isVoice && ytScriptShow(ep), saveMode = G.gate && scrPanel && ytScrBlocked(ep);
@@ -641,6 +642,7 @@
         run: () => {},
       };
     });
+    const edits = ytEditCards(it, ep, off);
     const last = {
       id: 'post', name: '올리기', title: 'YouTube에 올리기', desc: '업로드 패키지의 제목·설명란을 복사해 YouTube Studio에 올려요. 올린 뒤 영상 주소를 남기세요.',
       btn: it => it.idea && S.opened[it.key] ? '주소 남기기' : 'YouTube Studio 열기',
@@ -658,7 +660,87 @@
         recordUrl('youtube', it.key, it.idea, it.idea.title);
       },
     };
-    return [topic, look, ...mid, last];
+    return [topic, look, ...mid, ...edits];
+  }
+  // ===== ④ 1차 편집 · ⑤ 피드백 · ⑥ 2차 편집 · ⑦ 최종 편집안 다운로드 =====
+  function ytEditCards(it, ep, off) {
+    const names = ['1차 편집', '피드백', '2차 편집', '최종 편집안 다운로드'];
+    if (!ep) return names.map((n, i) => ({ id: 'e' + i, name: n, title: n, desc: '앞 단계를 끝내면 열려요.', btn: n, disabled: () => true, isDone: () => false, result: () => '', run: () => {} }));
+    const st = id => (ep.steps || []).find(x => x.id === id) || { status: 'todo', outputs: [] }, ok = id => st(id).status === 'done';
+    const dlDone = ok('research') && ok('download'), round = ep.round || 0, editing = !!ep.running && ['clip', 'plan', 'rough', 'subs', 'fx', 'script', 'mix'].includes(ep.running);
+    const fbNew = (ep.feedbackAt || 0) > (ep.editAt || 0), busyOther = !!ep.running && !editing;
+    const EDIT_IDS = ['clip', 'plan', 'rough', 'subs', 'fx', 'mix'];
+    const failed = EDIT_IDS.map(st).find(x => x.status === 'failed');
+    const runLine = () => editing ? `실행 중… (${esc(YT_STEP_NAME[ep.running] || ep.running)}) 끝나면 자동으로 바뀌어요.` : '';
+    const logs = () => `<div class="pl-logs">${EDIT_IDS.map(id => `<button type="button" class="pl-link" data-pl-log="${id}" aria-expanded="${T.logOpen === id}">${esc(YT_STEP_NAME[id])} 로그${T.logOpen === id ? ' 닫기' : ''}</button>`).join('')}</div>${EDIT_IDS.includes(T.logOpen) ? '<pre class="pl-log" id="plLog">불러오는 중…</pre>' : ''}`;
+    const editResult = r => () => {
+      const parts = [];
+      if (failed && failed.error && (ep.editRound || 1) === r) parts.push(`<p class="pl-error"><b>${esc(failed.name)}</b> · ${esc(runnerFriendly(failed.error))}</p>`);
+      if (round >= r) { const v = ytEditVideo(ep); parts.push(`<p><b>${r}차 편집본이 나왔어요.</b> 위 플레이어에서 보세요.${v ? ' ' + ytFileLink(ep.ep, { path: v.path }) : ''}</p>`); if (!ep.hasScript) parts.push('<p class="small">아직 자막 대본이 없어서 자막 없이 만들었어요. ⑤ 피드백에서 대본을 넣어요.</p>'); }
+      parts.push(logs()); return parts.join('');
+    };
+    const rangesNow = ((ep.sources && ep.sources[0] && ep.sources[0].ranges) || []).join(', ');
+    const e1 = {
+      id: 'e1', name: '1차 편집', title: '1차 편집',
+      desc: !dlDone ? '링크 영상을 먼저 받아 주세요.' : '쓸 구간을 넣으면 고른 스타일로 1차 편집본을 만들어요. 한 구간은 15초까지, 끝에 x0.5 를 붙이면 0.5배 슬로우예요.',
+      btn: () => editing && (ep.editRound || 1) === 1 ? '실행 멈춤' : round >= 1 ? '1차 편집 다시 만들기' : '1차 편집 만들기',
+      attrs: () => editing && (ep.editRound || 1) === 1 ? 'data-ya-act="stop"' : `data-ya-act="edit" data-ya-round="1"${round >= 1 ? ' data-ya-confirm="1차 편집을 다시 만들어요. 계속할까요?"' : ''}`,
+      cls: editing && (ep.editRound || 1) === 1 ? 'danger' : '',
+      disabled: () => off || !dlDone || busyOther || (editing && (ep.editRound || 1) !== 1),
+      isDone: () => round >= 1,
+      statusLine: () => (ep.editRound || 1) === 1 ? runLine() : '',
+      result: editResult(1),
+      body: () => dlDone && !editing ? `<div class="pl-ya-form"><label>쓸 구간 (쉼표로 여러 개 · 슬로우: 0:30-0:34x0.5)<input class="pl-input" data-ya-new="ranges" placeholder="0:30-0:42, 1:05-1:09x0.5" value="${esc(ytPipe.ranges || rangesNow)}"></label></div>` : '',
+      run: () => {},
+    };
+    const e2 = {
+      id: 'e2', name: '피드백', title: '피드백',
+      desc: round < 1 ? '1차 편집이 끝나면 열려요.' : '1차 편집본을 보고 고칠 점을 적으세요. Claude 요청문으로 받거나, 구간·대본을 직접 고쳐서 저장하면 돼요.',
+      btn: '수정안 저장',
+      attrs: () => 'data-ya-act="draftsave"',
+      disabled: () => off || round < 1 || !!ep.running,
+      isDone: () => fbNew || (round >= 2 && !fbNew),
+      result: () => fbNew ? '<b>수정안을 저장했어요.</b> ⑥ 2차 편집을 누르세요.' : '',
+      body: () => round >= 1 ? ytFeedbackPanel(ep) : '',
+      run: () => {},
+    };
+    const e3 = {
+      id: 'e3', name: '2차 편집', title: '2차 편집',
+      desc: round < 1 ? '1차 편집이 끝나면 열려요.' : fbNew || round < 2 ? '저장한 수정안으로 다시 편집해요. 자막·제목·선수 태그·점수 도장·원본 소리·배경음악이 들어가요.' : '다시 고치려면 ⑤ 피드백에서 수정안을 저장하고 누르세요.',
+      btn: () => editing && (ep.editRound || 0) >= 2 ? '실행 멈춤' : round >= 2 ? `${round + 1}차 편집 만들기` : '2차 편집 만들기',
+      attrs: () => editing && (ep.editRound || 0) >= 2 ? 'data-ya-act="stop"' : `data-ya-act="edit" data-ya-round="${Math.max(round + 1, 2)}"`,
+      cls: editing && (ep.editRound || 0) >= 2 ? 'danger' : '',
+      disabled: () => off || round < 1 || busyOther || (editing && (ep.editRound || 0) < 2),
+      isDone: () => round >= 2 && !fbNew,
+      statusLine: () => (ep.editRound || 0) >= 2 ? runLine() : '',
+      result: editResult(Math.max(2, ep.editRound || 2)),
+      body: () => '',
+      run: () => {},
+    };
+    const up = st('upload'), upDone = up.status === 'done', has = p => (up.outputs || []).find(o => o.path === p && o.exists);
+    const dlLink = (p, label) => `<a class="btn ghost ya-file" href="${RUNNER}/file?ep=${encodeURIComponent(ep.ep)}&path=${encodeURIComponent(p)}&dl=1">${esc(label)} ⬇</a>`;
+    const e4 = {
+      id: 'e4', name: '최종 편집안 다운로드', title: '최종 편집안 다운로드',
+      desc: round < 1 ? '편집본이 나오면 열려요.' : '마지막 편집본을 영상 파일·썸네일·제목/설명 파일로 내려받아요. 유튜브에는 YouTube Studio 에서 직접 올리세요.',
+      btn: () => ep.running === 'upload' ? '만드는 중…' : !upDone ? '최종 편집안 만들기' : it.idea && S.opened[it.key] ? '올린 영상 주소 남기기' : 'YouTube Studio 열기',
+      attrs: () => upDone ? '' : 'data-ya-steps="upload"',
+      hideBtn: () => !!(upDone && it.idea && it.idea.publicationCheck),
+      disabled: () => off || round < 1 || !!ep.running,
+      isDone: () => upDone,
+      result: () => upDone ? `<div class="pl-files">${has('업로드/영상.mp4') ? dlLink('업로드/영상.mp4', '영상 내려받기') : ''} ${has('업로드/썸네일.jpg') ? dlLink('업로드/썸네일.jpg', '썸네일') : ''} ${has('업로드/업로드.txt') ? dlLink('업로드/업로드.txt', '제목·설명·태그') : ''}</div>` : '',
+      body: () => {
+        if (!upDone || !it.idea) return '';
+        const done = it.idea.publicationCheck;
+        return (done ? `<p class="small">올린 영상: ${doneLink(done)}</p>` : S.opened[it.key] ? urlFormHtml(it.key) : '') +
+          `<p class="small"><button type="button" class="pl-link" data-ya-steps="upload" ${ep.running ? 'disabled' : ''}>최종 편집안 다시 만들기</button> (편집본을 다시 만들었으면 눌러 주세요)</p>`;
+      },
+      run: () => {
+        if (!upDone || !it.idea) return;
+        if (!S.opened[it.key]) { window.open(WRITE_URL.youtube, '_blank', 'noopener'); S.opened[it.key] = true; save(); repaint('youtube'); return; }
+        recordUrl('youtube', it.key, it.idea, it.idea.title);
+      },
+    };
+    return [e1, e2, e3, e4];
   }
   // ===== 유튜브 "작업 중" 카드 띠 =====
   const ytThumb = idea => { const v = ytVidOf(ytFirstUrl(idea)); return v ? `https://i.ytimg.com/vi/${v}/mqdefault.jpg` : ''; };
@@ -667,15 +749,17 @@
   function ytWipStatus(i) {
     const ep = ytEp(i);
     if (ep) {
-      const gs = YT_GROUPS.map(g => ({ g, G: ytGroupState(ep, g) })), n = 1 + (ep.look ? 1 : 0) + gs.filter(x => x.G.done).length, nx = gs.find(x => !x.G.done);
+      const ok = id => (ep.steps || []).some(x => x.id === id && x.status === 'done'), r = ep.round || 0, fb = (ep.feedbackAt || 0) > (ep.editAt || 0);
+      const flags = [true, !!ep.look, ok('research') && ok('download'), r >= 1, fb || r >= 2, r >= 2 && !fb, ok('upload')], n = flags.filter(Boolean).length, k = flags.findIndex(x => !x);
+      const nx = k < 0 ? null : { g: { name: YT_PLACEHOLDER[k] } };
       const b = [];
       if (ep.running) b.push('<i class="b run">실행 중</i>');
-      if (ep.gate) b.push('<i class="b gate">대본 확인 필요</i>');
+
       if ((ep.steps || []).some(x => x.status === 'failed')) b.push('<i class="b fail">실패</i>');
       if (ytEditVideo(ep)) b.push('<i class="b vid">▶ 편집본</i>');
-      return `${n}/9 단계 · ${esc(nx ? nx.g.name : '올리기')}${b.length ? `<span class="pl-wbs">${b.join('')}</span>` : ''}`;
+      return `${n}/7 단계 · ${esc(nx ? nx.g.name : '끝')}${b.length ? `<span class="pl-wbs">${b.join('')}</span>` : ''}`;
     }
-    return runnerOnline === false && !runnerData ? '실행기 꺼짐 · 상태 모름' : '편집 레퍼런스 선택 전';
+    return runnerOnline === false && !runnerData ? '실행기 꺼짐 · 상태 모름' : '편집 스타일 선택 전';
   }
   function ytWipHtml(curId) {
     const list = ytWipList();

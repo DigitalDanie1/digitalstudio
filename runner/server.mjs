@@ -6,11 +6,11 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { HOME, StepError, StopError, sanitize, exists, parseRanges, isLocalSource, localPath, run, FFMPEG, lastLines } from './util.mjs';
 import { listStyles, saveStyle, enqueue, cancelJob, listJobs, resolveReadable, thumbOf, shutdownImages, ImgError } from './images.mjs';
-import { STEP_DEFS, STEP_FN, outputsFor, listAssets, checkScript, cleanPasted, parseScript, parseBanner, parseHook, PLACEHOLDER, SCRIPT_MAX_LINES, CHANNEL_PROFILES, LOOK_CHOICES, lookKeyOf, migrateState, layoutLines } from './steps.mjs';
+import { STEP_DEFS, STEP_FN, outputsFor, listAssets, checkScript, cleanPasted, parseScript, parseBanner, parseHook, PLACEHOLDER, SCRIPT_MAX_LINES, CHANNEL_PROFILES, LOOK_CHOICES, lookKeyOf, migrateState, layoutLines, draftText, splitAnswer, feedbackPrompt, callClaude, parseCredit } from './steps.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // 작업판이 쓰는 기능 수준. 3 = 새 9칸 순서 (/look, /ranges, deferRanges, 단계 clip·subs·fx)
-const API_LEVEL = 3;
+const API_LEVEL = 4;   // 4 = 7칸 순서 (/edit 1차·2차 편집, /draft, /feedback, 슬로우 구간 x0.5, 매트 스토리 룩)
 let VERSION = 'dev';
 try { VERSION = fs.readFileSync(path.join(HERE, 'version.txt'), 'utf8').trim() || 'dev'; } catch {}
 const PORT = +(process.env.FIELDNOTE_RUNNER_PORT || 4777);
@@ -63,9 +63,11 @@ function view(E) {
       return o;
     }),
     running: E.running, gate: !!E.s.gate,
+    round: E.s.round || 0, editRound: E.s.editRound || 0, editAt: E.s.editAt || 0, feedbackAt: E.s.feedbackAt || 0, hasScript: hasScript(E),
   };
 }
 
+const hasScript = E => { if (E.s.steps?.script?.status !== 'done') return false; try { checkScript(E); return true; } catch { return false; } };
 // ---------- 실행 ----------
 const logFile = (E, id) => E.p('로그', id + '.log');
 function makeCtx(E, id) {
@@ -109,6 +111,55 @@ function launch(E, ids, chain) {
     }
     E.running = null;
   })();
+}
+// 1차·2차 편집: 자르기 → 계획 → 가편집 → 자막 → 이펙트 → (대본이 없으면 양식) → 대본 자막·소리 합치기(최종본). 대본 확인에서 멈추지 않아요.
+function launchEdit(E, round) {
+  E.ctrl.aborted = false; E.s.editRound = round; E.running = 'clip'; save(E);
+  (async () => {
+    try {
+      for (const id of ['clip', 'plan', 'rough', 'subs', 'fx']) { if (E.ctrl.aborted || !(await runStep(E, id))) return; }
+      if (E.s.steps.script.status !== 'done' && !(await runStep(E, 'script'))) return;
+      E.s.gate = false; save(E);
+      const ctx = makeCtx(E, 'mix');
+      if (hasScript(E)) { try { layoutLines(E, ctx); } catch (e) { ctx.log('대본 시간표를 못 짰어요: ' + e.message); } }
+      else {   // 대본이 아직 빈 양식이면 자막 없이 만들어요 (피드백 단계에서 대본을 넣어요)
+        try { const f = E.p('편집/편집계획.json'), P = JSON.parse(fs.readFileSync(f, 'utf8')); P.lines = []; fs.writeFileSync(f, JSON.stringify(P, null, 2)); } catch {}
+      }
+      if (E.ctrl.aborted) return;
+      const keep = fs.existsSync(logFile(E, 'mix')) ? fs.readFileSync(logFile(E, 'mix'), 'utf8') : '';
+      if (await runStep(E, 'mix')) {
+        if (keep) try { fs.writeFileSync(logFile(E, 'mix'), keep + fs.readFileSync(logFile(E, 'mix'), 'utf8')); } catch {}
+        E.s.round = Math.max(E.s.round || 0, round); E.s.editAt = Date.now(); save(E);
+      }
+    } finally { E.running = null; }
+  })();
+}
+// 고친 구간 저장 (바뀌면 자르기부터 다시 해야 해요)
+function setRanges(E, ranges) {
+  const src = E.s.sources[0]; if (!src) throw new HttpError(400, '소스가 없어요.');
+  let rg; try { rg = parseRanges(ranges); } catch (e) { throw new HttpError(400, e.message); }
+  if (!rg.length) throw new HttpError(400, '구간을 하나 이상 넣어 주세요. (예: 0:30-0:42)');
+  const changed = JSON.stringify(rg) !== JSON.stringify(src.ranges);
+  src.ranges = rg;
+  if (changed) { for (const id of ['clip', 'plan', 'rough', 'subs', 'fx', 'mix', 'upload']) { const st = E.s.steps[id]; if (st.status !== 'todo') { st.status = 'todo'; delete st.error; } } delete E.s.legacyBurn; }
+  return changed;
+}
+// 고친 대본 저장 ("> 배너:"·"> 출처:" 줄 + 대사 줄)
+function saveDraftText(E, text) {
+  const lines = cleanPasted(text);
+  if (!lines.length) throw new HttpError(400, '대사가 한 줄도 없어요.');
+  const bad = lines.findIndex(l => l.includes(PLACEHOLDER));
+  if (bad >= 0) throw new HttpError(400, `${bad + 1}번째 줄에 "${PLACEHOLDER}" 가 남아 있어요. 진짜 대사로 바꿔 주세요.`);
+  if (lines.length > SCRIPT_MAX_LINES) throw new HttpError(400, `대사가 너무 많아요. ${SCRIPT_MAX_LINES}줄 이하로 줄여 주세요.`);
+  const ban = parseBanner(text), credit = parseCredit(text);
+  if (ban && /\[여기에/.test(ban.raw)) throw new HttpError(400, '배너 줄에 "[여기에 …]" 가 남아 있어요.');
+  const f = E.p('편집/대본.md'); fs.mkdirSync(E.p('편집'), { recursive: true });
+  if (exists(f)) fs.copyFileSync(f, E.p('편집/대본.bak.md'));
+  const head = `# ${E.s.title}\n> 한 줄 = 자막 한 장면. "#"·">" 로 시작하는 줄은 무시돼요.\n` + (ban ? `> 배너: ${ban.raw}\n` : '') + (credit ? `> 출처: ${credit}\n` : '');
+  fs.writeFileSync(f, head + '\n' + lines.join('\n') + '\n');
+  E.s.steps.script = { status: 'done' }; E.s.gate = false;
+  for (const id of ['fx', 'mix', 'upload']) { const st = E.s.steps[id]; if (st.status === 'done') st.status = 'todo'; }   // 제목·자막이 바뀌었으니 다시 입혀요
+  return lines.length;
 }
 const orderIds = () => STEP_DEFS.map(d => d.id);
 const firstNotDone = E => orderIds().find(id => E.s.steps[id].status !== 'done');
@@ -179,6 +230,39 @@ const routes = {
     if (changed) for (const id of ['clip', 'plan', 'rough', 'subs', 'fx', 'mix', 'upload']) { const st = E.s.steps[id]; if (st.status !== 'todo') { st.status = 'todo'; delete st.error; } }
     if (changed) delete E.s.legacyBurn;
     save(E); return { json: { ok: true, ranges: rg, reset: changed } };
+  },
+  // ④·⑥ 1차·2차 편집 (구간을 같이 보내면 먼저 저장)
+  'POST /edit': ({ body }) => {
+    const E = getEp(body.ep); mustIdle(E);
+    if (E.s.steps.download.status !== 'done') throw new HttpError(400, '링크 영상 다운이 먼저예요.');
+    if (String(body.ranges || '').trim()) setRanges(E, body.ranges);
+    if (!E.s.sources.some(s => s.ranges.length)) throw new HttpError(400, '쓸 구간을 넣어 주세요. (예: 0:30-0:42, 슬로우는 0:30-0:34x0.5)');
+    const round = Math.max(1, Math.min(9, +body.round || (E.s.round || 0) + 1));
+    save(E); launchEdit(E, round); return { json: { ok: true, round } };
+  },
+  // ⑤ 피드백: 지금 구간·대본 읽기 / 고친 것 저장 / 피드백 글 → (AI 키가 있으면 바로 반영, 없으면 Claude 채팅용 요청문)
+  'GET /draft': ({ q }) => { const E = getEp(q.get('ep')); return { json: { ranges: (E.s.sources[0]?.ranges || []).join(', '), text: draftText(E), hasScript: hasScript(E), ai: !!process.env.ANTHROPIC_API_KEY, feedback: E.s.feedback || '' } }; },
+  'POST /draft': ({ body }) => {
+    const E = getEp(body.ep); mustIdle(E);
+    let ranges = body.ranges, text = body.text;
+    if (body.answer != null) { const a = splitAnswer(body.answer); if (!a.text) throw new HttpError(400, 'Claude 답이 비어 있어요. 받은 답을 통째로 붙여 넣어 주세요.'); text = a.text; if (a.ranges) ranges = a.ranges; }
+    let changed = false, n = 0;
+    if (String(ranges || '').trim()) changed = setRanges(E, ranges);
+    if (text != null && String(text).trim()) n = saveDraftText(E, text);
+    if (body.feedback != null) E.s.feedback = String(body.feedback).slice(0, 4000);
+    E.s.feedbackAt = Date.now(); save(E);
+    return { json: { ok: true, rangesChanged: changed, lines: n, ranges: (E.s.sources[0]?.ranges || []).join(', ') } };
+  },
+  'POST /feedback': async ({ body }) => {
+    const E = getEp(body.ep); mustIdle(E);
+    E.s.feedback = String(body.feedback || '').slice(0, 4000); save(E);
+    const prompt = await feedbackPrompt(E, E.s.feedback);
+    if (!process.env.ANTHROPIC_API_KEY || body.copyOnly) return { json: { ok: true, ai: false, request: prompt } };
+    let txt; try { txt = await callClaude(prompt); } catch (e) { throw new HttpError(502, 'Claude 호출 실패: ' + e.message); }
+    const a = splitAnswer(txt); let changed = false;
+    if (a.ranges) changed = setRanges(E, a.ranges);
+    const n = saveDraftText(E, a.text); E.s.feedbackAt = Date.now(); save(E);
+    return { json: { ok: true, ai: true, lines: n, rangesChanged: changed, text: draftText(E), ranges: (E.s.sources[0]?.ranges || []).join(', ') } };
   },
   'POST /link': ({ body }) => { const E = getEp(body.ep); E.s.ideaId = String(body.ideaId || ''); save(E); return { json: { ok: true } }; },
   'POST /run': ({ body }) => {
@@ -275,7 +359,7 @@ async function readBody(req, limit) {
 const MIME = { '.mp4': 'video/mp4', '.m4a': 'audio/mp4', '.webm': 'audio/webm', '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.ogg': 'audio/ogg', '.json': 'application/json; charset=utf-8',
   '.md': 'text/plain; charset=utf-8', '.txt': 'text/plain; charset=utf-8', '.ass': 'text/plain; charset=utf-8', '.log': 'text/plain; charset=utf-8', '.jpg': 'image/jpeg', '.png': 'image/png' };
 
-function serveFile(req, res, E, rel) {
+function serveFile(req, res, E, rel, dlName = '') {
   const full = path.resolve(E.dir, String(rel || ''));
   if (!rel || !(full === E.dir || full.startsWith(E.dir + path.sep))) throw new HttpError(403, '이 폴더 밖의 파일은 열 수 없어요.');
   let real; try { real = fs.realpathSync(full); } catch { throw new HttpError(404, '파일이 없어요.'); }
@@ -283,6 +367,7 @@ function serveFile(req, res, E, rel) {
   const st = fs.statSync(real); if (!st.isFile()) throw new HttpError(404, '파일이 아니에요.');
   const type = MIME[path.extname(real).toLowerCase()] || 'application/octet-stream';
   const h = { 'Content-Type': type, 'Accept-Ranges': 'bytes', 'Cache-Control': 'no-cache' };
+  if (dlName) h['Content-Disposition'] = `attachment; filename="download${path.extname(real)}"; filename*=UTF-8''${encodeURIComponent(dlName)}`;   // ⑦ 내려받기
   let start = 0, end = st.size - 1, code = 200;
   const m = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
   if (m && (m[1] || m[2])) {
@@ -334,12 +419,12 @@ const server = http.createServer(async (req, res) => {
       const ext = path.extname(real).toLowerCase(); res.writeHead(200, { 'Content-Type': ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : ext === '.webp' ? 'image/webp' : 'image/png', 'Cache-Control': 'no-cache' });
       return req.method === 'HEAD' ? res.end() : fs.createReadStream(real).pipe(res);
     }
-    if (key === 'GET /file') return serveFile(req, res, getEp(url.searchParams.get('ep')), url.searchParams.get('path'));
+    if (key === 'GET /file') { const E = getEp(url.searchParams.get('ep')), rel = url.searchParams.get('path'); return serveFile(req, res, E, rel, url.searchParams.get('dl') ? `${sanitize(E.s.title, 60) || E.s.ep}-${path.basename(String(rel || ''))}` : ''); }
     if (key === 'POST /voice') { const r = await saveVoice(getEp(url.searchParams.get('ep')), url.searchParams, req); return send(200, JSON.stringify(r.json)); }
     const fn = routes[key]; if (!fn) throw new HttpError(404, '없는 주소예요: ' + url.pathname);
     let body = {};
     if (req.method === 'POST') { const raw = (await readBody(req, 1e6)).toString('utf8'); try { body = raw ? JSON.parse(raw) : {}; } catch { throw new HttpError(400, '요청이 JSON 이 아니에요.'); } }
-    const r = fn({ body, q: url.searchParams });
+    const r = await fn({ body, q: url.searchParams });
     if (r.json) return send(200, JSON.stringify(r.json));
     return send(200, r.text ?? '', 'text/plain; charset=utf-8');
   } catch (e) {

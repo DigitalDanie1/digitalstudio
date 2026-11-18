@@ -24,20 +24,22 @@ export function fmtTime(sec) {
   const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60;
   return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`;
 }
-// "0:30-0:42, 1:05-1:12" → ['0:30-0:42','1:05-1:12'] (잘못된 항목이 있으면 Error)
+// "0:30-0:42, 1:05-1:12x0.5" → ['0:30-0:42','1:05-1:12x0.5'] (잘못된 항목이 있으면 Error). 끝의 x0.5 = 0.5배 느리게(슬로우)
 export const MAX_RANGE = 15;
 export function parseRanges(input) {
   const toks = Array.isArray(input) ? input : String(input || '').split(/[,\s]+/).map(x => x.trim()).filter(Boolean);
   return toks.map(t => {
-    const m = /^(\d+(?::\d{1,2}){0,2})\s*[-~–]\s*(\d+(?::\d{1,2}){0,2})$/.exec(t);
-    if (!m) throw new StepError(`구간 모양이 이상해요: "${t}" (예: 0:30-0:42)`);
-    const a = parseTime(m[1]), b = parseTime(m[2]);
+    const m = /^(\d+(?::\d{1,2}){0,2})\s*[-~–]\s*(\d+(?::\d{1,2}){0,2})(?:[x×*@](\d*\.?\d+))?$/i.exec(t);
+    if (!m) throw new StepError(`구간 모양이 이상해요: "${t}" (예: 0:30-0:42, 슬로우는 0:30-0:34x0.5)`);
+    const a = parseTime(m[1]), b = parseTime(m[2]), sp = m[3] == null ? 1 : +m[3];
     if (!(b > a)) throw new StepError(`구간의 끝이 시작보다 늦어야 해요: ${t}`);
     if (b - a > MAX_RANGE + 0.01) throw new StepError(`한 구간은 ${MAX_RANGE}초까지예요: ${t}`);
-    return `${fmtTime(a)}-${fmtTime(b)}`;
+    if (!(sp >= 0.25 && sp <= 1)) throw new StepError(`슬로우 배속은 0.25~1 사이예요: ${t} (예: x0.5)`);
+    return `${fmtTime(a)}-${fmtTime(b)}${sp < 1 ? 'x' + +sp.toFixed(2) : ''}`;
   });
 }
-export const rangeSecs = r => r.split('-').map(parseTime);
+export const rangeSpeed = r => { const m = /x(\d*\.?\d+)$/.exec(String(r)); return m ? +m[1] : 1; };
+export const rangeSecs = r => String(r).replace(/x\d*\.?\d+$/, '').split('-').map(parseTime);
 
 export const sanitize = (t, n = 40) =>
   String(t || '').replace(/[\\/:*?"<>|#%&{}$!'`@+=~^;,\[\]()]/g, '').replace(/\s+/g, ' ').trim().slice(0, n).trim();

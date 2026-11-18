@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   FFMPEG, YTDLP, FONT_DIR, FONT_NAME, StepError, StopError, run, ff, probe, lastLines, exists,
-  parseRanges, rangeSecs, fmtTime, isLocalSource, localPath, MAX_RANGE,
+  parseRanges, rangeSecs, rangeSpeed, fmtTime, isLocalSource, localPath, MAX_RANGE,
 } from './util.mjs';
 
 export const STEP_DEFS = [
@@ -72,6 +72,15 @@ export const CHANNEL_PROFILES = {
     disclaimer: '영상 장면은 해설·논평 목적으로 일부만 사용했습니다. 영상 속 영어 발언은 한국어로 옮겨 자막으로 달았습니다.',
     transcript: true,
   },
+  // 매트 스토리 룩: 검은 바탕 + 위 2줄 제목(노랑/빨강) + 가운데 경기 화면 + 굵은 자막 + 선수 태그·점수 도장·슬로우 표시 + 원본 경기 소리
+  'yt-mat': {
+    persona: fmt => `레슬링·주짓수·MMA를 취미로 하는 생활체육인(20~40대 직장인)을 위한 유튜브 ${fmt} 해설 작가`,
+    rules: [],
+    look: { kind: 'mat' },
+    tags: ['레슬링', '주짓수', 'MMA'],
+    disclaimer: '경기 장면은 해설·분석 목적으로 일부만 사용했습니다.',
+    transcript: false,
+  },
 };
 export const profileOf = E => CHANNEL_PROFILES[E?.s?.channel] || CHANNEL_PROFILES['yt-wrestling'];
 // 편집 룩: 영상마다 고를 수 있어요 (state.look). 비어 있으면 채널 자기 룩. 룩 이름 = 룩을 가진 채널 설정의 이름.
@@ -79,6 +88,7 @@ export const LOOK_CHOICES = [
   { id: 'yt-wrestling', name: '기본 룩', desc: '흰 자막 + 첫 1.5초 제목 카드 (레슬링 채널 기본)' },
   { id: 'yt-christian', name: '배너 룩', desc: '남색 배너 + 민트 강조 + 흑백 인트로 + 한·영 자막 (기독교 채널 기본)' },
   { id: 'yt-politics', name: '펀치 룩', desc: '첫 1초 훅 제목 + 굵은 자막 + 노란 강조 + 워터마크 (정치 채널 기본)' },
+  { id: 'yt-mat', name: '매트 스토리 룩', desc: '검은 바탕 + 위 2줄 제목(노랑·빨강) + 굵은 자막 + 선수 태그·점수 도장·SLOW 표시 + 원본 경기 소리 (레슬링 추천)' },
 ];
 export const lookKeyOf = E => (CHANNEL_PROFILES[E?.s?.look] ? E.s.look : CHANNEL_PROFILES[E?.s?.channel] ? E.s.channel : 'yt-wrestling');
 // 배너 룩 기본값 (채널의 look 이 덮어써요). 글자 크기는 1080x1920 기준 px.
@@ -88,9 +98,17 @@ export const LOOK_DEFAULTS = { kind: 'banner', bg: '#0E1B33', accent: '#3DE0C0',
 // 펀치 룩 기본값: 훅(처음 hookDur초, 화면 hookScale 크기) / 자막 / 펀치 한 단어 / 워터마크
 export const PUNCH_DEFAULTS = { kind: 'punch', accent: '#FFD400', hookFs: 140, hookScale: 0.78, hookDur: 1.3, hookY: 0.72, hookBord: 8,
   capFs: 84, capY: 0.68, capBord: 6, punchFs: 160, punchY: 0.60, punchRot: -4, subBox: false, boxAlpha: 0x1A, boxPad: 24, boxMinW: 1000, boxMinH: 260, boxR: 28, boxLineH: 1.12, watermark: 'FIELDNOTE', wmFs: 68, wmX: 60, wmY: 140, font: '', punchFont: '' };
-export const resolveLook = look => (look ? { ...(look.kind === 'punch' ? PUNCH_DEFAULTS : LOOK_DEFAULTS), ...look } : null);
+// 매트 스토리 룩 기본값 (1080x1920 기준 px): 제목 두 줄 / 경기 화면 칸(footY~footY+footH) / 자막 / 태그 / 도장 / 출처 / 워터마크 / 소리
+export const MAT_DEFAULTS = { kind: 'mat', footY: 470, footH: 970, titleFs: 92, titleY1: 257, titleY2: 355, c1: '#FFE100', c2: '#FF2B2B',
+  accent: '#FFE100', capFs: 78, capY: 1172, capBord: 7, capWrap: 15, tagX: 44, tagY: 500, tagH: 84, tagFs: 50, tagBg: '#F23A3A', tagSubFs: 36, tagSubH: 62, tagDur: 5,
+  slowFs: 66, slowY: 500, slowH: 91, slowRight: 1040, stampY: 790, stampFs: 220, stampSubFs: 62, stampRot: 4, stampBord: 10,
+  creditY: 1486, creditFs: 38, watermark: 'MAT STORY', wmFs: 46, wmX: 1050, wmY: 1420, audio: 'orig', origVol: 1.0, bgmVol: 0.22, font: '' };
+const LOOK_BASE = { punch: PUNCH_DEFAULTS, mat: MAT_DEFAULTS };
+export const resolveLook = look => (look ? { ...(LOOK_BASE[look.kind] || LOOK_DEFAULTS), ...look } : null);
 // 쇼츠일 때만 적용
 export const lookOf = E => (E?.s?.format === 'long' ? null : resolveLook(CHANNEL_PROFILES[lookKeyOf(E)].look));
+// 원본 영상 소리를 살리는 룩인가 (매트 스토리 룩). 다른 룩은 예전처럼 원본 소리를 빼요.
+export const keepsAudio = E => lookOf(E)?.audio === 'orig';
 
 // ---------- 영어 자막(VTT) 읽기 ----------
 const vttSecs = t => { const p = t.replace(',', '.').split(':').map(Number); return p.reduce((a, n) => a * 60 + n, 0); };
@@ -190,6 +208,21 @@ export function parseBanner(text) {
 const cutWords = (s, n) => { let o = ''; for (const x of s.split(' ')) { if ([...(o ? o + ' ' + x : x)].length > n) { if (!o) o = [...x].slice(0, n).join(''); break; } o = o ? o + ' ' + x : x; } return o; };
 // 훅 줄: "> 훅: 훅 제목" (없으면 null)
 export function parseHook(text) { const m = /^\s*>\s*훅\s*[:：]\s*(.+?)\s*$/m.exec(String(text || '')); return m ? { text: m[1].trim(), raw: m[1].trim() } : null; }
+// 출처 줄: "> 출처: United World Wrestling" (없으면 소스 채널 이름)
+export function parseCredit(text) { const m = /^\s*>\s*출처\s*[:：]\s*(.+?)\s*$/m.exec(String(text || '')); return m ? m[1].trim() : ''; }
+// 매트 스토리 룩의 표시 줄: "[태그] 큰 글 / 작은 글", "[점수] 4 : 0 / 쿠바 4 : 터키 0" (바로 다음 자막 줄에 붙어요, 녹음 줄은 아니에요)
+export const MAT_DIRECTIVE = /^\[(태그|점수|도장)\]\s*(.*)$/;
+const splitSlash = t => { const i = t.indexOf(' / '); return i < 0 ? { main: t.trim(), sub: '' } : { main: t.slice(0, i).trim(), sub: t.slice(i + 3).trim() }; };
+export function matItems(lines) {
+  const out = []; let pend = {};
+  for (const raw of lines) {
+    const m = MAT_DIRECTIVE.exec(String(raw).trim());
+    if (m) { const v = splitSlash(m[2]); if (!v.main) continue; pend[m[1] === '태그' ? 'tag' : 'stamp'] = v; continue; }
+    out.push({ ...parseLine(raw, 'mat'), ...pend }); pend = {};
+  }
+  if (out.length && (pend.tag || pend.stamp)) Object.assign(out[out.length - 1], pend);  // 끝에 남은 표시 줄은 마지막 자막에
+  return out;
+}
 export const hookFromTitle = title => ({ text: cutWords(String(title || '').replace(/["'“”‘’「」『』]/g, '').replace(/\s+/g, ' ').trim(), 16) });
 export function bannerFromTitle(title) {
   const t = String(title || '').replace(/["'“”‘’「」『』]/g, '').replace(/\s+/g, ' ').trim(), w = t.split(' ').filter(Boolean);
@@ -203,6 +236,7 @@ export function bannerFromTitle(title) {
 const stripHl = s => s.replace(/\*([^*\n]+)\*/g, '$1').replace(/\*/g, '').replace(/\s+/g, ' ').trim();
 export function parseLine(raw, kind = 'banner') {
   let s = String(raw || '').trim(), narr = false;
+  if (kind === 'mat') return { narr: false, ko: s, en: '', text: stripHl(s) };
   if (kind === 'punch') {  // "!그 순간!" = 펀치 한 단어, 영어 줄 없음
     const punch = s.startsWith('!'); if (punch) s = s.replace(/^!+\s*/, '');
     return { narr: false, punch, ko: s, en: '', text: stripHl(s) };
@@ -212,7 +246,7 @@ export function parseLine(raw, kind = 'banner') {
   return { narr, ko, en, text: stripHl(ko) || stripHl(en) };
 }
 // 붙여 넣은 대사 정리: 번호·글머리·따옴표 떼기 (POST /script 용)
-export const SCRIPT_MAX_LINES = 20;
+export const SCRIPT_MAX_LINES = 30;
 export function cleanPasted(text) {
   return parseScript(text).map(l => l.replace(/^["'“”‘’「『]+/, '').replace(/["'“”‘’」』]+$/, '').trim()).filter(Boolean);
 }
@@ -286,9 +320,14 @@ async function download(E, ctx) {
 }
 
 // ---------- 3. 구간 자르기 (스튜디오 ④ 컷 편집의 첫 단계) ----------
-function clipFilter(E) {
+function clipFilter(E, speed = 1) {
+  const f = clipFilter0(E);
+  return speed < 1 ? f.replace(/^\[0:v\]/, `[0:v]setpts=${+(1 / speed).toFixed(4)}*PTS,`) : f;
+}
+function clipFilter0(E) {
   const { w, h } = specOf(E);
   const look = lookOf(E);
+  if (look?.kind === 'mat') return `[0:v]scale=${w}:${look.footH}:force_original_aspect_ratio=increase,crop=${w}:${look.footH},fps=30,format=yuv420p,setsar=1[v]`;
   if (look?.kind === 'punch') return `[0:v]scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},fps=30,format=yuv420p,setsar=1[v]`;
   if (look) return `[0:v]scale=${w}:${h - look.bannerH}:force_original_aspect_ratio=increase,crop=${w}:${h - look.bannerH},fps=30,format=yuv420p,setsar=1[v]`;
   if (E.s.format === 'long') return `[0:v]scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,fps=30,format=yuv420p,setsar=1[v]`;
@@ -296,7 +335,9 @@ function clipFilter(E) {
     `[b]scale=${w}:${h}:force_original_aspect_ratio=decrease[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2,fps=30,format=yuv420p,setsar=1[v]`;
 }
 // 클립 번호(clip_NN) 순서 = 소스 순서 × 구간 순서. 이 목록으로 클립이 어느 소스의 어디였는지 알아요.
-export const clipMap = E => E.s.sources.flatMap((s, si) => s.ranges.map(range => { const [a, b] = rangeSecs(range); return { si, range, a, b }; }));
+export const clipMap = E => E.s.sources.flatMap((s, si) => s.ranges.map(range => { const [a, b] = rangeSecs(range); return { si, range, a, b, speed: rangeSpeed(range) }; }));
+// atempo 는 0.5~2 만 돼서 더 느리면 여러 번 이어요
+const atempoChain = sp => { const out = []; let r = sp; while (r < 0.5 - 1e-9) { out.push('atempo=0.5'); r /= 0.5; } if (Math.abs(r - 1) > 1e-6) out.push(`atempo=${+r.toFixed(4)}`); return out.join(','); };
 async function clip(E, ctx) {
   const info = readJson(E.p('소스.json'));
   if (!info) throw new StepError('소스 확인이 먼저예요. "소스 확인" 단계를 실행하세요.');
@@ -327,9 +368,17 @@ async function clip(E, ctx) {
       if (!got) throw new StepError('받은 파일을 찾지 못했어요.');
       input = E.p('원본', got); offset = a - ps;
     }
-    ctx.log(`  자르는 중 → ${path.basename(clipFile)} (${d}초, ${E.s.format === 'long' ? '가로' : '세로'})`);
+    const sp = m.speed || 1, outD = d / sp;
+    ctx.log(`  자르는 중 → ${path.basename(clipFile)} (${d}초${sp < 1 ? ` → 슬로우 ${sp}배 ${outD.toFixed(1)}초` : ''}, ${E.s.format === 'long' ? '가로' : '세로'})`);
     try {
-      await ff(['-ss', String(offset), '-t', String(d), '-i', input, '-filter_complex', clipFilter(E), '-map', '[v]', '-an',
+      let fc = clipFilter(E, sp), aIn = [], aMap = ['-an'];
+      if (keepsAudio(E)) {   // 원본 소리 살리기: 소리가 없는 영상이면 무음으로 채워서 클립마다 소리 칸이 꼭 있게 해요 (이어 붙이기 때문)
+        const has = (await probe(input, ctx)).hasAudio, at = atempoChain(sp);
+        if (has) fc += `;[0:a]aresample=44100,aformat=channel_layouts=stereo${at ? ',' + at : ''},atrim=0:${outD.toFixed(3)},asetpts=PTS-STARTPTS[a]`;
+        else { aIn = ['-f', 'lavfi', '-t', outD.toFixed(3), '-i', 'anullsrc=r=44100:cl=stereo']; fc += `;[1:a]anull[a]`; }
+        aMap = ['-map', '[a]', '-c:a', 'aac', '-b:a', '160k'];
+      }
+      await ff(['-ss', String(offset), '-t', String(d), '-i', input, ...aIn, '-filter_complex', fc, '-map', '[v]', ...aMap,
         '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', clipFile], ctx);
     } catch (e) { if (e instanceof StopError) throw e; throw new StepError(`ffmpeg가 영상을 자르지 못했어요: ${lastLines(e.err)}`); }
     if (!exists(clipFile)) throw new StepError('구간을 자르지 못했어요(영상이 짧은가요?).');
@@ -356,7 +405,9 @@ export const promptFor = (E, info, clips, T) => {
     '번호, 따옴표, 머리말, 설명 없이 대사 줄만 출력해.',
   ];
   const look = lookOf(E);
-  if (look?.kind === 'punch') {
+  if (look?.kind === 'mat') {
+    rules.splice(0, rules.length, ...MAT_RULES(Math.max(6, Math.min(16, Math.round(T / 3.2)))), ...P.rules);
+  } else if (look?.kind === 'punch') {
     // 펀치 룩: 한국어 자막만 + "!" 펀치 줄 (훅 제목은 이펙트 단계)
     rules.splice(0, rules.length, rules[0], rules[1], rules[2], rules[3], ...P.rules,
       '정책·주장·행동은 날카롭게 비판해도 되지만, 특정 국적·인종·종교의 사람들을 집단으로 조롱하거나 비하하지 마.',
@@ -394,7 +445,19 @@ ${said}
 규칙:
 ${rules.map((r, i) => `${i + 1}. ${r}`).join('\n')}`;
 };
-async function callClaude(prompt, log) {
+// 매트 스토리 룩 대본 규칙 (대본 요청문·피드백 요청문이 같이 써요)
+export const MAT_RULES = n => [
+  '맨 첫 줄은 "> 배너: 위 줄 / 아랫줄" 형식의 제목 두 줄. 위 줄(노란 글씨)은 12자 안팎으로 놀라운 사실, 아랫줄(빨간 글씨)은 선수 별명·결과 + " ㄷㄷ". 예: > 배너: 15초 만에 130kg급을 / 들어 던진 5연패 ㄷㄷ',
+  `그다음은 자막 줄. 영상 길이에 맞춰 약 ${n}줄, 한 줄 18자 이내. 친구한테 말하듯 반말 해설 ("~했어", "~지?", "~거든").`,
+  '첫 자막 줄은 시청자를 붙잡는 한 문장. 마지막 줄은 다시 보고 싶게 ("자, 15초 만에 한 번 더.").',
+  '줄마다 핵심 단어 1~2개를 *별표*로 감싸 (노란색으로 강조돼요).',
+  '선수·대회를 소개할 자리 바로 앞에 "[태그] 선수 이름 (나라) / 대회 · 체급" 줄 1~2개. 예: [태그] 미하인 로페스 (쿠바) / 2016 리우 결승 · 130kg 그레코로만',
+  '점수나 결과가 나오는 순간 바로 앞에 "[점수] 큰 글 / 작은 설명" 줄 1~2개. 예: [점수] 4 : 0 / 쿠바 4 : 터키 0 · 경기 시계 0:20 · 예: [점수] FALL / 1분 11초 폴승',
+  '기술 설명은 "① 확 낮추기", "② 허리 감고 들기" 처럼 번호로 끊어도 좋아.',
+  '확인되지 않은 기록·숫자는 쓰지 마. 모르면 빼.',
+  '번호 매기기, 따옴표, 설명 없이 위 형식의 줄만 출력해.',
+];
+export async function callClaude(prompt, log) {
   const key = process.env.ANTHROPIC_API_KEY;
   const r = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST', signal: AbortSignal.timeout(60000),
@@ -413,12 +476,12 @@ async function script(E, ctx) {
   fs.mkdirSync(E.p('편집'), { recursive: true });
   if (exists(f)) { fs.copyFileSync(f, E.p('편집/대본.bak.md')); ctx.log('이전 대본은 편집/대본.bak.md 로 백업했어요.'); }
   const prompt = promptFor(E, info, clips, T);
-  let lines = null;
+  let lines = null, aiRaw = '';
   if (process.env.ANTHROPIC_API_KEY) {
     ctx.log('Claude에게 대본을 부탁하는 중…');
     try {
-      const txt = await callClaude(prompt);
-      lines = parseScript(txt.replace(/^["“”]|["“”]$/gm, '')).slice(0, 14);
+      const txt = aiRaw = await callClaude(prompt);
+      lines = parseScript(txt.replace(/^["“”]|["“”]$/gm, '')).slice(0, lookOf(E)?.kind === 'mat' ? SCRIPT_MAX_LINES : 14);
       if (!lines.length) throw new Error('빈 응답');
       ctx.log(`대본 ${lines.length}줄을 받았어요.`);
       fs.rmSync(E.p('편집/대본-요청.txt'), { force: true });
@@ -427,7 +490,19 @@ async function script(E, ctx) {
   const head = `# ${E.s.title}\n> 한 줄 = 자막 한 장면(25자 안팎). "#"·">" 로 시작하는 줄은 무시돼요.\n` +
     (E.s.note ? E.s.note.split(/\r?\n/).filter(Boolean).map(l => `> 메모: ${l}`).join('\n') + '\n' : '') + '\n';
   const look = lookOf(E);
-  if (lines) fs.writeFileSync(f, head + lines.join('\n') + '\n');
+  if (lines) {
+    const ban = look?.kind === 'mat' ? parseBanner(aiRaw) : null;   // 매트 룩: AI가 쓴 "> 배너:" 줄은 머리말에 남겨요
+    fs.writeFileSync(f, head + (ban ? `> 배너: ${ban.raw}\n` : '') + lines.join('\n') + '\n');
+  }
+  else if (look?.kind === 'mat') {
+    const n = Math.max(6, Math.min(14, Math.round(T / 3.2)));
+    fs.writeFileSync(f, head + '> 아래 형식으로 채우세요. 자막 줄: 반말 해설 한 줄(18자 안팎). 강조할 단어는 *별표*로 감싸요 (노란색).\n' +
+      '> [태그] 선수 (나라) / 대회 · 체급  → 왼쪽 위 빨간 이름표.   [점수] 4 : 0 / 쿠바 4 : 터키 0  → 큰 노란 도장. 둘 다 바로 다음 자막 줄에 붙어요.\n' +
+      '> 슬로우는 구간 끝에 x0.5 를 붙여요 (예: 0:30-0:34x0.5).\n' +
+      `> 배너: [여기에 위 줄] / [여기에 아랫줄] ㄷㄷ\n` + Array(n).fill(PLACEHOLDER).join('\n') + '\n');
+    fs.writeFileSync(E.p('편집/대본-요청.txt'), prompt + '\n\n(받은 줄을 편집/대본.md 에 붙여 넣으세요.)\n');
+    ctx.log('편집/대본-요청.txt 에 Claude 채팅용 요청문을 적어 뒀어요.');
+  }
   else if (look?.kind === 'punch') {
     const n = Math.max(4, Math.min(8, Math.round(T / 4)));
     fs.writeFileSync(f, head + '> 아래 형식으로 채우세요. 자막 줄: 한국어 한 줄(24자 안팎). 강조할 단어는 *별표*로 감싸요 (노란색).\n' +
@@ -454,6 +529,53 @@ async function script(E, ctx) {
   ctx.log('대본 확인 대기: 편집/대본.md 를 읽고 고친 뒤 "대본 확인 완료 · 계속"을 누르세요.');
 }
 
+// ---------- 피드백 (1차 편집을 보고 고칠 점 → 구간·대본 고치기) ----------
+// 지금 대본 글: "> 배너:"·"> 출처:" 줄 + 대사 줄 (설명 머리말은 빼요)
+export function draftText(E) {
+  let t = ''; try { t = fs.readFileSync(E.p('편집/대본.md'), 'utf8'); } catch { return ''; }
+  const keep = t.split(/\r?\n/).map(l => l.trim()).filter(l => /^>\s*(배너|훅|출처)\s*[:：]/.test(l));
+  return [...keep, ...parseScript(t)].join('\n');
+}
+// Claude 답에서 "구간: …" 줄과 대본을 나눠요 (코드 블록 표시는 지워요)
+export function splitAnswer(text) {
+  let ranges = null; const out = [];
+  for (const l of String(text || '').replace(/```[a-z]*\n?/gi, '').split(/\r?\n/)) {
+    const m = /^\s*(?:\*\*)?구간(?:\*\*)?\s*[:：]\s*(.+?)\s*$/.exec(l);
+    if (m) ranges = m[1]; else out.push(l);
+  }
+  return { ranges, text: out.join('\n').trim() };
+}
+export async function feedbackPrompt(E, feedback, ctx = {}) {
+  const info = readJson(E.p('소스.json'), []), clips = exists(E.p('클립')) ? await clipDurations(E, ctx) : [];
+  const T = Math.min(clips.reduce((a, c) => a + c.duration, 0) || 30, specOf(E).maxTotal), look = lookOf(E), P = profileOf(E);
+  const cur = draftText(E), hasPh = !cur || cur.includes(PLACEHOLDER) || /\[여기에/.test(cur);
+  const rng = E.s.sources.map((s, i) => `소스 ${i + 1} (${(info[i] && fmtTime(info[i].duration || 0)) || '?'}): ${s.ranges.join(', ') || '(없음)'}`).join('\n');
+  const rules = look?.kind === 'mat' ? MAT_RULES(Math.max(6, Math.min(16, Math.round(T / 3.2)))) : ['한 줄 = 자막 한 장면, 25자 이내.', '확인되지 않은 기록·숫자는 쓰지 마.', '친구에게 말하듯 쉬운 말.'];
+  return `너는 ${P.persona(E.s.format === 'long' ? '롱폼' : '쇼츠')}야.
+1차 편집본을 본 내 피드백을 반영해서, 쓸 구간과 자막 대본을 고쳐 줘.
+
+- 제목: ${E.s.title}
+- 메모: ${E.s.note || '(없음)'}
+- 소스 영상: ${info.map(s => `${s.title} (${s.channel})`).join(' / ') || '(없음)'}
+- 지금 영상 길이: 약 ${T.toFixed(0)}초
+
+지금 쓰는 구간 (한 구간 15초까지, 끝에 x0.5 를 붙이면 0.5배 슬로우):
+${rng}
+
+지금 대본:
+${hasPh ? '(아직 없음 → 새로 써 줘)' : cur}
+
+내 피드백:
+${String(feedback || '').trim() || '(없음 → 더 재밌고 잘 보이게 다듬어 줘)'}
+
+출력 형식 (이 형식 그대로, 다른 설명 없이):
+구간: 0:30-0:42, 1:05-1:09x0.5   ← 구간을 안 바꿔도 지금 구간을 그대로 적어 줘. 소스가 여러 개면 첫 소스 구간만.
+그다음 줄부터 대본.
+
+대본 규칙:
+${rules.map((r, i) => `${i + 1}. ${r}`).join('\n')}`;
+}
+
 // ---------- 4. 편집 계획 (대본 없이: 구간·클립만) ----------
 // 나레이션 줄이 보이는 구간들 (이어진 줄은 하나로 합쳐요) → [[시작,끝],...]
 export function bwSpans(L) {
@@ -470,13 +592,13 @@ async function plan(E, ctx) {
     if (T >= max - 0.05) break;
     const d = Math.min(c.duration, max - T); if (d < 0.2) continue;
     const m = map[(+/clip_(\d+)/.exec(c.file)?.[1] || 0) - 1];   // 이 클립이 소스의 어디였는지 (자막 자동화가 써요)
-    used.push({ file: c.file, start: +T.toFixed(3), duration: +d.toFixed(3), ...(m ? { si: m.si, range: m.range, a: m.a, b: m.b } : {}) }); T += d;
+    used.push({ file: c.file, start: +T.toFixed(3), duration: +d.toFixed(3), ...(m ? { si: m.si, range: m.range, a: m.a, b: m.b, ...(m.speed < 1 ? { speed: m.speed } : {}) } : {}) }); T += d;
   }
   const P = { title: E.s.title, format: E.s.format, width: specOf(E).w, height: specOf(E).h, total: +T.toFixed(2), clips: used, lines: [] };
   if (look) P.look = look;
   writeJson(E.p('편집/편집계획.json'), P);
   for (const u of used) ctx.log(`  ${u.start.toFixed(1)}~${(u.start + u.duration).toFixed(1)}초 · ${path.basename(u.file)}${u.range ? ' · 원본 ' + u.range : ''}`);
-  ctx.log(`편집 계획 완성: 클립 ${used.length}개 · 총 ${T.toFixed(1)}초${look ? ' · ' + (look.kind === 'punch' ? '펀치 룩' : '배너 룩') : ' · 기본 룩'}`);
+  ctx.log(`편집 계획 완성: 클립 ${used.length}개 · 총 ${T.toFixed(1)}초${look ? ' · ' + ({ punch: '펀치 룩', mat: '매트 스토리 룩' }[look.kind] || '배너 룩') : ' · 기본 룩'}`);
   relayout(E, ctx);
 }
 
@@ -491,14 +613,15 @@ const spread = (items, t0, t1) => {   // 글자 수에 비례해 줄마다 시�
 export function layoutLines(E, ctx) {
   const lines = checkScript(E), look = lookOf(E), P = readJson(E.p('편집/편집계획.json'));
   if (!P) throw new StepError('컷 편집이 먼저예요. "편집 계획"을 만들어 주세요.');
-  const items = look ? lines.map(l => parseLine(l, look.kind)) : lines.map(text => ({ text })), T = P.total;
+  const items = look?.kind === 'mat' ? matItems(lines) : look ? lines.map(l => parseLine(l, look.kind)) : lines.map(text => ({ text })), T = P.total;
+  if (!items.length) throw new StepError('대본에 자막 줄이 없어요. [태그]·[점수] 줄 말고 자막 줄도 넣어 주세요.');
   const intro = look?.kind === 'banner' && P.bw?.[0] ? P.bw[0][1] : 0;   // 이펙트의 흑백 인트로 안에 나레이션 줄을 먼저 보여 줘요
   let lead = 0; if (intro) while (lead < items.length && items[lead].narr) lead++;
   const timed = lead && lead < items.length ? [...spread(items.slice(0, lead), 0, intro), ...spread(items.slice(lead), intro, T)] : spread(items, 0, T);
   P.lines = items.map((it, i) => {
     const { start, end } = timed[i], clipI = P.clips.findIndex(u => start >= u.start - 1e-6 && start < u.start + u.duration - 1e-6);
     const o = { i, text: it.text, start: +start.toFixed(2), end: +end.toFixed(2), clip: Math.max(0, clipI) };
-    if (look) Object.assign(o, { ko: it.ko, en: it.en, narr: it.narr, ...(look.kind === 'punch' ? { punch: !!it.punch } : {}) });
+    if (look) Object.assign(o, { ko: it.ko, en: it.en, narr: it.narr, ...(look.kind === 'punch' ? { punch: !!it.punch } : {}), ...(it.tag ? { tag: it.tag } : {}), ...(it.stamp ? { stamp: it.stamp } : {}) });
     return o;
   });
   writeJson(E.p('편집/편집계획.json'), P);
@@ -519,7 +642,8 @@ async function rough(E, ctx) {
   fs.writeFileSync(listFile, P.clips.map(c => `file '${E.p(c.file).replace(/'/g, "'\\''")}'\n`).join(''));
   ctx.log(`클립 ${P.clips.length}개를 이어 붙이는 중…`);
   try {
-    await ff(['-f', 'concat', '-safe', '0', '-i', listFile, '-t', String(P.total), '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-an', '-movflags', '+faststart', E.p('편집/가편집.mp4')], ctx);
+    const aud = keepsAudio(E) ? ['-c:a', 'aac', '-b:a', '160k'] : ['-an'];
+    await ff(['-f', 'concat', '-safe', '0', '-i', listFile, '-t', String(P.total), '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', ...aud, '-movflags', '+faststart', E.p('편집/가편집.mp4')], ctx);
   } catch (e) { if (e instanceof StopError) throw e; throw new StepError(`ffmpeg가 이어 붙이지 못했어요: ${lastLines(e.err)}`); }
   fs.rmSync(listFile, { force: true });
   ctx.log('가편집.mp4 완성.');
@@ -640,7 +764,82 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 ${ev.join('\n')}
 `;
 }
+// 매트 스토리 룩. 'fx' = 제목 두 줄·출처·워터마크·SLOW 표시 / 'lines' = 자막·선수 태그·점수 도장
+const assAlpha = a => '&H' + a.toString(16).toUpperCase().padStart(2, '0') + '&';
+function rectEv(layer, a, e, x, y, w, h, color, alpha = 0, r = 6) {
+  x = Math.round(x); y = Math.round(y); w = Math.round(w); h = Math.round(h); r = Math.min(r, Math.floor(h / 2));
+  const d = `m ${x + r} ${y} l ${x + w - r} ${y} b ${x + w} ${y} ${x + w} ${y} ${x + w} ${y + r} l ${x + w} ${y + h - r} b ${x + w} ${y + h} ${x + w} ${y + h} ${x + w - r} ${y + h} l ${x + r} ${y + h} b ${x} ${y + h} ${x} ${y + h} ${x} ${y + h - r} l ${x} ${y + r} b ${x} ${y} ${x} ${y} ${x + r} ${y}`;
+  return `Dialogue: ${layer},${assTime(a)},${assTime(e)},Box,,0,0,0,,{\\p1\\pos(0,0)\\bord0\\shad0\\1c&H${hexBgr(color)}&\\1a${assAlpha(alpha)}}${d}`;
+}
+const matW = (t, fs) => lineW(t, fs) * 0.9;   // 굵은 한글 글꼴 폭 어림 (배너 룩보다 조금 좁게)
+function buildMatAss(P, part = 'all') {
+  const L = P.look, W = P.width, H = P.height, C = Math.round(W / 2), ac = L.accent, font = L.font || FONT_NAME, end = assTime(P.total);
+  const ev = [], fxOn = part !== 'lines', lnOn = part !== 'fx', heavy = '\\b800';
+  if (fxOn) {
+    const b = P.banner || { small: '', big: '' }, rows = [b.small, b.big].filter(Boolean);
+    const fit = t => Math.max(40, Math.min(L.titleFs, Math.floor(L.titleFs * (W - 70) / Math.max(1, matW(t, L.titleFs)))));
+    const ys = rows.length === 2 ? [L.titleY1, L.titleY2] : [Math.round((L.titleY1 + L.titleY2) / 2)], cols = rows.length === 2 ? [L.c1, L.c2] : [L.c1];
+    rows.forEach((t, i) => ev.push(`Dialogue: 2,${assTime(0)},${end},Title,,0,0,0,,{\\an5\\pos(${C},${ys[i]})\\fs${fit(t)}\\1c&H${hexBgr(cols[i])}&${heavy}}${assEsc(t)}`));
+    if (P.credit) ev.push(`Dialogue: 2,${assTime(0)},${end},Credit,,0,0,0,,{\\an5\\pos(${C},${L.creditY})}{\\1c&HBBBBBB&\\b0}영상: {\\1c&HFFFFFF&\\b1}${assEsc(P.credit)}`);
+    if (L.watermark) { const [w1, ...w2] = String(L.watermark).split(' ');
+      ev.push(`Dialogue: 3,${assTime(0)},${end},WM,,0,0,0,,{\\an3\\pos(${L.wmX},${L.wmY})\\fscx78}${assEsc(w1)}${w2.length ? ` {\\1c&H${hexBgr(ac)}&}${assEsc(w2.join(' '))}` : ''}`); }
+    for (const c of P.clips || []) {   // 슬로우 구간에는 오른쪽 위에 SLOW 0.5x
+      if (!(c.speed < 1)) continue;
+      const a = c.start, e = c.start + c.duration, t = `SLOW ${c.speed}x`, bw = matW(t, L.slowFs) * 0.82 + 44;
+      ev.push(rectEv(3, a, e, L.slowRight - bw, L.slowY, bw, L.slowH, ac, 0, 4));
+      ev.push(`Dialogue: 4,${assTime(a)},${assTime(e)},Slow,,0,0,0,,{\\an5\\pos(${Math.round(L.slowRight - bw / 2)},${Math.round(L.slowY + L.slowH / 2)})\\fscx82}${assEsc(t)}`);
+    }
+  }
+  if (lnOn) {
+    const lines = P.lines || [];
+    lines.forEach((l, k) => {
+      ev.push(`Dialogue: 1,${assTime(l.start)},${assTime(l.end)},Cap,,0,0,0,,{\\an8\\pos(${C},${L.capY})${heavy}}${hlText(l.ko ?? l.text, L.capWrap, ac)}`);
+      if (l.tag) {   // 선수 태그: 다음 태그가 나오거나 tagDur 초가 지날 때까지
+        const nx = lines.slice(k + 1).find(x => x.tag), e = Math.min(P.total, Math.max(l.end, Math.min(l.start + L.tagDur, nx ? nx.start : P.total)));
+        const w1 = matW(l.tag.main, L.tagFs) + 48;
+        ev.push(rectEv(3, l.start, e, L.tagX, L.tagY, w1, L.tagH, L.tagBg, 0, 4));
+        ev.push(`Dialogue: 4,${assTime(l.start)},${assTime(e)},Tag,,0,0,0,,{\\an4\\pos(${L.tagX + 24},${Math.round(L.tagY + L.tagH / 2)})}${assEsc(l.tag.main)}`);
+        if (l.tag.sub) {
+          const y2 = L.tagY + L.tagH + 12, w2 = matW(l.tag.sub, L.tagSubFs) + 36;
+          ev.push(rectEv(3, l.start, e, L.tagX, y2, w2, L.tagSubH, '#000000', 0x50, 4));
+          ev.push(`Dialogue: 4,${assTime(l.start)},${assTime(e)},TagS,,0,0,0,,{\\an4\\pos(${L.tagX + 18},${Math.round(y2 + L.tagSubH / 2)})}${assEsc(l.tag.sub)}`);
+        }
+      }
+      if (l.stamp) {   // 점수·결과 도장: 크게 튀어나왔다가 제자리
+        const fs = Math.max(90, Math.min(L.stampFs, Math.floor(L.stampFs * (W - 140) / Math.max(1, lineW(l.stamp.main, L.stampFs) * 0.8))));
+        ev.push(`Dialogue: 5,${assTime(l.start)},${assTime(l.end)},Stamp,,0,0,0,,{\\an2\\pos(${C},${L.stampY})\\fs${fs}\\frz${L.stampRot}\\fscx80\\fscy110\\t(0,140,\\fscx100\\fscy100)${heavy}}${assEsc(l.stamp.main)}`);
+        if (l.stamp.sub) ev.push(`Dialogue: 5,${assTime(l.start)},${assTime(l.end)},StampS,,0,0,0,,{\\an8\\pos(${C + 10},${L.stampY + 6})\\frz${L.stampRot}${heavy}}${assEsc(l.stamp.sub)}`);
+      }
+    });
+  }
+  const sty = (n, fs, col, bord, sh, al, bold = -1) => `Style: ${n},${font},${fs},&H00${col},&H000000FF,&H00000000,&H96000000,${bold},0,0,0,100,100,0,0,1,${bord},${sh},${al},40,40,0,1`;
+  return `[Script Info]
+ScriptType: v4.00+
+PlayResX: ${W}
+PlayResY: ${H}
+WrapStyle: 2
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+${sty('Title', L.titleFs, hexBgr(L.c1), 0, 0, 5)}
+${sty('Credit', L.creditFs, 'FFFFFF', 2, 0, 5)}
+${sty('WM', L.wmFs, 'FFFFFF', 3, 1, 3)}
+${sty('Slow', L.slowFs, '000000', 0, 0, 5)}
+${sty('Box', 20, 'FFFFFF', 0, 0, 7, 0)}
+${sty('Cap', L.capFs, 'FFFFFF', L.capBord, 2, 8)}
+${sty('Tag', L.tagFs, 'FFFFFF', 0, 0, 4)}
+${sty('TagS', L.tagSubFs, 'FFFFFF', 0, 0, 4)}
+${sty('Stamp', L.stampFs, hexBgr(L.c1), L.stampBord, 3, 2)}
+${sty('StampS', L.stampSubFs, 'FFFFFF', 6, 2, 8)}
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+${ev.join('\n')}
+`;
+}
 export function buildAss(P, part = 'all') {
+  if (P.look?.kind === 'mat' && P.height > P.width) return buildMatAss(P, part);
   if (P.look?.kind === 'punch' && P.height > P.width) return buildPunchAss(P, part);
   if (P.look && P.height > P.width) return buildBannerAss(P, part);
   const W = P.width, H = P.height, short = H > W;
@@ -703,7 +902,7 @@ export async function translateCues(cues, call, ctx) {
 }
 // 원본 자막 ASS: 룩에 맞는 모양, 화면 아래쪽 (대본 자막은 화면 가운데쪽이라 겹치지 않아요)
 export function buildSrcAss(P, cues) {
-  const short = P.height > P.width, look = P.look && short ? P.look : null, W = P.width, H = look?.kind === 'banner' ? P.height - look.bannerH : P.height;
+  const short = P.height > P.width, look = P.look && short ? P.look : null, W = P.width, H = look?.kind === 'banner' ? P.height - look.bannerH : look?.kind === 'mat' ? look.footH : P.height;
   const fs = short ? 56 : 42, mv = short ? 110 : 60, wrap = short ? 18 : 40, bil = look?.kind === 'banner' && look.bilingual;
   const col = look?.kind === 'punch' ? hexBgr(look.accent) : 'FFFFFF', font = look?.font || FONT_NAME;
   const ev = cues.map(c => {
@@ -739,11 +938,11 @@ async function subs(E, ctx) {
   try {
     if (!cues.length) {
       ctx.log('소스 영상에서 쓸 자막을 못 찾았어요. 자막 없이 넘어가요. (내 파일은 같은 이름의 .vtt/.srt 를 옆에 두면 읽어요)');
-      await ff(['-i', E.p('편집/가편집.mp4'), '-c', 'copy', '-an', '-movflags', '+faststart', out], ctx);
+      await ff(['-i', E.p('편집/가편집.mp4'), '-c', 'copy', ...(keepsAudio(E) ? [] : ['-an']), '-movflags', '+faststart', out], ctx);
     } else {
       const assFile = E.p('편집/원본자막.ass'); fs.writeFileSync(assFile, buildSrcAss(P, cues));
       ctx.log(`원본 자막 ${cues.length}줄을 입혀요${cues.some(c => c.ko) ? ' (한국어)' : ' (영어)'}…`);
-      await ff(['-i', E.p('편집/가편집.mp4'), '-vf', `ass='${escFilterPath(assFile)}':fontsdir='${FONT_DIR}'`, '-an', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '19', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', out], ctx);
+      await ff(['-i', E.p('편집/가편집.mp4'), '-vf', `ass='${escFilterPath(assFile)}':fontsdir='${FONT_DIR}'`, ...(keepsAudio(E) ? ['-c:a', 'copy'] : ['-an']), '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '19', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', out], ctx);
     }
   } catch (e) { if (e instanceof StopError) throw e; throw new StepError(`ffmpeg가 자막을 입히지 못했어요: ${lastLines(e.err)}`); }
   ctx.log('자막본.mp4 완성.');
@@ -759,7 +958,12 @@ async function fx(E, ctx) {
   const look = P.look && P.height > P.width ? P.look : null, W = P.width, H = P.height;
   // 문구는 영상 제목에서 (대본에 "> 배너:"/"> 훅:" 줄이 있으면 그걸 먼저 써요)
   const txt = exists(E.p('편집/대본.md')) ? fs.readFileSync(E.p('편집/대본.md'), 'utf8') : '';
-  if (look?.kind === 'punch') {
+  if (look?.kind === 'mat') {
+    const b = parseBanner(txt) || bannerFromTitle(E.s.title), info = readJson(E.p('소스.json'), []);
+    const credit = parseCredit(txt) || [...new Set(info.filter(x => !x.local && x.channel).map(x => x.channel))].join(' · ');
+    P.banner = { small: b.small, big: b.big }; P.credit = credit; P.bw = [];
+    ctx.log(`  제목: ${b.small || '(없음)'} / ${b.big}${credit ? ' · 출처: ' + credit : ''}`);
+  } else if (look?.kind === 'punch') {
     const h = parseHook(txt) || hookFromTitle(E.s.title);
     P.hook = { text: h.text, dur: +Math.min(look.hookDur, P.total * 0.3).toFixed(2) }; P.bw = [];
     ctx.log(`  훅 제목: ${h.text} (처음 ${P.hook.dur}초)`);
@@ -772,7 +976,14 @@ async function fx(E, ctx) {
   const assFile = E.p('편집/효과.ass');
   fs.writeFileSync(assFile, buildAss(P, 'fx'));
   let vf = `ass='${escFilterPath(assFile)}':fontsdir='${FONT_DIR}'`, vArgs = ['-vf', vf, '-map', '0:v'];
-  if (look?.kind === 'punch') {
+  let aArgs = ['-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo'], aMap = ['-map', '1:a', '-shortest'];
+  if (look?.kind === 'mat') {
+    // 경기 화면은 가운데 칸(footY부터 footH 높이), 나머지는 검은 바탕 → 제목·출처·워터마크·SLOW
+    vf = `scale=${W}:${look.footH}:force_original_aspect_ratio=increase,crop=${W}:${look.footH},setsar=1,pad=${W}:${H}:0:${look.footY}:color=black,` + vf;
+    vArgs = ['-vf', vf, '-map', '0:v'];
+    if ((await probe(E.p(base), ctx)).hasAudio) { aArgs = []; aMap = ['-map', '0:a']; }
+    ctx.log('매트 스토리 틀(제목·출처·워터마크·SLOW)을 입혀요…');
+  } else if (look?.kind === 'punch') {
     // 처음 hook.dur초는 화면을 줄여 검은 바탕에 놓고(훅 제목), 그다음은 꽉 찬 화면
     const hd = P.hook?.dur || 0, w2 = 2 * Math.round(W * look.hookScale / 2), h2 = 2 * Math.round(H * look.hookScale / 2);
     const full = `[0:v]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1`;
@@ -791,8 +1002,8 @@ async function fx(E, ctx) {
     ctx.log(`배너를 입혀요${bw.length ? ' (인트로는 흑백)' : ''}…`);
   } else ctx.log('제목 카드(처음 1.5초)를 입혀요…');
   try {
-    await ff(['-i', E.p(base), '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo', ...vArgs,
-      '-map', '1:a', '-shortest', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '19', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', E.p('편집/완성본.mp4')], ctx);
+    await ff(['-i', E.p(base), ...aArgs, ...vArgs,
+      ...aMap, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '19', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', E.p('편집/완성본.mp4')], ctx);
   } catch (e) { if (e instanceof StopError) throw e; throw new StepError(`ffmpeg가 이펙트를 입히지 못했어요: ${lastLines(e.err)}`); }
   ctx.log('완성본.mp4 완성 (대본 자막·목소리·음악은 다음 단계에서).');
   relayout(E, ctx);
@@ -826,7 +1037,11 @@ export async function mix(E, ctx) {
   const bgmFile = E.s.mix?.bgm ? assetPath(E, 'bgm', E.s.mix.bgm) : null, stFile = E.s.mix?.sting ? assetPath(E, 'sting', E.s.mix.sting) : null;
   if (E.s.mix?.bgm && !bgmFile) ctx.log(`  배경음악 "${E.s.mix.bgm}" 파일을 못 찾아서 빼요.`);
   if (E.s.mix?.sting && !stFile) ctx.log(`  시그니처 "${E.s.mix.sting}" 파일을 못 찾아서 빼요.`);
-  const mixIn = [];
+  const mixIn = [], look = P.look && P.height > P.width ? P.look : null;
+  if (look?.audio === 'orig' && (await probe(E.p('편집/완성본.mp4'), ctx)).hasAudio) {   // 원본 경기 소리 (목소리가 있으면 조금 낮춰요)
+    chains.push(`[0:a]aresample=44100,aformat=channel_layouts=stereo,volume=${voiceLabels.length ? (look.origVol * 0.6).toFixed(2) : look.origVol}[orig]`);
+    mixIn.push('[orig]'); ctx.log('  원본 경기 소리를 살려요.');
+  }
   if (voiceLabels.length) {
     chains.push(`${voiceLabels.join('')}amix=inputs=${voiceLabels.length}:normalize=0:duration=longest,apad=whole_dur=${T}[voice]`);
     if (bgmFile) chains.push('[voice]asplit=2[voiceA][voiceSC]'); else chains.push('[voice]anull[voiceA]');
@@ -834,7 +1049,7 @@ export async function mix(E, ctx) {
   }
   if (bgmFile) {
     inputs.push('-stream_loop', '-1', '-i', bgmFile);
-    chains.push(`[${idx}:a]aresample=44100,aformat=channel_layouts=stereo,atrim=0:${T},asetpts=PTS-STARTPTS,volume=0.35,afade=t=out:st=${Math.max(0, T - 1.5)}:d=1.5[bgm]`); idx++;
+    chains.push(`[${idx}:a]aresample=44100,aformat=channel_layouts=stereo,atrim=0:${T},asetpts=PTS-STARTPTS,volume=${look?.bgmVol ?? 0.35},afade=t=out:st=${Math.max(0, T - 1.5)}:d=1.5[bgm]`); idx++;
     if (voiceLabels.length) { chains.push('[bgm][voiceSC]sidechaincompress=threshold=0.02:ratio=10:attack=20:release=500:makeup=1[bgmd]'); mixIn.push('[bgmd]'); }
     else mixIn.push('[bgm]');
     ctx.log(`  배경음악: ${E.s.mix.bgm}${voiceLabels.length ? ' (목소리 나올 때 자동으로 낮춤)' : ''}`);

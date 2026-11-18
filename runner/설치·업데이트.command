@@ -13,7 +13,7 @@ TARGET="${FIELDNOTE_INSTALL_DIR:-$HOME_ROOT/실행기}"
 PORT="${FIELDNOTE_RUNNER_PORT:-4777}"
 BIN="$HOME/.local/bin"
 STAMP="$(date +%Y%m%d-%H%M)"
-FILES=(server.mjs steps.mjs util.mjs images.mjs test.mjs README.md "실행기 켜기.command")
+FILES=(server.mjs steps.mjs util.mjs images.mjs test.mjs README.md "실행기 켜기.command" "자동실행 켜기.command" "자동실행 끄기.command")
 
 say() { echo; echo "▶ $*"; }
 finish() { echo; if [ -t 0 ]; then read -r -p "엔터를 누르면 닫혀요"; fi; exit "${1:-0}"; }
@@ -103,7 +103,7 @@ else
   [ -e "$TARGET/styles.json" ] || cp -p "$SRC/styles.json" "$TARGET/styles.json"
   echo "  넣었어요 (내 그림체 styles.json 과 anthropic-key.txt 는 그대로 둬요)"
 fi
-chmod +x "$TARGET/실행기 켜기.command" "$TARGET/설치·업데이트.command" 2>/dev/null
+chmod +x "$TARGET/"*.command 2>/dev/null
 [ "$SRC" = "$TARGET" ] || cp -p "$SRC/설치·업데이트.command" "$TARGET/설치·업데이트.command" 2>/dev/null
 xattr -dr com.apple.quarantine "$TARGET" 2>/dev/null
 
@@ -121,7 +121,11 @@ echo "  버전: $VER"
 # h. 켜기
 if [ "$NO_START" = 0 ]; then
   say "실행기 켜는 중"
-  open "$TARGET/실행기 켜기.command"
+  if [ -f "$HOME/Library/LaunchAgents/com.digitalstudio.runner.plist" ]; then
+    launchctl kickstart -k "gui/$(id -u)/com.digitalstudio.runner" 2>/dev/null || open "$TARGET/자동실행 켜기.command"   # 자동 실행을 쓰는 맥
+  else
+    open "$TARGET/실행기 켜기.command"
+  fi
   H=""
   for _ in $(seq 1 20); do
     H="$(curl -s --max-time 2 "http://127.0.0.1:$PORT/health")" && [ -n "$H" ] && break
