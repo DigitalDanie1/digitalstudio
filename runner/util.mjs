@@ -26,8 +26,13 @@ export function fmtTime(sec) {
 }
 // "0:30-0:42, 1:05-1:12x0.5" → ['0:30-0:42','1:05-1:12x0.5'] (잘못된 항목이 있으면 Error). 끝의 x0.5 = 0.5배 느리게(슬로우)
 export const MAX_RANGE = 15;
+export const ALL_RANGE = '전체';
 export function parseRanges(input) {
   const toks = Array.isArray(input) ? input : String(input || '').split(/[,\s]+/).map(x => x.trim()).filter(Boolean);
+  if (toks.some(t => /^(전체|all)$/i.test(t))) {   // 영상 전체 = "전체" 하나만 (쇼츠는 앞 58초까지)
+    if (toks.length > 1) throw new StepError('"전체"는 혼자만 쓸 수 있어요. 구간과 같이 쓰지 마세요.');
+    return [ALL_RANGE];
+  }
   return toks.map(t => {
     const m = /^(\d+(?::\d{1,2}){0,2})\s*[-~–]\s*(\d+(?::\d{1,2}){0,2})(?:[x×*@](\d*\.?\d+))?$/i.exec(t);
     if (!m) throw new StepError(`구간 모양이 이상해요: "${t}" (예: 0:30-0:42, 슬로우는 0:30-0:34x0.5)`);
@@ -39,7 +44,7 @@ export function parseRanges(input) {
   });
 }
 export const rangeSpeed = r => { const m = /x(\d*\.?\d+)$/.exec(String(r)); return m ? +m[1] : 1; };
-export const rangeSecs = r => String(r).replace(/x\d*\.?\d+$/, '').split('-').map(parseTime);
+export const rangeSecs = r => r === ALL_RANGE ? [0, Infinity] : String(r).replace(/x\d*\.?\d+$/, '').split('-').map(parseTime);
 
 export const sanitize = (t, n = 40) =>
   String(t || '').replace(/[\\/:*?"<>|#%&{}$!'`@+=~^;,\[\]()]/g, '').replace(/\s+/g, ' ').trim().slice(0, n).trim();

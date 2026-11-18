@@ -138,7 +138,7 @@ function ytFeedbackPanel(ep) {
     <p class="small">${st.ai ? '실행기에 AI 키가 있어서 바로 반영할 수 있어요.' : 'AI 키가 없어서 Claude 채팅으로 받아요. 요청문에 지금 구간·대본·피드백이 다 들어가요.'}${ph ? ' 아직 자막 대본이 없어요. 이번에 새로 써 달라고 해요.' : ''}</p>
     ${ai}
     <details class="pl-peek" ${ph ? '' : 'open'}><summary>직접 고치기 (구간·대본)</summary>
-      <label class="pl-scr-l">쓸 구간 (슬로우: 0:30-0:34x0.5)<input class="pl-input" data-ya-draft="ranges" value="${esc(st.ranges)}"></label>
+      <label class="pl-scr-l">쓸 구간 (슬로우: 0:30-0:34x0.5 · 영상 전체: 전체)<input class="pl-input" data-ya-draft="ranges" value="${esc(st.ranges)}"></label>
       <label class="pl-scr-l">대본<textarea class="pl-input" rows="12" data-ya-draft="text">${esc(st.text)}</textarea></label>
       <p class="small"><code>&gt; 배너: 위 줄 / 아랫줄 ㄷㄷ</code> 위 2줄 제목 · <code>&gt; 출처: 채널 이름</code> · <code>[태그] 선수 (나라) / 대회 · 체급</code> 빨간 이름표 · <code>[점수] 4 : 0 / 설명</code> 큰 도장 · <code>*단어*</code> 노란 강조. 태그·점수 줄은 바로 다음 자막 줄에 붙어요.</p>
     </details>
@@ -147,6 +147,12 @@ function ytFeedbackPanel(ep) {
     <div id="yaRec">${recState.open ? recPanel() : ''}</div>
   </div>`;
 }
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('button[data-ya-allrange]'); if (!b) return;
+  const i = document.querySelector('[data-ya-new="ranges"]'); if (i) i.value = '전체';
+  if (typeof ytPipe === 'object') ytPipe.ranges = '전체';
+  b.classList.add('on'); toast('영상 전체를 써요. "1차 편집 만들기"를 누르세요.');
+});
 document.addEventListener('input', e => {
   const t = e.target; if (!t.closest) return;
   const cur = runnerEp(); if (!cur) return; const st = ytFb(cur.ep);

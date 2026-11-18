@@ -690,7 +690,7 @@
       isDone: () => round >= 1,
       statusLine: () => (ep.editRound || 1) === 1 ? runLine() : '',
       result: editResult(1),
-      body: () => dlDone && !editing ? `<div class="pl-ya-form"><label>쓸 구간 (쉼표로 여러 개 · 슬로우: 0:30-0:34x0.5)<input class="pl-input" data-ya-new="ranges" placeholder="0:30-0:42, 1:05-1:09x0.5" value="${esc(ytPipe.ranges || rangesNow)}"></label></div>` : '',
+      body: () => dlDone && !editing ? `<div class="pl-ya-form"><label>쓸 구간 (쉼표로 여러 개 · 슬로우: 0:30-0:34x0.5)<input class="pl-input" data-ya-new="ranges" placeholder="0:30-0:42, 1:05-1:09x0.5" value="${esc(ytPipe.ranges || rangesNow)}"></label><div class="pl-chips"><button type="button" class="pl-chip ${(ytPipe.ranges || rangesNow) === '전체' ? 'on' : ''}" data-ya-allrange>영상 전체 쓰기</button><span class="small">구간을 고르지 않고 영상 전체를 써요 (쇼츠는 앞 58초까지).</span></div></div>` : '',
       run: () => {},
     };
     const e2 = {

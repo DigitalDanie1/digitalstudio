@@ -286,7 +286,7 @@ async function research(E, ctx) {
     }
     for (const r of ranges) {
       const [, e] = rangeSecs(r);
-      if (info.duration && e > info.duration + 0.5) throw new StepError(`구간 ${r} 이(가) 영상 길이(${fmtTime(info.duration)})를 넘어요.`);
+      if (isFinite(e) && info.duration && e > info.duration + 0.5) throw new StepError(`구간 ${r} 이(가) 영상 길이(${fmtTime(info.duration)})를 넘어요.`);
     }
     ctx.log(`  제목: ${info.title} · 길이 ${info.duration ? fmtTime(info.duration) : '?'}${ranges.length ? ' · 구간 ' + ranges.join(', ') : ' · 구간은 컷 편집에서 정해요'}`);
     out.push({ ...info, ranges });
@@ -349,7 +349,7 @@ async function clip(E, ctx) {
   for (const f of fs.readdirSync(E.p('클립'))) if (/^clip_\d+\.mp4$/.test(f)) fs.rmSync(E.p('클립', f));
   const total = map.length;
   for (const [n0, m] of map.entries()) {
-    const n = n0 + 1, s = info[m.si], a = m.a, b = m.b, d = b - a, clipFile = E.p('클립', `clip_${String(n).padStart(2, '0')}.mp4`);
+    const n = n0 + 1, s = info[m.si], a = m.a, b = isFinite(m.b) ? m.b : Math.min(s.duration || specOf(E).maxTotal, specOf(E).maxTotal), d = b - a, clipFile = E.p('클립', `clip_${String(n).padStart(2, '0')}.mp4`);
     if (s.duration && b > s.duration + 0.5) throw new StepError(`구간 ${m.range} 이(가) 영상 길이(${fmtTime(s.duration)})를 넘어요.`);
     ctx.log(`[${n}/${total}] ${s.title} ${m.range} 자르는 중…`);
     let input, offset;
@@ -591,7 +591,7 @@ async function plan(E, ctx) {
   for (const c of clips) {
     if (T >= max - 0.05) break;
     const d = Math.min(c.duration, max - T); if (d < 0.2) continue;
-    const m = map[(+/clip_(\d+)/.exec(c.file)?.[1] || 0) - 1];   // 이 클립이 소스의 어디였는지 (자막 자동화가 써요)
+    const m0 = map[(+/clip_(\d+)/.exec(c.file)?.[1] || 0) - 1], m = m0 && !isFinite(m0.b) ? { ...m0, b: m0.a + c.duration } : m0;   // "전체"는 실제 길이로   // 이 클립이 소스의 어디였는지 (자막 자동화가 써요)
     used.push({ file: c.file, start: +T.toFixed(3), duration: +d.toFixed(3), ...(m ? { si: m.si, range: m.range, a: m.a, b: m.b, ...(m.speed < 1 ? { speed: m.speed } : {}) } : {}) }); T += d;
   }
   const P = { title: E.s.title, format: E.s.format, width: specOf(E).w, height: specOf(E).h, total: +T.toFixed(2), clips: used, lines: [] };

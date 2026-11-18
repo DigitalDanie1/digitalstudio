@@ -183,6 +183,7 @@ try {
     assert.deepEqual(parseRanges('0:30-0:42, 1:05-1:09x0.5 2:00-2:04*0.4'), ['0:30-0:42', '1:05-1:09x0.5', '2:00-2:04x0.4']);
     assert.deepEqual(rangeSecs('1:05-1:09x0.5'), [65, 69]); assert.equal(rangeSpeed('1:05-1:09x0.5'), 0.5); assert.equal(rangeSpeed('0:30-0:42'), 1);
     assert.throws(() => parseRanges('0:30-0:34x2'), /0.25~1/);
+    assert.deepEqual(parseRanges('전체'), ['전체']); assert.deepEqual(rangeSecs('전체'), [0, Infinity]); assert.throws(() => parseRanges('전체, 0:01-0:03'), /혼자만/);
     const it = matItems(['[태그] 로페스 (쿠바) / 2016 리우', '첫 *자막*', '[점수] 4 : 0 / 쿠바 4 : 터키 0', '둘째']);
     assert.equal(it.length, 2); assert.deepEqual(it[0].tag, { main: '로페스 (쿠바)', sub: '2016 리우' }); assert.equal(it[0].text, '첫 자막'); assert.equal(it[1].stamp.main, '4 : 0');
     assert.deepEqual(splitAnswer('```\n구간: 0:01-0:05x0.5\n> 배너: a / b\n줄\n```'), { ranges: '0:01-0:05x0.5', text: '> 배너: a / b\n줄' });
