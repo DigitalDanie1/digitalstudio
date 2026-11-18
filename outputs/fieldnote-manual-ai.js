@@ -18,7 +18,7 @@ function manualYoutubeTopics(id) {
   manualAIModal({
     kind: 'topics', channel: 'youtube', category: topic.name, topicId: id,
     ytChannel: ytChannelOf(id), format: ytFormat(), voice: ytChVoice(ytChannelOf(id)),
-    note: ytTopicNote(id), existingTitles: ytTitles(id), sources: wrestlingPromptSources(id),
+    note: ytTopicNote(id), existingTitles: ytTitles(id), sources: ytPromptSources(id),
   });
 }
 

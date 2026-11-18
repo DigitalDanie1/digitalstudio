@@ -733,11 +733,17 @@ const WRESTLING_SOURCES = [
   },
 ];
 
-function wrestlingPromptSources(topicId) {
-  return WRESTLING_SOURCES.filter(source=>source.topics.includes(topicId)).map(source=>({
-    name:source.name,url:source.wrestlingUrl||source.url,role:source.role,note:source.note,
-  }));
+function ytPromptSources(topicId) {
+  // 레슬링 + 기독교 소스 채널 모두 대상. CHRISTIAN_SOURCES는 호출 시점에만 읽으므로 선언 순서 문제 없음
+  return [...WRESTLING_SOURCES, ...CHRISTIAN_SOURCES]
+    .filter(source=>source.enabled!==false&&source.topics.includes(topicId))
+    .map(source=>{
+      const entry={name:source.name,url:source.wrestlingUrl||source.url,role:source.role,note:source.note};
+      if(source.candidate)entry.video={title:source.candidate.title,url:source.candidate.url};
+      return entry;
+    });
 }
+const wrestlingPromptSources = ytPromptSources;
 
 // 기독교 소스 채널 — 사용자가 준 영상 4개의 채널(2026.11.11 추가)
 const CHRISTIAN_SOURCES = [
