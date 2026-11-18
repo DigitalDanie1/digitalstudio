@@ -11,9 +11,9 @@
   const NAME = { blog: '네이버', x: 'X', telegram: 'Telegram', insta: '인스타', threads: 'Threads', youtube: 'YouTube Studio' };
 
   // ----- 저장되는 상태 (이 브라우저) -----
-  let S = { sel: {}, opened: {}, instaMode: 'toon' };
+  let S = { sel: {}, opened: {}, instaMode: 'toon', igSel: {}, igLoaded: 'insta-sing' };
   try { S = { ...S, ...JSON.parse(localStorage.getItem(KEY) || '{}') }; } catch (_) {}
-  S.sel = S.sel || {}; S.opened = S.opened || {};
+  S.sel = S.sel || {}; S.opened = S.opened || {}; S.igSel = S.igSel || {};
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (_) {} };
   // 예전 "오늘 글 하나 쓰기"에서 하던 작업 이어받기
   try {
@@ -21,6 +21,26 @@
     if (c && old.postId && !S.sel[c] && !S.migrated) { S.sel[c] = { postId: old.postId }; }
     S.migrated = true; save();
   } catch (_) {}
+  // 인스타 계정마다 '작업 중' 선택을 따로 기억한다 (계정을 바꾸면 선택을 맞바꿈)
+  const T0 = () => T;
+  function igSync() {
+    const want = igCur();
+    if (!IG_BY_ID[S.igLoaded]) S.igLoaded = 'insta-sing';
+    if (want === S.igLoaded) return;
+    S.igSel[S.igLoaded] = S.sel.insta; S.sel.insta = S.igSel[want] || {}; S.igLoaded = want;
+    for (const k of ['view', 'pick', 'custom', 'page', 'manual', 'err', 'askCopied', 'busy', 'answer', 'url', 'seen']) { const o = T0()[k]; if (o) delete o.insta; }
+    save();
+  }
+  // 오늘 할 일: 다른 계정·채널의 진행 상황을 잠깐 그쪽 기준으로 계산
+  function withRoute(route, fn) {
+    const pIg = igLock, pYt = db.profile.ytChannelTab;
+    try {
+      if (IG_BY_ID[route]) igLock = route;
+      else if (route === 'youtube') { if (YT_LOCKS[pYt]) db.profile.ytChannelTab = 'yt-wrestling'; }
+      else if (YT_LOCKS[route]) db.profile.ytChannelTab = route;
+      return fn();
+    } finally { igLock = pIg; db.profile.ytChannelTab = pYt; }
+  }
   // ----- 잠깐 쓰는 상태 -----
   const T = { view: {}, manual: {}, busy: {}, err: {}, askCopied: {}, answer: {}, pick: {}, custom: {}, page: {}, url: {}, seen: {}, caption: {}, logOpen: null, ytFmt: null };
 
@@ -35,13 +55,26 @@
   const isLocalOnly = () => !/^https?:$/.test(location.protocol) || /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
 
   // ===== 공통 도우미 =====
-  const unfinished = c => db.posts.filter(p => p.channel === c && !p.publicationCheck).sort((a, b) => (b.updated || 0) - (a.updated || 0));
-  const pfIdeas = pf => db.ideas.filter(i => ideaPlatform(i) === pf)
+  const unfinished = c => db.posts.filter(p => p.channel === c && !p.publicationCheck && (c !== 'insta' || igOf(p) === igCur())).sort((a, b) => (b.updated || 0) - (a.updated || 0));
+  const pfIdeas = pf => db.ideas.filter(i => ideaPlatform(i) === pf && (pf !== 'Instagram' || igOf(i) === igCur()))
     .sort((a, b) => (a.sample === b.sample ? 0 : a.sample ? 1 : -1) || (b.created || 0) - (a.created || 0));
   const sampleTag = p => (p && p.sample ? ' <span class="sampletag">예시</span>' : '');
 
   function askText(c, idea) {
     const pf = PF_NAME[c], tone = c === 'blog' ? (db.profile.blogVoice || db.profile.tone) : db.profile.tone;
+    if (c === 'insta') {
+      const a = igOf(idea.igAccount ? idea : { igAccount: igCur() }), en = IG_BY_ID[a].lang === 'en', rules = en ? ['Facts first: keep fact, quote and opinion separate, and name the source.', 'Cross-check key numbers and dates; mark anything unverified as [확인 필요].', 'Never invent prices, dates, quotes or availability.', 'Do not generalise one person or scene to a whole country or group.', 'Use only short, credited quotes and visuals.'] : COMMON_RULES;
+      return [
+        en ? `Write an Instagram card-news post for the account "${igName(a)}".` : `인스타그램 카드뉴스 원고를 한국어로 써 주세요. 계정: ${igName(a)}.`,
+        `${en ? 'Topic' : '주제'}: ${idea.title}`,
+        idea.note ? `${en ? 'Notes' : '메모'}:\n${idea.note}` : '',
+        idea.sources ? `${en ? 'Sources' : '참고 자료'}:\n${idea.sources}` : '',
+        `${en ? 'Account voice' : '계정 소개·말투'}:\n${igVoice(a)}`,
+        igDirective(a),
+        (en ? 'Rules:\n' : '꼭 지켜 주세요:\n') + rules.map(r => '- ' + r).join('\n'),
+        en ? 'Reply format: first line = title, blank line, then the cards and caption. No other commentary.' : '답은 이렇게만 주세요:\n첫 줄에 제목\n한 줄 비우고 본문\n(다른 설명은 붙이지 마세요)',
+      ].filter(Boolean).join('\n\n');
+    }
     return [
       `${pf}에 올릴 글을 한국어로 써 주세요.`,
       `주제: ${idea.title}`,
@@ -84,7 +117,7 @@
     if (!T.seen[key]) throw Error('올린 글을 열어 확인했는지 체크해 주세요.');
     return { url, note: '', at: Date.now() };
   }
-  const doneLink = chk => chk ? `올림 · <a href="${esc(chk.url)}" target="_blank" rel="noopener noreferrer">${esc(chk.url)}</a>` : '';
+  const doneLink = chk => chk && !chk.url ? '올림 · 비공개 채널이라 글 주소가 없어요' : chk ? `올림 · <a href="${esc(chk.url)}" target="_blank" rel="noopener noreferrer">${esc(chk.url)}</a>` : '';
 
   // ===== 일반 플랫폼 (블로그·X·Telegram·Threads, 인스타 카드뉴스/릴스) =====
   function gItem(c) {
@@ -106,7 +139,7 @@
     const own = String(T.custom[c] || '').trim(), pf = PF_NAME[c];
     let idea;
     if (own) {
-      idea = { id: uid(), title: own, note: '', sources: '', platform: pf, sample: false, created: Date.now(), ...(c === 'blog' ? { preferredChannel: 'blog' } : c === 'insta' ? { preferredChannel: 'insta' } : {}) };
+      idea = { id: uid(), title: own, note: '', sources: '', platform: pf, sample: false, created: Date.now(), ...(c === 'blog' ? { preferredChannel: 'blog' } : c === 'insta' ? { preferredChannel: 'insta', igAccount: igCur() } : {}) };
       db.ideas.unshift(idea); log('새 주제: ' + own); persist(); T.custom[c] = '';
     } else idea = db.ideas.find(i => i.id === T.pick[c]);
     if (!idea) { toast('주제를 하나 골라 주세요.'); return false; }
@@ -172,6 +205,51 @@
     repaint(c);
   }
 
+
+  // ===== Telegram 자동 올리기 (서버가 봇으로 채널에 보낸다) =====
+  const TG = { info: null, loading: false, sending: {} };   // info: null(모름) | {configured, target}
+  function tgLoad() {
+    if (TG.info || TG.loading) return;
+    if (!/^https?:$/.test(location.protocol)) { TG.info = { configured: false, target: null }; return; }
+    TG.loading = true;
+    fetch('/api/publish/telegram', { cache: 'no-store', credentials: 'same-origin' }).then(r => r.ok ? r.json() : null).catch(() => null).then(j => {
+      TG.loading = false; TG.info = { configured: !!(j && j.ok && j.configured), target: j && j.target || null };
+      window.tgInfo = TG.info; repaint('telegram', true);
+      if (typeof render === 'function' && typeof view !== 'undefined' && view === 'settings') render();
+    });
+  }
+  window.tgLoad = tgLoad;
+  const tgOn = () => !!(TG.info && TG.info.configured);
+  const tgText = p => `# ${p.title}\n\n${String(p.body || '').trim()}`;
+  function tgConfirm(p, again) {
+    if (!p || p.sample || TG.sending[p.id]) return;
+    const prev = markdownToPlain(tgText(p)).replace(/\s+/g, ' ').trim().slice(0, 140);
+    modal(`<div class="modalhead"><h2 id="modalTitle">${again ? '텔레그램에 다시 올릴까요?' : '텔레그램에 올릴까요?'}</h2><button class="close" data-action="close" aria-label="닫기">×</button></div>
+      <p>채널 · <b>${esc(TG.info.target || '')}</b></p><p class="small" style="white-space:pre-wrap">${esc(prev)}…</p>
+      <p><b>이 채널에 바로 올라가요. 되돌릴 수 없어요.</b>${again ? ' 이미 올린 글은 그대로 남고, 새 글이 하나 더 올라가요.' : ''}</p>
+      <div class="modalfooter"><button type="button" class="btn ghost" data-action="close">취소</button><button type="button" class="btn primary" data-pl-tgyes="${esc(p.id)}" data-again="${again ? 1 : ''}">올리기</button></div>`);
+  }
+  async function tgSend(id, again) {
+    const p = db.posts.find(x => x.id === id);
+    if (!p || p.sample || TG.sending[id] || (p.publish?.state === 'published' && !again)) return;
+    TG.sending[id] = true; T.err.telegram = ''; repaint('telegram', true);
+    try {
+      const r = await fetch('/api/publish/telegram', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: tgText(p), postId: p.id, force: !!again }) });
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j || !j.ok) throw Error(j && j.message || (r.status === 401 ? '로그인이 필요해요. 다시 로그인하세요.' : '올리지 못했어요. 잠시 뒤에 다시 해 주세요.'));
+      const url = j.url || '';
+      p.publish = { state: 'published', requestedAt: Date.now(), url, message: '텔레그램 자동 올리기' };
+      p.publicationCheck = { url, note: '자동 올리기', at: Date.now(), auto: true };
+      p.updated = Date.now(); S.opened[p.id] = true; save();
+      log('텔레그램 자동 올리기: ' + p.title); persist(); toast('텔레그램에 올렸어요');
+    } catch (e) { T.err.telegram = e.message || '올리지 못했어요.'; }
+    delete TG.sending[id]; repaint('telegram', true);
+  }
+  const tgHelp = () => `<details class="pl-help"><summary>자동 올리기 켜기</summary><ol class="small">
+      <li>Telegram에서 <b>@BotFather</b> → <code>/newbot</code> → 토큰을 받아요.</li>
+      <li>그 봇을 내 채널 <b>관리자</b>로 추가해요 (글 올리기 권한 켜기).</li>
+      <li>Vercel → Settings → Environment Variables에 <code>TELEGRAM_BOT_TOKEN</code>, <code>TELEGRAM_CHAT_ID</code>(<code>@채널아이디</code>)를 넣고 Redeploy 해요.</li></ol></details>`;
+
   function genericSteps(c) {
     const pf = PF_NAME[c], blog = c === 'blog', pbook = PLATFORM_PLAYBOOK[pf] || {};
     const S1 = {
@@ -231,12 +309,14 @@
       body: checkBody, run: it => marksOf(it.post.body).total ? openEditor(it) : approve(c, it),
     };
     const bridgeOn = blog && isConnected('blog');
+    const tg = c === 'telegram', auto = it => tg && tgOn() && !(it.post && it.post.sample);
+    if (tg) tgLoad();
     const upload = {
       id: 'upload', name: '업로드', title: blog ? '네이버 블로그에 올리기' : `${NAME[c]}에 올리기`,
-      desc: blog ? (bridgeOn ? '자동 채우기로 네이버 글쓰기 칸에 넣어요. 올린 뒤 글 주소를 남기세요.' : '본문을 복사하고 네이버 글쓰기를 열어요. 붙여 넣고 올린 뒤 글 주소를 남기세요.')
+      desc: it => auto(it) ? '버튼을 누르면 확인 창이 떠요. 올리면 채널에 바로 게시돼요.' : blog ? (bridgeOn ? '자동 채우기로 네이버 글쓰기 칸에 넣어요. 올린 뒤 글 주소를 남기세요.' : '본문을 복사하고 네이버 글쓰기를 열어요. 붙여 넣고 올린 뒤 글 주소를 남기세요.')
         : `글을 복사하고 ${NAME[c]}를 열어요. 붙여 넣고 올린 뒤 글 주소를 남기세요.`,
-      btn: it => !it.post ? '올리기' : uploaded(it.post.id, it.post) ? '주소 남기기' : blog ? (bridgeOn ? '네이버 자동 채우기' : '본문 복사 · 네이버 글쓰기 열기') : `글 복사 · ${NAME[c]} 열기`,
-      disabled: it => !it.post || it.post.status !== 'approved' || !!it.post.sample,
+      btn: it => !it.post ? '올리기' : auto(it) && !uploaded(it.post.id, it.post) ? (TG.sending[it.post.id] ? '올리는 중…' : '텔레그램에 올리기') : uploaded(it.post.id, it.post) ? '주소 남기기' : blog ? (bridgeOn ? '네이버 자동 채우기' : '본문 복사 · 네이버 글쓰기 열기') : `글 복사 · ${NAME[c]} 열기`,
+      disabled: it => !it.post || it.post.status !== 'approved' || !!it.post.sample || !!TG.sending[it.post.id],
       hideBtn: it => !!(it.post && it.post.publicationCheck),
       isDone: it => !!(it.post && it.post.publicationCheck),
       result: it => it.post && it.post.publicationCheck ? `<b>${doneLink(it.post.publicationCheck)}</b>` : it.post && uploaded(it.post.id, it.post) ? '올리는 중 · 올린 뒤 아래에 글 주소를 남겨 주세요' : '',
@@ -244,14 +324,18 @@
         if (!it.post) return '';
         if (it.post.sample) return '<p class="pl-error">예시 원고는 올릴 수 없어요. 진짜 원고로 만들어 주세요.</p>';
         if (it.post.status !== 'approved') return '<p class="pl-note">먼저 앞 단계에서 승인해 주세요.</p>';
+        if (tg && it.post.publicationCheck && it.post.publish?.state === 'published' && auto(it)) return `<p class="small"><button type="button" class="pl-nav-btn" data-pl-tgagain ${TG.sending[it.post.id] ? 'disabled' : ''}>다시 올리기</button></p>`;
+        const tgHint = tg && !it.post.publicationCheck ? (auto(it) ? (uploaded(it.post.id, it.post) ? '<p class="small"><button type="button" class="pl-link" data-pl-tgauto>직접 올리기 대신 자동으로 올리기</button></p>' : `<p class="small">올릴 곳 · <b>${esc(TG.info.target || '')}</b></p>`) : TG.info ? tgHelp() : '') : '';
         const fail = it.post.publish?.state === 'failed' ? `<p class="pl-error" role="alert">자동 채우기 실패: ${esc(it.post.publish.message || '')}</p>` : '';
         const alt = bridgeOn && !it.post.publicationCheck ? '<p class="small"><button type="button" class="pl-link" data-pl-copyopen>자동 채우기 대신 복사해서 직접 올리기</button></p>' : '';
         const form = it.post.publicationCheck ? '' : uploaded(it.post.id, it.post) ? urlFormHtml(it.post.id) : '';
-        return fail + form + alt + (blog && it.post.naverCategory ? `<p class="small">네이버 카테고리 · <b>${esc(it.post.naverCategory)}</b></p>` : '');
+        const manualAlt = auto(it) && !it.post.publicationCheck && !uploaded(it.post.id, it.post) ? '<p class="small"><button type="button" class="pl-link" data-pl-copyopen>복사해서 직접 올리기</button></p>' : '';
+        return fail + form + tgHint + manualAlt + alt + (blog && it.post.naverCategory ? `<p class="small">네이버 카테고리 · <b>${esc(it.post.naverCategory)}</b></p>` : '');
       },
       run: it => {
         const p = it.post;
         if (p.publicationCheck) return;
+        if (auto(it) && !uploaded(p.id, p)) return tgConfirm(p, false);
         if (!uploaded(p.id, p)) {
           if (bridgeOn) { Promise.resolve(sendToBridge(p.id)).then(() => repaint(c)); return; }
           return copyOpen(c, p);
@@ -270,14 +354,15 @@
     upload: '제목·설명란·태그·썸네일 문구를 한 파일로 만들어요.',
   };
   const YT_PLACEHOLDER = ['주제·소스', '대본', '편집', '녹음·음악', '업로드 패키지'];
-  function ytCh(i) { return ytValidCh(i.ytChannel) || (typeof ytChannelOfTopic === 'function' && ytChannelOfTopic(i.topicId)) || ''; }
-  function ytIdeas() { return db.ideas.filter(i => ideaPlatform(i) === 'YouTube' && ytFormatOf(i) === ytPipe.format && (!ytCh(i) || ytCh(i) === ytTab())).sort((a, b) => ytRank(a) - ytRank(b) || (b.created || 0) - (a.created || 0)); }
+  function ytCh(i) { return ytValidCh(i.ytChannel) || (typeof ytChannelOfTopic === 'function' && ytChannelOfTopic(i.topicId)) || 'yt-wrestling'; }
+  function ytIdeas() { return db.ideas.filter(i => ideaPlatform(i) === 'YouTube' && ytFormatOf(i) === ytPipe.format && ytCh(i) === ytTab()).sort((a, b) => ytRank(a) - ytRank(b) || (b.created || 0) - (a.created || 0)); }
   function ytEp(idea) { return idea && runnerData ? (runnerData.episodes || []).find(e => e.ideaId === idea.id) || null : null; }
   function ytItem() {
     const s = S.sel.youtube = S.sel.youtube || {};
     if (ytPipe.ideaId && ytPipe.ideaId !== s.ideaId && !T.ytSkipAdopt) { s.ideaId = ytPipe.ideaId; s.empty = false; }
     let idea = s.ideaId ? db.ideas.find(i => i.id === s.ideaId) || null : null;
-    if (!idea && !s.empty && runnerData) { const e = (runnerData.episodes || []).find(x => x.ideaId && db.ideas.some(i => i.id === x.ideaId && !i.publicationCheck)); if (e) { idea = db.ideas.find(i => i.id === e.ideaId); s.ideaId = idea.id; } }
+    if (idea && ytCh(idea) !== ytTab()) idea = null; // 다른 채널 주제는 이 채널 화면에 보이지 않음
+    if (!idea && !s.empty && runnerData) { const e = (runnerData.episodes || []).find(x => x.ideaId && db.ideas.some(i => i.id === x.ideaId && !i.publicationCheck && ytCh(i) === ytTab())); if (e) { idea = db.ideas.find(i => i.id === e.ideaId); s.ideaId = idea.id; } }
     if (idea && ytPipe.ideaId !== idea.id) ytPick(idea.id);
     return { c: 'youtube', idea, ep: ytEp(idea), key: idea ? 'y:' + idea.id : '', title: idea ? idea.title : '' };
   }
@@ -294,11 +379,11 @@
       isDone: it => !!it.ep,
       result: it => it.ep ? `<b>${esc(it.ep.ep)}</b> 폴더 만듦 · 소스 ${it.ep.sources.length}개${it.ep.sources[0] ? ' · ' + esc(it.ep.sources[0].url) : ''}` : '',
       body: it => {
-        const tabs = `<div class="filters yt-tabs pl-ytabs" role="tablist" aria-label="유튜브 채널">${YT_CHANNELS.map(y => `<button class="filter ${ytTab() === y.id ? 'active' : ''}" role="tab" aria-selected="${ytTab() === y.id}" data-yt-tab="${y.id}" title="${esc(ytChName(y.id))}">${esc(y.tab)}</button>`).join('')}</div>`;
+        const tabs = ytLock ? '' : `<div class="filters yt-tabs pl-ytabs" role="tablist" aria-label="유튜브 채널">${YT_CHANNELS.filter(y => !YT_LOCKS[y.id]).map(y => `<button class="filter ${ytTab() === y.id ? 'active' : ''}" role="tab" aria-selected="${ytTab() === y.id}" data-yt-tab="${y.id}" title="${esc(ytChName(y.id))}">${esc(y.tab)}</button>`).join('')}</div>`;
         const fmt = f => `<button type="button" class="pl-chip ${ytPipe.format === f ? 'on' : ''}" data-yp-format="${f}" aria-pressed="${ytPipe.format === f}">${f === 'long' ? '🎬 롱폼' : '📱 쇼츠'}</button>`;
         if (it.ep) return '';
         const list = ytIdeas(), pg = (T.page.youtube || 0) % Math.max(1, Math.ceil(list.length / PAGE)), shown = list.slice(pg * PAGE, pg * PAGE + PAGE);
-        const picker = `<div class="pl-topics" role="radiogroup" aria-label="주제">${shown.map(t => `<button type="button" role="radio" aria-checked="${it.idea && t.id === it.idea.id}" class="pl-topic ${it.idea && t.id === it.idea.id ? 'on' : ''}" data-pl-ytpick="${esc(t.id)}"><span>${esc(t.title)}</span></button>`).join('') || '<p class="small">이 채널·형식에는 주제가 없어요. 위쪽 "참고"의 주제 관리나 AI 주제 발굴에서 먼저 추가하세요.</p>'}</div>${list.length > PAGE ? `<button type="button" class="pl-link" data-pl-more>다른 주제 보기 (${pg + 1}/${Math.ceil(list.length / PAGE)})</button>` : ''}`;
+        const picker = `<div class="pl-topics" role="radiogroup" aria-label="주제">${shown.map(t => `<button type="button" role="radio" aria-checked="${it.idea && t.id === it.idea.id}" class="pl-topic ${it.idea && t.id === it.idea.id ? 'on' : ''}" data-pl-ytpick="${esc(t.id)}"><span>${esc(t.title)}</span></button>`).join('') || `<div class="pl-empty"><p class="small"><b>이 채널 주제가 아직 없어요.</b> 아래에서 주제를 찾거나 직접 적어 주세요.</p><div class="pl-chips"><button type="button" class="pl-chip" data-view="${ytRoute('youtubePlan', ytLock)}">AI 주제 발굴</button><button type="button" class="pl-chip" data-action="newIdea">직접 적기</button></div></div>`}</div>${list.length > PAGE ? `<button type="button" class="pl-link" data-pl-more>다른 주제 보기 (${pg + 1}/${Math.ceil(list.length / PAGE)})</button>` : ''}`;
         const inputs = it.idea ? `<div class="pl-ya-form"><label>소스 영상 주소<input class="pl-input" data-ya-new="url" placeholder="https://www.youtube.com/watch?v=…" value="${esc(ytPipe.url || ytFirstUrl(it.idea))}"></label><label>구간 (쉼표로 여러 개)<input class="pl-input" data-ya-new="ranges" placeholder="0:30-0:42, 1:05-1:12" value="${esc(ytPipe.ranges || '')}"></label></div>` : '';
         return (off ? offMsg : '') + tabs + `<div class="pl-chips">${fmt('shorts')}${fmt('long')}</div>` + picker + inputs;
       },
@@ -418,24 +503,25 @@
       list: it => {
         const out = [], seen = new Set();
         const add = i => { if (!i || seen.has(i.id) || i.publicationCheck && !(it.idea && it.idea.id === i.id)) return; seen.add(i.id); out.push({ key: 'y:' + i.id, label: i.title, id: i.id }); };
-        (runnerData?.episodes || []).forEach(e => add(db.ideas.find(i => i.id === e.ideaId)));
+        (runnerData?.episodes || []).forEach(e => { const i = db.ideas.find(x => x.id === e.ideaId); if (i && ytCh(i) === ytTab()) add(i); });
         add(it.idea); return out;
       },
       select: key => selectYt(key.slice(2)),
       fresh: () => { S.sel.youtube = { empty: true }; ytPipe.ideaId = ''; T.ytSkipAdopt = false; T.ytPick = ''; save(); },
     };
     if (c === 'insta') {
-      const toon = () => (S.instaMode === 'post' ? false : true);
+      igSync();
+      const toonOn = () => igCur() === 'insta-sing' && S.instaMode !== 'post';
       return {
         item: () => {
           const s = S.sel.insta = S.sel.insta || {};
-          if (s.kind === 'post' || (!s.kind && S.instaMode === 'post')) { const g = gItem('insta'); g.kind = 'post'; return g; }
+          if (!toonOn() || s.kind === 'post' || (!s.kind && S.instaMode === 'post')) { const g = gItem('insta'); g.kind = 'post'; return g; }
           const t = toonItem(); t.kind = 'toon'; return t;
         },
         steps: it => it.kind === 'post' ? genericSteps('insta') : toonSteps(),
         list: it => {
           const out = [], IT = window.InstaToon;
-          IT.list().filter(p => (p.raw.trim() || toonCount(p)) && (!p.publicationCheck || (it.toon && it.toon.id === p.id))).forEach(p => out.push({ key: 't:' + p.id, label: '🎨 ' + (p.title || p.raw.slice(0, 24) || '제목 없는 이야기') }));
+          if (igCur() === 'insta-sing') IT.list().filter(p => (p.raw.trim() || toonCount(p)) && (!p.publicationCheck || (it.toon && it.toon.id === p.id))).forEach(p => out.push({ key: 't:' + p.id, label: '🎨 ' + (p.title || p.raw.slice(0, 24) || '제목 없는 이야기') }));
           unfinished('insta').forEach(p => out.push({ key: 'p:' + p.id, label: '🖼 ' + p.title }));
           if (it.kind === 'post' && it.idea && !it.post) out.push({ key: 'i:' + it.idea.id, label: '🖼 ' + it.idea.title });
           return out;
@@ -446,7 +532,7 @@
           else { S.sel.insta = { kind: 'post', ...(key.startsWith('p:') ? { postId: key.slice(2) } : { ideaId: key.slice(2) }) }; }
           save();
         },
-        fresh: () => { window.InstaToon.remember(''); S.sel.insta = { kind: S.instaMode === 'post' ? 'post' : 'toon', empty: true }; save(); },
+        fresh: () => { window.InstaToon.remember(''); S.sel.insta = { kind: toonOn() ? 'toon' : 'post', empty: true }; save(); },
       };
     }
     return {
@@ -482,7 +568,7 @@
       return `<li class="${st8} ${k === v ? 'view' : ''}"><button type="button" ${can ? `data-pl-go="${k}"` : 'disabled'} ${k === v ? 'aria-current="step"' : ''}><span class="pl-n" aria-hidden="true">${done[k] ? '✓' : k + 1}</span><span class="pl-nm">${esc(st.name)}</span></button></li>`;
     }).join('')}</ol>`;
     const items = `<div class="pl-items"><label><span>작업 중</span><select data-pl-item aria-label="작업 중인 글">${list.length ? '' : '<option value="">작업 없음</option>'}${list.map(o => `<option value="${esc(o.key)}" ${o.key === cur ? 'selected' : ''}>${esc(o.label.length > 36 ? o.label.slice(0, 36) + '…' : o.label)}</option>`).join('')}</select></label><button type="button" class="pl-newbtn" data-pl-new>＋ 새 작업</button></div>`;
-    const insta = c === 'insta' ? `<div class="pl-chips pl-instamode" role="group" aria-label="만들 것"><button type="button" class="pl-chip ${(it.kind || 'toon') === 'toon' ? 'on' : ''}" data-pl-instamode="toon">🎨 인스타툰</button><button type="button" class="pl-chip ${it.kind === 'post' ? 'on' : ''}" data-pl-instamode="post">🖼 카드뉴스·릴스</button></div>` : '';
+    const insta = c === 'insta' && igCur() === 'insta-sing' ? `<div class="pl-chips pl-instamode" role="group" aria-label="만들 것"><button type="button" class="pl-chip ${(it.kind || 'toon') === 'toon' ? 'on' : ''}" data-pl-instamode="toon">🎨 인스타툰</button><button type="button" class="pl-chip ${it.kind === 'post' ? 'on' : ''}" data-pl-instamode="post">🖼 카드뉴스·릴스</button></div>` : '';
     const dis = !!(s.disabled && s.disabled(it)), hide = !!(s.hideBtn && s.hideBtn(it) && done[v]);
     const attrs = s.attrs ? s.attrs(it) : 'data-pl-run';
     const btn = hide ? '' : `<button type="button" class="pl-primary ${done[v] ? 'again' : ''} ${s.cls || ''}" ${attrs} ${dis ? 'disabled' : ''}>${esc(val(s.btn, it))}</button>`;
@@ -504,8 +590,8 @@
       </article></section>`;
   }
   function pageFor(c) {
-    const pf = PF_NAME[c], book = PLATFORM_PLAYBOOK[pf];
-    return `<div class="pl-head" style="--pc:${platformColor(pf)}"><div class="eyebrow">${esc(pf)}</div><h1>${esc(platformLabel(pf))}</h1><p>${esc(book.role)}</p></div>${frame(c)}`;
+    const pf = PF_NAME[c], book = PLATFORM_PLAYBOOK[pf], ig = c === 'insta' ? IG_BY_ID[igCur()] : null, yh = c === 'youtube' ? ytHeader() : null;
+    return `<div class="pl-head" style="--pc:${platformColor(pf)}"><div class="eyebrow">${esc(pf)}</div><h1>${esc(yh ? yh.title : ig ? igName(ig.id) : platformLabel(pf))}</h1><p>${esc(yh ? yh.desc : ig ? ig.role : book.role)}</p></div>${frame(c)}`;
   }
 
   // 다시 그리기 (타이핑 중이면 건드리지 않음)
@@ -555,13 +641,20 @@
   }
   function homeEl() { const d = document.createElement('div'); d.innerHTML = homeHtml(); return d.firstElementChild; }
   function homeHtml() {
-    const rows = IDEA_PLATFORMS.map(pf => {
-      const c = PF_KEY[pf], s = summary(c), pb = db.posts.filter(p => p.channel === c && p.status === 'review').length;
+    const ents = [];
+    for (const pf of IDEA_PLATFORMS) {
+      const c = PF_KEY[pf];
+      if (c === 'youtube') { ents.push({ pf, c, route: 'youtube', label: platformLabel(pf) }); Object.keys(YT_LOCKS).forEach(id => ents.push({ pf, c, route: id, label: YT_LOCKS[id] })); }
+      else if (c === 'insta') IG_ACCOUNTS.forEach(a => ents.push({ pf, c, route: a.id, label: 'Insta - ' + (a.id === 'insta-krsg' ? 'KR Content for SG' : igName(a.id)), role: a.role }));
+      else ents.push({ pf, c, route: c, label: platformLabel(pf) });
+    }
+    const rows = ents.map(e => {
+      const { pf, c } = e, s = withRoute(e.route, () => summary(c)), pb = db.posts.filter(p => p.channel === c && p.status === 'review').length;
       const prog = s.has ? `<span class="pl-home-step"><b>${s.idx + 1}/${s.N}</b> ${esc(s.name)}</span>` : '<span class="pl-home-step none">진행 중인 작업 없음</span>';
       const lbl = s.has ? (s.done ? '새 작업 시작' : '이어서 하기 →') : '새 작업 시작 →';
-      return `<article class="pl-home-row" style="--pc:${platformColor(pf)}"><div class="pl-home-main"><span class="pl-home-pf">${esc(platformLabel(pf))}</span><span class="pl-home-title">${esc(s.has ? s.title : book(pf))}</span>${prog}</div>
+      return `<article class="pl-home-row" style="--pc:${platformColor(pf)}"><div class="pl-home-main"><span class="pl-home-pf">${esc(e.label)}</span><span class="pl-home-title">${esc(s.has ? s.title : (e.role || book(pf)))}</span>${prog}</div>
         <div class="pl-home-bar" aria-hidden="true"><i style="width:${s.has && s.N ? Math.round((s.done ? s.N : s.idx) / s.N * 100) : 0}%"></i></div>
-        <button type="button" class="pl-primary ${s.has ? '' : 'again'}" data-pl-goto="${c}">${lbl}</button></article>`;
+        <button type="button" class="pl-primary ${s.has ? '' : 'again'}" data-pl-goto="${c}" data-pl-route="${e.route}">${lbl}</button></article>`;
     }).join('');
     return `<section class="pl-home" id="plHome">${rows}</section>`;
   }
@@ -579,9 +672,9 @@
   document.addEventListener('click', e => {
     const home = e.target.closest('[data-pl-goto]');
     if (home) {
-      const c = home.dataset.plGoto, { it, now, steps } = evalSteps(c);
-      if (it.key && now >= steps.length) adapter(c).fresh();
-      T.view[c] = null; navigate(c); return;
+      const c = home.dataset.plGoto, route = home.dataset.plRoute || c;
+      withRoute(route, () => { const { it, now, steps } = evalSteps(c); if (it.key && now >= steps.length) adapter(c).fresh(); });
+      igLock = IG_BY_ID[route] ? route : igLock; T.view[c] = null; navigate(route); return;
     }
     const root = e.target.closest('#plRoot'); if (!root) return;
     const c = root.dataset.c, v = +root.dataset.v, t = e.target.closest('button, a'); if (!t) return;
@@ -598,6 +691,8 @@
     if (t.hasAttribute('data-pl-retryauto')) { T.manual[c] = false; T.err[c] = ''; T.askCopied[c] = false; repaint(c, true); return; }
     if (t.hasAttribute('data-pl-recopy')) { const { it } = ctx(); manualCopy(c, it); return; }
     if (t.hasAttribute('data-pl-unapprove')) { const { it } = ctx(); if (it.post) { it.post.status = 'review'; it.post.updated = Date.now(); log('승인 취소: ' + it.post.title); persist(); T.view[c] = v; repaint(c, true); } return; }
+    if (t.hasAttribute('data-pl-tgagain')) { const { it } = ctx(); tgConfirm(it.post, true); return; }
+    if (t.hasAttribute('data-pl-tgauto')) { const { it } = ctx(); tgConfirm(it.post, false); return; }
     if (t.hasAttribute('data-pl-copyopen')) { const { it } = ctx(); if (it.post) copyOpen(c, it.post); return; }
     if (t.dataset.plLog) { T.logOpen = T.logOpen === t.dataset.plLog ? null : t.dataset.plLog; repaint(c, true); return; }
     if (t.hasAttribute('data-pl-run')) {
@@ -606,6 +701,10 @@
       T.err[c] = ''; const r = s.run(it);
       Promise.resolve(r).then(() => { if (!T.busy[c]) repaint(c, true); });
     }
+  });
+  document.addEventListener('click', e => {
+    const y = e.target.closest('button[data-pl-tgyes]'); if (!y) return;
+    closeModal(); tgSend(y.dataset.plTgyes, !!y.dataset.again);
   });
   // 유튜브 실행기 버튼(data-ya-*)은 fieldnote-runner.js 가 처리한다. 누르는 순간 보고 있던 단계를 붙잡아 두고, 끝나면 다시 그린다.
   document.addEventListener('click', e => {
@@ -686,10 +785,11 @@
 .pl-nav .pl-nav-btn:last-child{margin-left:auto}
 .pl-finish{margin-top:14px;border:2px solid var(--pc);border-radius:12px;padding:14px;background:#171b21;font-size:15px}
 .pl-picker{margin-bottom:6px}
-.pl-topics{display:grid;gap:8px;margin-bottom:8px}
+.pl-empty{padding:4px 0 10px}.pl-topics{display:grid;gap:8px;margin-bottom:8px}
 .pl-topic{display:flex;gap:10px;align-items:center;justify-content:space-between;text-align:left;min-height:52px;padding:10px 14px;border-radius:12px;border:2px solid var(--line);background:var(--panel2);color:var(--text);font-size:16px;line-height:1.4;cursor:pointer}
 .pl-topic.on{border-color:var(--pc);background:color-mix(in srgb,var(--pc) 12%,var(--panel2))}
 .pl-topic em{font-style:normal;font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:1px 6px;flex:none}
+.pl-help{margin:10px 0;font-size:14px}.pl-help summary{cursor:pointer;color:var(--pc);min-height:36px;display:flex;align-items:center}.pl-help ol{margin:6px 0 0;padding-left:20px;line-height:1.7}.pl-help code{background:var(--panel2);padding:1px 5px;border-radius:4px}
 .pl-link{background:none;border:0;color:var(--pc);text-decoration:underline;cursor:pointer;font-size:14px;padding:6px 0;min-height:36px}
 .pl-own{display:grid;gap:6px;margin:10px 0 6px;font-size:14px;color:#c3c8cf}
 .pl-input{width:100%;min-height:48px;padding:0 14px;font-size:16px;border-radius:10px;border:2px solid var(--line);background:#0f1216;color:var(--text)}

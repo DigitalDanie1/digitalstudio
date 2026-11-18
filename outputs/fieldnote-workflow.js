@@ -1055,6 +1055,7 @@ function platformStarterNote(s) {
   return `${s.sid && s.sid.startsWith('gt-') ? '[🔥 멋있는 기술 시리즈 · ' + YT_REPEAT + ']\n' : ''}[플랫폼 시작 소재 · ${s.platform}${s.ytFormat ? (s.ytFormat === 'long' ? ' 롱폼' : ' 쇼츠') : ''} · 사실 확인 전 아이디어]\n형식: ${s.ytFormat ? YT_FORMAT_TEXT[s.ytFormat] : PLATFORM_FORMAT[s.platform]}\n각도: ${s.angle}\n훅: ${s.hook}\n\n구성\n${s.outline.map(x => '- ' + x).join('\n')}\n\n확인할 것\n${s.verify.map(x => '- ' + x).join('\n')}`;
 }
 function ensurePlatformStarters() {
+  if (db && Array.isArray(db.ideas)) igSeedStarters();
   if (!db || !Array.isArray(db.ideas) || (db.platformSeedVersion || 0) >= PLATFORM_SEED_VERSION) return;
   if ((db.platformSeedVersion || 0) < 8) for (const [id, from, to] of V8_MOVES) {
     const i = db.ideas.find(x => x.id === id); if (!i || ideaPlatform(i) !== from) continue;
@@ -1083,6 +1084,38 @@ function ensurePlatformStarters() {
     db.ideas.push(idea);
   }
   db.platformSeedVersion = PLATFORM_SEED_VERSION;
+  setTimeout(() => { try { persist(); } catch (_) {} }, 0);
+}
+const IG_STARTERS = {
+  'insta-krsg': [
+    ['Why Singaporeans are queuing for Korean fried chicken (and which style to order first)', 'Food. Compare yangnyeom vs. soy-garlic vs. plain; mention 2-3 outlets in Singapore. Check current outlets and prices.'],
+    ['5 K-dramas on Netflix Singapore that feel surprisingly local', 'Dramas. Pick shows with family/work/HDB-style relatable themes. Verify they are currently streaming in SG.'],
+    ['Korean skincare routine: what actually works in Singapore humidity', 'Beauty. Light layers, sunscreen, hydrating toner. No medical claims; say it is a routine, not advice.'],
+    ['Seoul in 4 days on a Singapore budget: where to eat, stay and shop', 'Travel. Sample itinerary with SGD ballpark costs. Mark prices [확인 필요].'],
+    ['K-pop concerts in Singapore: how to get tickets without stress', 'K-pop. Presale vs. general sale, queue tips, scams to avoid. Check the latest ticketing rules.'],
+    ['Korean convenience-store snacks you can now buy in Singapore', 'Food. Banmi, ramyeon, honey butter chips and where to find them. Verify availability.'],
+    ['Korean brands you probably did not know are in Singapore', 'Brands. Cafes, bakeries, beauty and fashion labels with SG outlets. Verify each location.'],
+    ['Korean dining etiquette: 6 things that surprise first-time Singaporean visitors', 'Culture. Pouring drinks, shared dishes, shoes off. Explain each term once.'],
+  ],
+  'insta-jury': [
+    ['직장 후배가 단톡방에서 읽씹했다고 화낸 선배, 누가 잘못일까', '직장 예절 논쟁. 사연 요약 → 쟁점(업무 시간 외 연락) → A/B 댓글 → 판결.'],
+    ['축의금 5만 원 냈다가 손절당했다는 사연', '경조사 비용 논쟁. 금액 기준이 서로 다른 댓글을 A/B로 묶기.'],
+    ['엘리베이터에서 아이 소리에 눈치 준 이웃, 예민한 걸까', '이웃 간 소음. 양쪽 입장을 공평하게 요약하고 개인을 조롱하지 않기.'],
+    ['더치페이 계산 후 남은 1,000원까지 정산하자는 친구', '친구 사이 돈 문제. 쟁점은 "정확함 vs 정".'],
+    ['시댁 명절 방문 횟수를 두고 부부가 다툰 사연', '가족 갈등. 익명 처리 철저히, 특정 가족을 조롱하지 않기.'],
+    ['카페에서 노트북 4시간 쓰는 손님, 괜찮을까', '공공장소 에티켓. 업주·손님 입장 댓글을 나눠 정리.'],
+    ['반려견 목줄 없이 산책하는 이웃과 대화를 시도한 사연', '반려동물 에티켓. 규정은 [확인 필요]로 표시.'],
+    ['회식 자리에서 술 거절했더니 분위기가 싸해졌다는 사연', '회식 문화. 세대별 댓글 차이를 쟁점으로.'],
+  ],
+};
+function igSeedStarters() {
+  if (db.igSeedVersion >= 1) return;
+  const base = Date.now(); let k = 0;
+  for (const [acct, list] of Object.entries(IG_STARTERS)) list.forEach(([title, hint], n) => {
+    const id = `ig-starter-${acct.replace('insta-', '')}-${n + 1}`; if (db.ideas.some(i => i && i.id === id)) return;
+    db.ideas.push({ id, title, note: `[스타터 아이디어 · 마음에 안 들면 지워도 돼요]\n${hint}`, sources: '', platform: 'Instagram', preferredChannel: 'insta', igAccount: acct, sample: false, starter: true, created: base - (k++) });
+  });
+  db.igSeedVersion = 1;
   setTimeout(() => { try { persist(); } catch (_) {} }, 0);
 }
 function ideaPlatform(i) {
@@ -1138,7 +1171,7 @@ function platformStudio() {
   const p = studioPlatform, pc = p === '미분류' ? '#8b929e' : platformColor(p), book = PLATFORM_PLAYBOOK[p], ideas = list(p);
   const tools = (PLATFORM_TOOLS[p] || []).filter(([, must]) => must).map(([id]) => PREP_TOOLS[id].name);
   const bar = `<div class="ps-tabs" role="tablist" aria-label="플랫폼">${tabs.map(t => `<button role="tab" aria-selected="${t === p}" class="ps-tab ${t === p ? 'active' : ''}" style="--pc:${t === '미분류' ? '#8b929e' : platformColor(t)}" data-studio-platform="${esc(t)}">${esc(t)}<b>${list(t).length}</b></button>`).join('')}</div>`;
-  const topic = i => `<li class="ps-topic"><details><summary><span class="ps-topic-title">${esc(i.title)}</span>${i.sample ? '<span class="sampletag">예시</span>' : ''}</summary>
+  const topic = i => `<li class="ps-topic"><details><summary><span class="ps-topic-title">${esc(i.title)}</span>${i.sample ? '<span class="sampletag">예시</span>' : ''}${i.starter && i.igAccount ? '<span class="sampletag">스타터</span>' : ''}</summary>
     <p class="ps-note">${esc(i.note)}</p>${ideaPlatformPicker(i)}
     <div class="actions"><button class="btn primary" data-create="${esc(i.id)}">${ideaChannel(i)==='youtube'?'원고 만들기':'원고 생성'}</button><button class="btn ghost" data-idea-edit="${esc(i.id)}">수정</button><button class="btn ghost danger" data-idea-delete="${esc(i.id)}" aria-label="소재 삭제">×</button></div></details></li>`;
   return bar + `<section class="ps-board" style="--pc:${pc}">
@@ -1222,16 +1255,16 @@ function researchBlock() {
 function platformPage(c) {
   ensurePlatformStarters();
   const p = PF_NAME[c], pc = platformColor(p), book = PLATFORM_PLAYBOOK[p], guide = PLATFORM_OPERATING_GUIDE.find(x => x.name === p);
-  const ideas = db.ideas.filter(i => ideaPlatform(i) === p);
-  const posts = db.posts.filter(x => x.channel === c).sort((a, b) => (b.updated || 0) - (a.updated || 0));
+  const igOn = c === 'insta', ideas = db.ideas.filter(i => ideaPlatform(i) === p && (!igOn || igOf(i) === igCur()));
+  const posts = db.posts.filter(x => x.channel === c && (!igOn || igOf(x) === igCur())).sort((a, b) => (b.updated || 0) - (a.updated || 0));
   const n = st => posts.filter(x => x.status === st).length;
   const ready = toolReady();
   const roleOf = Object.fromEntries(SUBSCRIPTION_STAGES.flatMap(st => st.items.map(it => [it.id, { ...it, stage: st.label }])));
   const tools = (PLATFORM_TOOLS[p] || []).filter(([id]) => id !== 'ai');
-  const topic = i => `<li class="ps-topic"><details><summary><span class="ps-topic-title">${esc(i.title)}</span>${i.sample ? '<span class="sampletag">예시</span>' : ''}</summary>
+  const topic = i => `<li class="ps-topic"><details><summary><span class="ps-topic-title">${esc(i.title)}</span>${i.sample ? '<span class="sampletag">예시</span>' : ''}${i.starter && i.igAccount ? '<span class="sampletag">스타터</span>' : ''}</summary>
     <p class="ps-note">${esc(i.note)}</p>${ideaPlatformPicker(i)}
     <div class="actions"><button class="btn primary" data-create="${esc(i.id)}">${ideaChannel(i)==='youtube'?'원고 만들기':'원고 생성'}</button>${c === 'youtube' ? `<button class="btn" data-yp-pick="${esc(i.id)}">▶ 제작 라인에서 작업</button>` : ''}<button class="btn ghost" data-idea-edit="${esc(i.id)}">수정</button><button class="btn ghost danger" data-idea-delete="${esc(i.id)}" aria-label="소재 삭제">×</button></div></details></li>`;
-  const hero = `<section class="pf-hero" style="--pc:${pc}"><div class="pf-hero-main"><div class="eyebrow">PLATFORM</div><h1>${esc(platformLabel(p))}</h1><p>${esc(book.role)}</p><p class="pf-themes">다루는 주제 · ${esc(PLATFORM_THEMES[p] || '')}</p></div>
+  const hero = `<section class="pf-hero" style="--pc:${pc}"><div class="pf-hero-main"><div class="eyebrow">PLATFORM</div><h1>${esc(igOn ? IG_BY_ID[igCur()].tab : c === 'youtube' ? ytHeader().title : platformLabel(p))}</h1><p>${esc(igOn ? IG_BY_ID[igCur()].role : c === 'youtube' ? ytHeader().desc : book.role)}</p><p class="pf-themes">${igOn ? '작업 방식 · ' + esc(IG_BY_ID[igCur()].flow) : '다루는 주제 · ' + esc(PLATFORM_THEMES[p] || '')}</p></div>
     <dl class="pf-stats">${c === 'youtube' ? `<div><dt>쇼츠</dt><dd>${ideas.filter(i => ytFormatOf(i) === 'shorts').length}</dd></div><div><dt>롱폼</dt><dd>${ideas.filter(i => ytFormatOf(i) === 'long').length}</dd></div>` : `<div><dt>주제</dt><dd>${ideas.length}</dd></div>`}<div><dt>작성 중</dt><dd>${n('draft')}</dd></div><div><dt>검수 대기</dt><dd class="orange">${n('review')}</dd></div><div><dt>승인</dt><dd class="green">${n('approved')}</dd></div></dl>
     <div class="pf-hero-actions"><button class="btn ${ideaGenOpen[c] ? 'active' : ''}" data-idea-gen="${c}" aria-expanded="${!!ideaGenOpen[c]}">💡 아이디어 생성</button><button class="btn primary" data-action="newIdea">＋ 새 주제</button></div></section>${ideaGenOpen[c] ? ideaGenPanel(c) : ''}`;
   let board = `<section class="ps-board" style="--pc:${pc}"><div class="ps-cols">
@@ -1284,8 +1317,12 @@ const COMMON_CHAIN_NOTE = { '네이버 블로그':'상세 원문', 'Telegram':'�
 
 function commonPage() {
   ensurePlatformStarters();
-  const cards = IDEA_PLATFORMS.map(p => { const c = PF_KEY[p], posts = db.posts.filter(x => x.channel === c), rv = posts.filter(x => x.status === 'review').length;
-    return `<button class="cp-pf" style="--pc:${platformColor(p)}" data-view="${c}"><span class="cp-pf-name">${esc(platformLabel(p))}</span><span class="cp-pf-role">${esc(PLATFORM_PLAYBOOK[p].role)}</span><span class="cp-pf-nums">주제 ${db.ideas.filter(i => ideaPlatform(i) === p).length} · 원고 ${posts.length}${rv ? ` · <b>검수 대기 ${rv}</b>` : ''}</span></button>`; }).join('');
+  const ideaYt = i => (typeof ytValidCh === 'function' && ytValidCh(i.ytChannel)) || (typeof ytChannelOfTopic === 'function' && ytChannelOfTopic(i.topicId)) || '';
+  const cardOf = (p, route, ytId, igId) => { const c = PF_KEY[p], isYt = c === 'youtube', inScope = x => c === 'insta' ? igOf(x) === igId : !isYt || (ytId ? x.ytChannel === ytId : !YT_LOCKS[x.ytChannel]);
+    const posts = db.posts.filter(x => x.channel === c && inScope(x)), rv = posts.filter(x => x.status === 'review').length, nIdeas = db.ideas.filter(i => ideaPlatform(i) === p && inScope(c === 'insta' ? i : { ytChannel: ideaYt(i) })).length;
+    const label = ytId ? YT_LOCKS[ytId] : igId ? IG_BY_ID[igId].tab : platformLabel(p);
+    return `<button class="cp-pf" style="--pc:${platformColor(p)}" data-view="${route}"><span class="cp-pf-name">${esc(label)}</span><span class="cp-pf-role">${esc(PLATFORM_PLAYBOOK[p].role)}</span><span class="cp-pf-nums">주제 ${nIdeas} · 원고 ${posts.length}${rv ? ` · <b>검수 대기 ${rv}</b>` : ''}</span></button>`; };
+  const cards = IDEA_PLATFORMS.map(p => PF_KEY[p] === 'youtube' ? cardOf(p, 'youtube') + Object.keys(YT_LOCKS).map(id => cardOf(p, id, id)).join('') : PF_KEY[p] === 'insta' ? IG_ACCOUNTS.map(a => cardOf(p, a.id, null, a.id)).join('') : cardOf(p, PF_KEY[p])).join('');
   const unsorted = db.ideas.filter(i => ideaPlatform(i) === '미분류');
   return head('공통 원리', '모든 플랫폼에 똑같이 적용되는 것만 모았습니다. 플랫폼별 작업은 왼쪽 메뉴에서 하세요.')
     + `<div class="cp-pfs">${cards}</div>`
@@ -1421,7 +1458,7 @@ document.addEventListener('click', e => {
 document.addEventListener('click', e => {
   const b = e.target.closest('button[data-yp-src]'); if (!b) return;
   ytPipe.url = b.dataset.ypSrc; ytPipe.ranges = '';
-  navigate('youtube');
+  navigate(ytLock || 'youtube');
   setTimeout(() => { const manual = document.getElementById('ytManual'); if (manual) manual.open = true; document.querySelector('[data-yp-field="ranges"]')?.focus(); document.querySelectorAll('.yp-stage')[1]?.scrollIntoView({ behavior: 'smooth', block: 'center' }); toast('소스 다운로드 칸에 영상을 넣었어요. 구간을 적고 명령을 복사하세요.'); }, 50);
 });
 
@@ -1670,15 +1707,17 @@ function ideaFromBank(c, k) {
   if (db.ideas.some(i => normTitle(i.title) === normTitle(b.title))) { toast('이미 있는 주제입니다.'); return; }
   const idea = { id: uid(), title: b.title, note: `[💡 아이디어 생성 · ${p} · ${b.t}]\n형식: ${b.fmt ? YT_FORMAT_TEXT[b.fmt] : PLATFORM_FORMAT[p]}\n구성: ${b.note}`, sources: '', platform: p, ideaType: b.t, sample: false, created: Date.now() };
   if (['youtube', 'blog', 'insta'].includes(c)) idea.preferredChannel = c;
+  if (c === 'insta') idea.igAccount = igCur();
   if (c === 'youtube') idea.ytFormat = b.fmt || 'shorts';
   db.ideas.unshift(idea); log('아이디어 생성 → 주제 추가: ' + b.title); persist(); render(); toast('① 주제에 추가했어요.');
 }
 let ideaGenAICtx = null;
 function ideaGenPrompt(c) {
-  const p = PF_NAME[c], book = PLATFORM_PLAYBOOK[p], titles = db.ideas.filter(i => ideaPlatform(i) === p).map(i => i.title).slice(0, 60);
+  const p = PF_NAME[c], book = PLATFORM_PLAYBOOK[p], titles = db.ideas.filter(i => ideaPlatform(i) === p && (c !== 'insta' || igOf(i) === igCur())).map(i => i.title).slice(0, 60);
   const types = [...new Set((IDEA_BANK[p] || []).map(b => b.t))];
   return [`${p} 콘텐츠 아이디어 10개를 제안해 주세요.`,
     `이 채널에서 ${p}의 역할: ${book.role}. 형식: ${PLATFORM_FORMAT[p]}.${c === 'youtube' ? ' 쇼츠는 멋있는 기술을 원속도 → 슬로우 → 원속도로 3번 반복해 보여주는 구조입니다. 시청자: ' + YT_AUDIENCE + '.' : ''}`,
+    ...(c === 'insta' ? [`계정: ${IG_BY_ID[igCur()].name}. ${igVoice(igCur())}`] : []),
     `글 유형(type)은 다음 중에서 고르고, 아직 적은 유형을 우선해 주세요: ${types.join(', ')}.`,
     '이미 있는 제목과 겹치지 않게, 직접 경험이 필요한 부분은 [직접 경험], 확인이 필요한 사실은 [확인 필요]로 표시해 주세요. 수치·링크를 지어내지 마세요. 돈·투자 주제는 투자 권유가 되지 않게, 도박·손실 주제는 도움 받을 곳 안내를 넣어 주세요.',
     `반환 형식: [{"title":"제목","note":"구성과 확인할 사실","type":"글 유형"${c === 'youtube' ? ',"format":"shorts 또는 long"' : ''}}] 형태의 JSON 배열만. 코드 블록 없이.`,
@@ -1700,6 +1739,7 @@ function ideaGenSave(text, c) {
     const type = typeof it.type === 'string' ? it.type.trim().slice(0, 40) : '';
     const idea = { id: uid(), title: it.title.trim(), note: `[💡 AI 아이디어 · ${p}${type ? ' · ' + type : ''}]\n` + it.note.trim(), sources: '', platform: p, sample: false, aiGenerated: true, created: now - items.length, ...(type ? { ideaType: type } : {}) };
     if (['youtube', 'blog', 'insta'].includes(c)) idea.preferredChannel = c;
+    if (c === 'insta') idea.igAccount = igCur();
     if (c === 'youtube') idea.ytFormat = it.format === 'long' ? 'long' : 'shorts';
     items.push(idea);
   }

@@ -16,6 +16,8 @@
 | `ANTHROPIC_API_KEY` | AI 생성에 필요 | 주제·초안 생성에만 사용합니다. 호출마다 유료 요금이 발생합니다. |
 | `FIELDNOTE_PAID_AI_ENABLED` | AI 자동 생성에 필요 | `true`로 설정하면 소재에서 Claude 1차 원고·대본을 바로 생성합니다. 비용 방지를 위해 기본값은 꺼짐입니다. |
 | `FIELDNOTE_MODEL` | 선택 | 기본 `claude-opus-5-5`. 비용을 줄이려면 `claude-sonnet-5-5`. |
+| `TELEGRAM_BOT_TOKEN` | 텔레그램 자동 올리기에 필요 | @BotFather에서 받은 봇 토큰. 봇을 채널 관리자(글 올리기 권한)로 추가하세요. |
+| `TELEGRAM_CHAT_ID` | 텔레그램 자동 올리기에 필요 | 올릴 채널. 공개 채널은 `@채널아이디`, 비공개 채널은 `-100…` 숫자 ID. |
 
 4. 환경변수를 추가·변경했다면 **Redeploy** 합니다.
 
