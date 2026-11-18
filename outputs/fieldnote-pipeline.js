@@ -496,8 +496,10 @@
       const topicId = (hit && hit.candidate.topic) || (def && def.id) || (g && g.sources[0] && g.sources[0].topics[0]) || '';
       const note = [YL.view.trim(), YL.orig ? '원본 영상: ' + YL.orig + (YL.author ? ' · ' + YL.author : '') : ''].filter(Boolean).join('\n\n');
       idea = { id: uid(), title, note, sources: url, preferredChannel: 'youtube', ytChannel: ch, ytFormat: ytPipe.format === 'long' ? 'long' : 'shorts', topicId, sample: false, created: Date.now() };
-      db.ideas.unshift(idea); persist();
+      db.ideas.unshift(idea);
     }
+    if (!idea.ytStarted) idea.ytStarted = Date.now();
+    delete idea.ytHidden; persist();
     selectYt(idea.id); ytPipe.url = url; T.view.youtube = null; ytLinkReset();
   }
   function ytCh(i) { return ytValidCh(i.ytChannel) || (typeof ytChannelOfTopic === 'function' && ytChannelOfTopic(i.topicId)) || 'yt-wrestling'; }
@@ -599,6 +601,30 @@
       },
     };
     return [topic, src, ...mid, last];
+  }
+  // ===== 유튜브 "작업 중" 카드 띠 =====
+  const ytThumb = idea => { const v = ytVidOf(ytFirstUrl(idea)); return v ? `https://i.ytimg.com/vi/${v}/mqdefault.jpg` : ''; };
+  const ytIsWip = i => !i.publicationCheck && !i.ytHidden && (!!i.ytStarted || !!ytEp(i));
+  function ytWipList() { return db.ideas.filter(i => ideaPlatform(i) === 'YouTube' && ytCh(i) === ytTab() && ytIsWip(i)).sort((a, b) => (b.ytStarted || b.created || 0) - (a.ytStarted || a.created || 0)); }
+  function ytWipStatus(i) {
+    const ep = ytEp(i);
+    if (ep) {
+      const st = ep.steps || [], n = st.filter(x => x.status === 'done').length, nx = st.find(x => x.id === ep.running) || st.find(x => x.status !== 'done');
+      const b = [];
+      if (ep.running) b.push('<i class="b run">실행 중</i>');
+      if (ep.gate) b.push('<i class="b gate">대본 확인 필요</i>');
+      if (st.some(x => x.status === 'failed')) b.push('<i class="b fail">실패</i>');
+      return `${n}/${st.length} 단계 · ${esc(nx ? nx.name : '모두 끝')}${b.length ? `<span class="pl-wbs">${b.join('')}</span>` : ''}`;
+    }
+    return runnerOnline === false && !runnerData ? '실행기 꺼짐 · 상태 모름' : '구간 정하기 전';
+  }
+  function ytWipHtml(curId) {
+    const list = ytWipList();
+    const card = i => { const th = ytThumb(i);
+      return `<div class="pl-wc ${i.id === curId ? 'on' : ''}"><button type="button" class="pl-wc-main" data-pl-wip="${esc(i.id)}" ${i.id === curId ? 'aria-current="true"' : ''}>${th ? `<img src="${esc(th)}" alt="" loading="lazy">` : '<span class="pl-wc-ph" aria-hidden="true">🎬</span>'}<span class="pl-wc-t">${esc(i.title)}</span><span class="pl-wc-s">${ytWipStatus(i)}</span></button><button type="button" class="pl-wc-x" data-pl-wiphide="${esc(i.id)}" aria-label="작업 중에서 숨기기" title="숨기기">×</button></div>`; };
+    const pubs = db.ideas.filter(i => ideaPlatform(i) === 'YouTube' && ytCh(i) === ytTab() && i.publicationCheck);
+    const pubHtml = pubs.length ? `<details class="pl-wpub"><summary>올린 영상 ${pubs.length}개</summary><ul>${pubs.map(i => { const u = typeof i.publicationCheck === 'string' ? i.publicationCheck : (i.publicationCheck && i.publicationCheck.url) || ''; return `<li>${/^https?:/.test(u) ? `<a class="pl-link" href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(i.title)} ↗</a>` : esc(i.title)}</li>`; }).join('')}</ul></details>` : '';
+    return `<div class="pl-wip" aria-label="작업 중인 영상"><div class="pl-wip-h"><b>작업 중 ${list.length}개</b>${list.length ? '' : '<span class="small">작업 중인 영상이 없어요. 링크를 넣어 시작하세요.</span>'}</div><div class="pl-wip-row"><button type="button" class="pl-wc pl-wc-new" data-pl-ytchange>＋ 새 링크로 시작</button>${list.map(card).join('')}</div>${pubHtml}</div>`;
   }
   function selectYt(id) { const idea = db.ideas.find(i => i.id === id); if (!idea) return; ytPick(id); S.sel.youtube = { ideaId: id }; T.ytPick = id; save(); }
 
@@ -773,7 +799,7 @@
       const st8 = done[k] ? 'done' : k === now ? 'now' : 'todo', can = k <= now;
       return `<li class="${st8} ${k === v ? 'view' : ''}"><button type="button" ${can ? `data-pl-go="${k}"` : 'disabled'} ${k === v ? 'aria-current="step"' : ''}><span class="pl-n" aria-hidden="true">${done[k] ? '✓' : k + 1}</span><span class="pl-nm">${esc(st.name)}</span></button></li>`;
     }).join('')}</ol>`;
-    const items = `<div class="pl-items"><label><span>작업 중</span><select data-pl-item aria-label="작업 중인 글">${list.length ? '' : '<option value="">작업 없음</option>'}${list.map(o => `<option value="${esc(o.key)}" ${o.key === cur ? 'selected' : ''}>${esc(o.label.length > 36 ? o.label.slice(0, 36) + '…' : o.label)}</option>`).join('')}</select></label><button type="button" class="pl-newbtn" data-pl-new>＋ 새 작업</button></div>`;
+    const items = c === 'youtube' ? ytWipHtml(it.idea ? it.idea.id : '') : `<div class="pl-items"><label><span>작업 중</span><select data-pl-item aria-label="작업 중인 글">${list.length ? '' : '<option value="">작업 없음</option>'}${list.map(o => `<option value="${esc(o.key)}" ${o.key === cur ? 'selected' : ''}>${esc(o.label.length > 36 ? o.label.slice(0, 36) + '…' : o.label)}</option>`).join('')}</select></label><button type="button" class="pl-newbtn" data-pl-new>＋ 새 작업</button></div>`;
     const insta = c === 'insta' && igCur() === 'insta-sing' ? `<div class="pl-chips pl-instamode" role="group" aria-label="만들 것"><button type="button" class="pl-chip ${(it.kind || 'toon') === 'toon' ? 'on' : ''}" data-pl-instamode="toon">🎨 인스타툰</button><button type="button" class="pl-chip ${it.kind === 'post' ? 'on' : ''}" data-pl-instamode="post">🖼 카드뉴스·릴스</button></div>` : '';
     const dis = !!(s.disabled && s.disabled(it)), hide = !!(s.noBtn || (s.hideBtn && s.hideBtn(it) && done[v]));
     const attrs = s.attrs ? s.attrs(it) : 'data-pl-run';
@@ -906,6 +932,8 @@
     if (t.hasAttribute('data-pl-new')) { adapter(c).fresh(); T.link[c] = null; T.view[c] = 0; T.err[c] = ''; T.manual[c] = false; T.askCopied[c] = false; repaint(c, true); return; }
     if (t.dataset.plPick) { T.pick[c] = t.dataset.plPick; T.custom[c] = ''; repaint(c, true); return; }
     if (t.hasAttribute('data-pl-more')) { T.page[c] = (T.page[c] || 0) + 1; repaint(c, true); return; }
+    if (t.dataset.plWip) { selectYt(t.dataset.plWip); T.view.youtube = null; T.err.youtube = ''; render(); return; }
+    if (t.dataset.plWiphide) { const i = db.ideas.find(x => x.id === t.dataset.plWiphide); if (i && confirm('작업 중 목록에서 뺄까요?\n(영상과 작업 내용은 지워지지 않아요)')) { delete i.ytStarted; i.ytHidden = Date.now(); persist(); const sel = S.sel.youtube; if (sel && sel.ideaId === i.id) { S.sel.youtube = { empty: true }; ytPipe.ideaId = ''; T.ytSkipAdopt = false; T.ytPick = ''; save(); } render(); } return; }
     if (t.dataset.plYtpick) { selectYt(t.dataset.plYtpick); T.view.youtube = null; repaint('youtube', true); return; }
     if (t.dataset.plYlchip) { ylSetUrl(t.dataset.plYlchip, true); return; }
     if (t.hasAttribute('data-pl-ytchange')) { ytLinkReset(); adapter('youtube').fresh(); T.view.youtube = 0; repaint('youtube', true); return; }
@@ -974,6 +1002,20 @@
 .pl-items label span{font-size:13px;color:var(--muted);flex:none}
 .pl-items select{min-width:0;width:100%;min-height:42px;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:9px;padding:0 10px;font-size:15px}
 .pl-newbtn{min-height:42px;padding:0 14px;border-radius:9px;border:1px dashed var(--pc);background:transparent;color:var(--pc);font-weight:700;font-size:15px;cursor:pointer;white-space:nowrap}
+.pl-wip{flex:1 1 100%;min-width:0}.pl-wip-h{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:8px}.pl-wip-h b{font-size:16px}
+.pl-wip-row{display:flex;gap:10px;overflow-x:auto;padding-bottom:6px;scroll-snap-type:x proximity}
+.pl-wc{position:relative;flex:none;width:200px;scroll-snap-align:start;border:2px solid var(--line);border-radius:12px;background:var(--panel2);overflow:hidden}
+.pl-wc.on{border-color:var(--pc);box-shadow:0 0 0 1px var(--pc)}
+.pl-wc-main{display:flex;flex-direction:column;gap:4px;width:100%;text-align:left;padding:0 0 8px;border:0;background:transparent;color:var(--text);cursor:pointer;font:inherit}
+.pl-wc-main img,.pl-wc-ph{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;background:#1b2027}.pl-wc-ph{display:grid;place-items:center;font-size:26px}
+.pl-wc-t{padding:0 10px;font-size:14px;font-weight:700;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.7em}
+.pl-wc-s{padding:0 10px;font-size:12px;color:var(--muted);line-height:1.4}
+.pl-wbs{display:flex;gap:4px;flex-wrap:wrap;margin-top:3px}.pl-wbs .b{font-style:normal;font-size:11px;padding:1px 6px;border-radius:999px;border:1px solid var(--line);color:var(--text)}
+.pl-wbs .run{border-color:#3ddc84;color:#3ddc84}.pl-wbs .gate{border-color:#f2c94c;color:#f2c94c}.pl-wbs .fail{border-color:#ff6b6b;color:#ff6b6b}
+.pl-wc-x{position:absolute;top:4px;right:4px;width:28px;height:28px;border-radius:50%;border:0;background:rgba(0,0,0,.65);color:#fff;font-size:16px;line-height:1;cursor:pointer}
+.pl-wc-new{display:grid;place-items:center;min-height:120px;border-style:dashed;border-color:var(--pc);background:transparent;color:var(--pc);font-weight:700;font-size:15px;cursor:pointer;padding:0 10px}
+.pl-wpub{margin-top:6px;font-size:13px;color:var(--muted)}.pl-wpub ul{margin:6px 0 0;padding-left:18px}
+@media(max-width:760px){.pl-wc{width:160px}}
 .pl-newbtn:hover{background:color-mix(in srgb,var(--pc) 12%,transparent)}
 .pl-chips{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px}
 .pl-chip{min-height:38px;padding:0 14px;border-radius:99px;border:1px solid var(--line);background:transparent;color:var(--text);font-size:14px;cursor:pointer}

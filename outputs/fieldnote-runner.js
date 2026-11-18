@@ -169,6 +169,7 @@ document.addEventListener('click', async e => {
         let channel = ''; try { channel = (typeof ytValidCh === 'function' && ytValidCh(idea.ytChannel)) || (typeof ytChannelOfTopic === 'function' && ytChannelOfTopic(idea.topicId)) || (typeof ytTab === 'function' && ytTab()) || ''; } catch (e) { channel = ''; }
         let voice = ''; try { voice = typeof ytChVoice === 'function' && channel ? ytChVoice(channel) : ''; } catch (e) { voice = ''; }
         const r = await runnerFetch('/episodes', { title: idea.title, note: idea.note || '', url: v('url'), ranges: v('ranges'), ideaId: idea.id, channel, voice });
+        if (!idea.ytStarted || idea.ytHidden) { idea.ytStarted = idea.ytStarted || Date.now(); delete idea.ytHidden; persist(); }
         runnerSelectedStep = runnerOpenLog = null;
         toast('에피소드를 만들었어요: ' + r.ep);
       } else if (a === 'addsrc') {
