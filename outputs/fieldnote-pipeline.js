@@ -451,7 +451,38 @@
     finish: '자막과 효과를 얹은 완성본을 만들어요.',
     upload: '제목·설명란·태그·썸네일 문구를 한 파일로 만들어요.',
   };
-  const YT_PLACEHOLDER = ['링크 전달', '구간 정하기', '대본', '편집', '녹음·음악', '업로드 패키지'];
+  const YT_GROUPS = [
+    { id: 'g-script', name: '대본', ids: ['research', 'download', 'script'], desc: '소스를 확인하고 받아서 대본을 만들어요. 다 되면 한 번 읽어 보고 계속 진행하세요.', go: '대본 만들기' },
+    { id: 'g-edit', name: '편집', ids: ['plan', 'rough', 'finish'], desc: '편집 계획을 짜고, 가편집한 뒤 자막과 효과를 얹어요. 끝나면 위에서 바로 볼 수 있어요.', go: '편집 실행' },
+    { id: 'g-mix', name: '녹음·음악', ids: ['mix'], desc: '대본 줄마다 내 목소리를 녹음하고, 배경음악을 골라 합쳐요.', go: '녹음·음악 열기' },
+    { id: 'g-upload', name: '업로드 패키지', ids: ['upload'], desc: '제목·설명란·태그·썸네일 문구를 한 파일로 만들어요.', go: '업로드 패키지 만들기' },
+  ];
+  const YT_STEP_NAME = { research: '소스 확인', download: '소스 받기', script: '대본', plan: '편집 계획', rough: '가편집', finish: '자막·효과', mix: '목소리·음악', upload: '업로드 패키지' };
+  const YT_PLACEHOLDER = ['링크 전달', '구간 정하기', ...YT_GROUPS.map(g => g.name), '올리기'];
+  // 실행기 단계들을 칸(그룹)으로 묶은 상태
+  function ytGroupState(ep, g) {
+    const sts = g.ids.map(id => (ep.steps || []).find(x => x.id === id)).filter(Boolean);
+    const gate = !!ep.gate && g.ids.includes('script');
+    const running = sts.find(x => ep.running === x.id) || null, failed = sts.find(x => x.status === 'failed') || null;
+    return { sts, gate, running, failed, done: sts.length === g.ids.length && sts.every(x => x.status === 'done') && !gate };
+  }
+  const ytVideoRe = /\.(mp4|mov|webm)$/i;
+  // 편집 영상: 최종본 > 완성본 > 가편집
+  function ytEditVideo(ep) {
+    if (!ep) return null;
+    for (const [sid, file, label] of [['mix', '편집/최종본.mp4', '최종본'], ['finish', '편집/완성본.mp4', '완성본 (목소리 전)'], ['rough', '편집/가편집.mp4', '가편집 (자막 전)']]) {
+      const o = ((ep.steps || []).find(x => x.id === sid) || { outputs: [] }).outputs.find(x => x.path === file && x.exists);
+      if (o) return { path: o.path, label, mtime: o.mtime };
+    }
+    return null;
+  }
+  const ytVideoSrc = (ep, v) => `${RUNNER}/file?ep=${encodeURIComponent(ep.ep)}&path=${encodeURIComponent(v.path)}${v.mtime ? '&t=' + v.mtime : ''}`;
+  function ytPlayerHtml(it) {
+    if (runnerOnline === false || !it.ep) return '';
+    const v = ytEditVideo(it.ep); if (!v) return '';
+    const src = ytVideoSrc(it.ep, v);
+    return `<section class="pl-player" id="ytPlayer" aria-label="편집본"><div class="pl-player-h"><b>편집본</b><span class="pl-player-v">${esc(v.label)}</span><a class="pl-link" href="${esc(src)}" target="_blank" rel="noopener noreferrer">새 창에서 열기 ↗</a></div><video id="ytPlayerVid" controls playsinline preload="metadata" src="${esc(src)}"></video></section>`;
+  }
   // ===== 링크 전달 (1단계): 유튜브 링크 → 제목 → 주제 =====
   const YL = { url: '', title: '', view: '', orig: '', author: '', state: '', vid: '', edited: false, timer: 0 };
   const YT_URL_RE = /^https?:\/\/(?:www\.|m\.)?(?:youtube\.com\/(?:watch\?(?:[^#]*&)?v=|shorts\/)|youtu\.be\/)([\w-]{6,})/;
@@ -557,29 +588,37 @@
       },
       run: () => {},
     };
-    let mid;
-    if (!ep) mid = YT_PLACEHOLDER.slice(2).map((n, k) => ({ id: 'ph' + k, name: n, title: n, desc: '앞 단계를 끝내면 열려요.', btn: '실행', disabled: () => true, isDone: () => false, result: () => '', run: () => {} }));
-    else mid = ep.steps.map(s => {
-      const reviewing = ep.gate && s.gate, running = ep.running === s.id, done = s.status === 'done' && !reviewing;
-      const files = s.outputs.filter(o => o.exists), vid = files.find(o => /\.(mp4|mov|webm)$/i.test(o.path));
+    const mid = YT_GROUPS.map(g => {
+      const base = { id: g.id, name: g.name, title: g.name };
+      if (!ep) return { ...base, desc: '앞 단계를 끝내면 열려요.', btn: g.go, disabled: () => true, isDone: () => false, result: () => '', run: () => {} };
+      const G = ytGroupState(ep, g), isMix = g.id === 'g-mix', scrPanel = g.id === 'g-script' && ytScriptShow(ep), saveMode = G.gate && scrPanel && ytScrBlocked(ep);
+      const stOf = id => ep.steps.find(x => x.id === id), scriptDone = stOf('script') && stOf('script').status === 'done' && !ep.gate;
+      const finishDone = stOf('finish') && stOf('finish').status === 'done';
+      const todo = G.sts.filter(x => x.status !== 'done').map(x => x.id), all = g.ids.slice();
+      const ids = G.done || !todo.length ? all : todo;
+      const locked = (g.id === 'g-edit' && !scriptDone) || (g.id === 'g-upload' && !finishDone);
+      const desc = G.gate ? '대본이 만들어졌어요. 아래 결과에서 대본을 열어 읽어 보고, 괜찮으면 "대본 확인 완료 · 계속"을 누르세요.'
+        : g.id === 'g-edit' && ep.gate ? '먼저 앞 단계에서 대본을 읽고 확인해 주세요.' : g.id === 'g-edit' && !scriptDone ? '대본을 먼저 만들어 주세요.'
+        : g.id === 'g-upload' && !finishDone ? '편집이 끝나면 열려요.' : g.desc;
+      const nameOf = id => (YT_STEP_NAME[id] || id);
       return {
-        id: s.id, name: s.name, title: s.name,
-        desc: reviewing ? '대본이 만들어졌어요. 열어서 읽어 보고, 괜찮으면 계속 진행하세요.' : YT_DESC[s.id] || '버튼을 누르면 이 단계가 이 맥에서 실행돼요. 끝나면 결과 파일이 아래에 나와요.',
-        btn: it => reviewing ? '대본 확인 완료 · 계속' : running ? '실행 멈춤' : s.id === 'mix' ? '녹음·음악 열기' : done ? '다시 실행' : s.status === 'failed' ? `${s.name} 다시 실행` : `${s.name} 실행`,
-        attrs: it => reviewing ? 'data-ya-act="continue"' : running ? 'data-ya-act="stop"' : s.id === 'mix' ? 'data-ya-recopen' : `data-ya-run="${esc(s.id)}"`,
-        cls: running ? 'danger' : '',
-        disabled: it => !!ep.running && !running && !reviewing,
-        isDone: it => done,
-        statusLine: () => running ? '실행 중… 끝나면 자동으로 바뀌어요.' : s.status === 'failed' ? '실패했어요. 로그를 보고 다시 실행하세요.' : '',
+        ...base, desc,
+        btn: it => G.gate ? (saveMode ? '대본 저장하고 계속' : '대본 확인 완료 · 계속') : G.running ? '실행 멈춤' : isMix ? '녹음·음악 열기' : G.done ? '다시 실행' : G.failed ? '다시 실행' : g.go,
+        attrs: it => G.gate ? (saveMode ? 'data-ya-act="scriptsave"' : 'data-ya-act="continue"') : G.running ? 'data-ya-act="stop"' : isMix ? 'data-ya-recopen' : `data-ya-steps="${esc(ids.join(','))}"${G.done && g.ids.includes('script') ? ' data-ya-confirm="대본까지 처음부터 다시 만들어요. 직접 고친 대본은 사라져요. 계속할까요?"' : ''}`,
+        cls: G.running ? 'danger' : '',
+        disabled: it => (!!ep.running && !G.running && !G.gate) || (locked && !G.running) || (G.gate && scrPanel && ytScrWaiting(ep)),
+        isDone: it => G.done,
+        statusLine: () => G.running ? `실행 중… (${nameOf(G.running.id)}) 끝나면 자동으로 바뀌어요.` : G.failed ? '실패했어요. 아래 로그를 보고 다시 실행하세요.' : '',
         result: it => {
           const parts = [];
-          if (s.error && s.status === 'failed') parts.push(`<p class="pl-error">${esc(s.error)}</p>`);
-          if (vid) parts.push(`<video controls preload="metadata" playsinline src="${RUNNER}/file?ep=${encodeURIComponent(ep.ep)}&path=${encodeURIComponent(vid.path)}"></video>`);
-          parts.push(files.length ? `<ul class="pl-files">${files.map(o => `<li>${ytFileLink(ep.ep, o)}</li>`).join('')}</ul>` : (running ? '' : '<span class="small">아직 결과 파일이 없어요.</span>'));
-          parts.push(`<button type="button" class="pl-link" data-pl-log="${esc(s.id)}">${T.logOpen === s.id ? '로그 닫기' : '로그 보기'}</button>${T.logOpen === s.id ? '<pre class="pl-log" id="plLog">불러오는 중…</pre>' : ''}`);
+          if (G.failed && G.failed.error) parts.push(`<p class="pl-error"><b>${esc(G.failed.name)}</b> · ${esc(runnerFriendly(G.failed.error))}${g.id !== 'g-script' && /여기에 대사/.test(G.failed.error) ? ' <button type="button" class="pl-link" data-ya-goscript>대본 단계로 가기</button>' : ''}</p>`);
+          parts.push(`<p class="small pl-subs">${G.sts.map(x => `${esc(x.name)} ${x.status === 'done' ? '✓' : x.status === 'running' ? '…' : x.status === 'failed' ? '✕' : '·'}`).join(' · ')}</p>`);
+          const files = G.sts.flatMap(x => x.outputs.filter(o => o.exists));
+          parts.push(files.length ? `<ul class="pl-files">${files.map(o => `<li>${ytFileLink(ep.ep, o)}</li>`).join('')}</ul>` : (G.running ? '' : '<span class="small">아직 결과 파일이 없어요.</span>'));
+          parts.push(`<div class="pl-logs">${G.sts.map(x => `<button type="button" class="pl-link" data-pl-log="${esc(x.id)}" aria-expanded="${T.logOpen === x.id}">${esc(x.name)} 로그${T.logOpen === x.id ? ' 닫기' : ''}</button>`).join('')}</div>${G.sts.some(x => x.id === T.logOpen) ? '<pre class="pl-log" id="plLog">불러오는 중…</pre>' : ''}`);
           return parts.join('');
         },
-        body: it => s.id === 'mix' && recState.open ? `<div id="yaRec">${recPanel()}</div>` : '',
+        body: it => (scrPanel ? ytScriptPanel(ep, saveMode) : '') + (isMix && recState.open ? `<div id="yaRec">${recPanel()}</div>` : ''),
         run: () => {},
       };
     });
@@ -609,12 +648,13 @@
   function ytWipStatus(i) {
     const ep = ytEp(i);
     if (ep) {
-      const st = ep.steps || [], n = st.filter(x => x.status === 'done').length, nx = st.find(x => x.id === ep.running) || st.find(x => x.status !== 'done');
+      const gs = YT_GROUPS.map(g => ({ g, G: ytGroupState(ep, g) })), n = 2 + gs.filter(x => x.G.done).length, nx = gs.find(x => !x.G.done);
       const b = [];
       if (ep.running) b.push('<i class="b run">실행 중</i>');
       if (ep.gate) b.push('<i class="b gate">대본 확인 필요</i>');
-      if (st.some(x => x.status === 'failed')) b.push('<i class="b fail">실패</i>');
-      return `${n}/${st.length} 단계 · ${esc(nx ? nx.name : '모두 끝')}${b.length ? `<span class="pl-wbs">${b.join('')}</span>` : ''}`;
+      if ((ep.steps || []).some(x => x.status === 'failed')) b.push('<i class="b fail">실패</i>');
+      if (ytEditVideo(ep)) b.push('<i class="b vid">▶ 편집본</i>');
+      return `${n}/7 단계 · ${esc(nx ? nx.g.name : '올리기')}${b.length ? `<span class="pl-wbs">${b.join('')}</span>` : ''}`;
     }
     return runnerOnline === false && !runnerData ? '실행기 꺼짐 · 상태 모름' : '구간 정하기 전';
   }
@@ -811,7 +851,7 @@
     const finish = allDone ? `<div class="pl-finish"><b>🎉 이 작업이 끝났어요.</b> ${esc(PLATFORM_PLAYBOOK[PF_NAME[c]]?.metric ? '올린 뒤 볼 숫자: ' + PLATFORM_PLAYBOOK[PF_NAME[c]].metric : '')}<button type="button" class="pl-primary again" data-pl-new>＋ 새 작업 시작</button></div>` : '';
     const lastLabel = v === lastIdx ? '<span class="pl-tag">마지막 · 업로드</span>' : '';
     return `<section class="pl ${c === 'youtube' ? 'pl-yt' : ''}" id="plRoot" data-c="${c}" data-v="${v}" style="--pc:${pc}">${c === 'youtube' ? '<i id="ytAuto" hidden></i>' : ''}
-      <div class="pl-top">${items}${insta}</div>${bar}
+      <div class="pl-top">${items}${insta}</div>${c === 'youtube' ? ytPlayerHtml(it) : ''}${bar}
       <article class="pl-card" aria-live="polite"><div class="pl-steplabel">${v + 1} / ${N} 단계 ${lastLabel}</div>
         <h2>${esc(val(s.title, it))}</h2><p class="pl-desc">${esc(val(s.desc, it))}</p>
         ${val(s.body || '', it) || ''}${err}
@@ -839,9 +879,14 @@
     const tmp = document.createElement('div'); tmp.innerHTML = html;
     const next = tmp.firstElementChild; next.dataset.sig = html;
     [...next.querySelectorAll('details')].forEach((d, k) => { if (open[k]) d.open = true; });
+    const ov = root.querySelector('#ytPlayerVid'), nv = next.querySelector('#ytPlayerVid');
+    if (ov && nv && ov.getAttribute('src') === nv.getAttribute('src')) nv.replaceWith(ov);   // 보고 있던 영상은 끊지 않는다
     root.replaceWith(next);
     afterPaint(root.dataset.c);
   }
+  // 대본 단계로 돌아가기 (빈 대본 오류가 났을 때)
+  window.ytGoScript = function () { const { steps } = evalSteps('youtube'), k = steps.findIndex(x => x.id === 'g-script'); if (k >= 0) { T.view.youtube = k; repaint('youtube', true); } };
+  window.ytRepaint = function () { repaint('youtube'); };
   function afterPaint(c) {
     if (window.CodexImg) setTimeout(() => CodexImg.hydrate(), 0);
     if (c === 'insta') setTimeout(() => window.InstaToon && window.InstaToon.hydrateArt(), 0);
@@ -961,7 +1006,7 @@
   // 유튜브 실행기 버튼(data-ya-*)은 fieldnote-runner.js 가 처리한다. 누르는 순간 보고 있던 단계를 붙잡아 두고, 끝나면 다시 그린다.
   document.addEventListener('click', e => {
     if (e.target.closest('#plRoot [data-yp-format]')) { S.sel.youtube = { empty: true }; save(); return; }
-    const b = e.target.closest('#plRoot [data-ya-run], #plRoot [data-ya-act], #plRoot [data-ya-recopen]'); if (!b) return;
+    const b = e.target.closest('#plRoot [data-ya-run], #plRoot [data-ya-steps], #plRoot [data-ya-act], #plRoot [data-ya-recopen]'); if (!b) return;
     const root = b.closest('#plRoot'); T.view.youtube = +root.dataset.v;
     setTimeout(() => repaint('youtube', true), 700);
   }, true);
@@ -1011,7 +1056,7 @@
 .pl-wc-t{padding:0 10px;font-size:14px;font-weight:700;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.7em}
 .pl-wc-s{padding:0 10px;font-size:12px;color:var(--muted);line-height:1.4}
 .pl-wbs{display:flex;gap:4px;flex-wrap:wrap;margin-top:3px}.pl-wbs .b{font-style:normal;font-size:11px;padding:1px 6px;border-radius:999px;border:1px solid var(--line);color:var(--text)}
-.pl-wbs .run{border-color:#3ddc84;color:#3ddc84}.pl-wbs .gate{border-color:#f2c94c;color:#f2c94c}.pl-wbs .fail{border-color:#ff6b6b;color:#ff6b6b}
+.pl-wbs .run{border-color:#3ddc84;color:#3ddc84}.pl-wbs .gate{border-color:#f2c94c;color:#f2c94c}.pl-wbs .fail{border-color:#ff6b6b;color:#ff6b6b}.pl-wbs .vid{border-color:var(--pc,#9ad);color:var(--text);background:#1d2630}
 .pl-wc-x{position:absolute;top:4px;right:4px;width:28px;height:28px;border-radius:50%;border:0;background:rgba(0,0,0,.65);color:#fff;font-size:16px;line-height:1;cursor:pointer}
 .pl-wc-new{display:grid;place-items:center;min-height:120px;border-style:dashed;border-color:var(--pc);background:transparent;color:var(--pc);font-weight:700;font-size:15px;cursor:pointer;padding:0 10px}
 .pl-wpub{margin-top:6px;font-size:13px;color:var(--muted)}.pl-wpub ul{margin:6px 0 0;padding-left:18px}
@@ -1064,6 +1109,10 @@
 .pl-result{margin-top:14px;border:1px solid var(--line);border-left:4px solid var(--green);border-radius:10px;background:var(--panel2);padding:12px 14px;font-size:15px;overflow-wrap:anywhere}
 .pl-result-h{font-size:12px;color:var(--muted);font-weight:700;margin-bottom:4px}
 .pl-result video{width:100%;max-height:420px;border-radius:8px;background:#000;margin-bottom:8px}
+.pl-player{margin:0 0 14px;border:1px solid var(--line);border-left:4px solid var(--pc);border-radius:12px;background:var(--panel2);padding:12px 14px}
+.pl-player-h{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:10px}.pl-player-h b{font-size:17px}.pl-player-v{font-size:13px;color:var(--muted);flex:1}
+.pl-player video{display:block;margin:0 auto;max-width:100%;max-height:70vh;width:auto;height:auto;background:#000;border-radius:8px}
+.pl-subs{margin:0 0 4px}.pl-logs{display:flex;gap:12px;flex-wrap:wrap;margin-top:4px}
 .pl-files{list-style:none;margin:6px 0 0;padding:0;display:flex;gap:8px;flex-wrap:wrap}
 .pl-nav{display:flex;justify-content:space-between;gap:10px;margin-top:16px}
 .pl-nav-btn{min-height:46px;padding:0 20px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--text);font-size:16px;font-weight:700;cursor:pointer}
@@ -1083,6 +1132,7 @@
 .pl-input:focus,.pl-answer:focus{outline:none;border-color:var(--pc)}
 .pl-answer{width:100%;min-height:180px;padding:12px 14px;font-size:15px;line-height:1.6;border-radius:12px;border:2px solid var(--line);background:#0f1216;color:var(--text);resize:vertical;font-family:inherit}
 .pl-error{color:#ffb4b4;background:#3a1f22;border:1px solid #6b3237;border-radius:10px;padding:10px 14px;margin:10px 0;font-size:15px}
+.pl-scr{margin:10px 0;display:grid;gap:8px}.pl-scr-l{display:grid;gap:6px;font-weight:600}.pl-scr textarea{width:100%;box-sizing:border-box;font:inherit;line-height:1.5}
 .pl-error code{background:#241416;border-radius:4px;padding:1px 5px;overflow-wrap:anywhere}
 .pl-checks{display:grid;gap:8px;margin:0 0 10px}
 .pl-check{display:flex;gap:12px;align-items:center;min-height:52px;padding:8px 14px;border-radius:12px;border:2px solid var(--line);background:var(--panel2);font-size:15px;cursor:pointer}

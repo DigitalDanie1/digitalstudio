@@ -42,6 +42,59 @@ async function runnerRefresh() {
   clearTimeout(runnerTimer);
   if (document.getElementById('ytAuto')) runnerTimer = setTimeout(runnerRefresh, busy ? 2000 : 8000);
 }
+
+// ===== 대본 직접 붙여 넣기 (AI 키 없이): 요청문 복사 → Claude 채팅 → 받은 대사 붙여 넣기 =====
+const PH_RE = /여기에 대사/;
+const ytScrState = {};  // ep 이름별로 따로 들고 있어서, 다시 그려도 쓰던 글이 남는다
+function ytScr(ep) { return ytScrState[ep] = ytScrState[ep] || { loaded: false, loading: false, failed: false, request: '', lines: [], hasPh: null, ai: false, text: null, busy: false }; }
+function ytScriptShow(ep) {
+  const sc = ep.steps.find(s => s.id === 'script'); if (!sc) return false;
+  return sc.status === 'failed' || (ep.gate && !!sc.gate) || ep.steps.some(s => s.status === 'failed' && PH_RE.test(s.error || ''));
+}
+// 대본 칸이 아직 확인 중이면 계속 버튼을 잠깐 막는다 (빈 양식으로 계속 누르는 일을 막기 위해)
+const ytScrWaiting = ep => { const st = ytScr(ep.ep); return !st.loaded && !st.failed; };
+const ytScrBlocked = ep => ytScr(ep.ep).hasPh === true;
+function runnerFriendly(msg) { return PH_RE.test(msg || '') ? '대본이 아직 비어 있어요. 대본 단계에서 받은 대사를 붙여 넣고 저장하세요.' : msg; }
+async function ytScrLoad(ep) {
+  const st = ytScr(ep); if (st.loading) return; st.loading = true;
+  try {
+    const d = await runnerFetch('/script?ep=' + encodeURIComponent(ep));
+    Object.assign(st, { request: d.request || '', lines: d.lines || [], hasPh: !!d.hasPlaceholder, ai: !!d.ai, loaded: true, failed: false });
+    if (st.text === null) st.text = st.lines.join('\n');
+  } catch (_) { st.failed = true; st.loaded = true; }  // 예전 실행기면 이 길이 없음
+  st.loading = false;
+  if (typeof ytRepaint === 'function') ytRepaint();
+}
+const ytScrCount = t => String(t || '').split(/\r?\n/).map(l => l.trim()).filter(l => l && !/^[#>]/.test(l)).length;
+function ytScriptPanel(ep, mainIsSave) {
+  const st = ytScr(ep.ep);
+  if (!st.loaded && !st.loading) setTimeout(() => ytScrLoad(ep.ep), 0);
+  const text = st.text === null ? '' : st.text, n = ytScrCount(text);
+  const hint = st.failed ? '<p class="pl-error" role="alert">실행기가 옛 버전이에요. 실행기를 껐다가 다시 켜면 여기서 대본을 붙여 넣을 수 있어요.</p>'
+    : st.hasPh ? '<p class="small">대본에 "[여기에 대사]" 빈칸이 남아 있어요. 대사를 채워 주세요.</p>' : '';
+  const copy = !st.ai && st.request ? `<p class="small">AI 키가 없어서 대본을 직접 받아요.</p><button type="button" class="pl-chip" data-ya-scr="copy">① 요청문 복사</button>` : '';
+  const form = `<div class="pl-scr">${hint}${copy}
+    <label class="pl-scr-l">② 받은 대사 붙여 넣기<textarea class="pl-input" rows="9" data-ya-scr-text placeholder="한 줄 = 자막 한 장면 (25자 안팎)" ${st.failed ? 'disabled' : ''}>${esc(text)}</textarea></label>
+    <p class="small"><b id="yaScrN">${n}줄</b> · 최대 20줄</p>
+    ${mainIsSave || st.failed ? '' : `<button type="button" class="pl-chip on" data-ya-act="scriptsave" ${st.busy ? 'disabled' : ''}>대본 저장하고 계속</button>`}</div>`;
+  return st.hasPh === false && !st.failed ? `<details class="pl-peek"><summary>대본 고쳐서 저장하기</summary>${form}</details>` : form;
+}
+document.addEventListener('click', e => { if (e.target.closest('[data-ya-goscript]') && typeof ytGoScript === 'function') ytGoScript(); });
+document.addEventListener('input', e => {
+  const ta = e.target.closest && e.target.closest('textarea[data-ya-scr-text]'); if (!ta) return;
+  const cur = runnerEp(); if (!cur) return;
+  ytScr(cur.ep).text = ta.value;
+  const n = document.getElementById('yaScrN'); if (n) n.textContent = ytScrCount(ta.value) + '줄';
+});
+document.addEventListener('click', async e => {
+  const b = e.target.closest('button[data-ya-scr="copy"]'); if (!b) return;
+  const cur = runnerEp(); if (!cur) return;
+  try {
+    const d = await runnerFetch('/script?ep=' + encodeURIComponent(cur.ep));
+    if (!d.request) { toast('요청문이 없어요. 대본 단계를 다시 실행하세요.'); return; }
+    if (await copyText(d.request)) toast('Claude 채팅에 붙여 넣으세요.'); else toast('복사가 안 됐어요. 대본-요청.txt 파일을 열어 복사하세요.');
+  } catch (err) { toast('실행기: ' + runnerFriendly(err.message)); }
+});
 const RUN_LABEL = { done: '완료', running: '진행 중', failed: '실패', todo: '대기' };
 function runnerFileLink(ep, p, label) {
   return `<a class="btn ghost ya-file" href="${RUNNER}/file?ep=${encodeURIComponent(ep)}&path=${encodeURIComponent(p)}" target="_blank" rel="noopener noreferrer">${esc(label || p.split('/').pop())} ↗</a>`;
@@ -155,12 +208,14 @@ document.addEventListener('click', async e => {
   }
   const lg = e.target.closest('button[data-ya-log]');
   if (lg) { runnerOpenLog = runnerOpenLog === lg.dataset.yaLog ? null : lg.dataset.yaLog; runnerPaint(document.getElementById('ytAutoLive'), true); document.querySelector('[data-ya-log]')?.focus(); if (runnerOpenLog) runnerShowLog(runnerOpenLog); return; }
-  const run = e.target.closest('button[data-ya-run]'), act = e.target.closest('button[data-ya-act]');
+  const run = e.target.closest('button[data-ya-run], button[data-ya-steps]'), act = e.target.closest('button[data-ya-act]');
   if ((!run && !act) || runnerBusy) return;
+  if (run && run.dataset.yaConfirm && !confirm(run.dataset.yaConfirm)) return;
   const cur = runnerEp();
   runnerBusy = true;
   try {
-    if (run) { await runnerFetch('/run', { ep: cur.ep, step: run.dataset.yaRun }); runnerOpenLog = run.dataset.yaRun; toast('실행을 시작했어요.'); }
+    if (run && run.dataset.yaSteps) { const ids = run.dataset.yaSteps.split(',').filter(Boolean); await runnerFetch('/run', { ep: cur.ep, steps: ids }); runnerOpenLog = ids[0]; toast('실행을 시작했어요.'); }
+    else if (run) { await runnerFetch('/run', { ep: cur.ep, step: run.dataset.yaRun }); runnerOpenLog = run.dataset.yaRun; toast('실행을 시작했어요.'); }
     else {
       const a = act.dataset.yaAct;
       if (a === 'create') {
@@ -177,11 +232,24 @@ document.addEventListener('click', async e => {
         await runnerFetch('/source', { ep: cur.ep, url: v('url'), ranges: v('ranges') });
         document.querySelectorAll('[data-ya-src]').forEach(input => { input.value = ''; }); toast('소스를 추가했어요.');
       } else if (a === 'runall') { const r = await runnerFetch('/runall', { ep: cur.ep }); runnerOpenLog = r.from || null; toast('처음 안 끝난 단계부터 차례로 돌아요.'); }
+      else if (a === 'scriptsave') {
+        const st = ytScr(cur.ep), ta = document.querySelector('textarea[data-ya-scr-text]');
+        const text = ta ? ta.value : st.text || ''; st.text = text; st.busy = true;
+        try {
+          await runnerFetch('/script', { ep: cur.ep, text }).catch(e => { e.fromSave = true; throw e; });
+          const r = await runnerFetch('/continue', { ep: cur.ep }); runnerSelectedStep = runnerOpenLog = r.from || null;
+          st.loaded = false; st.text = null; toast('대본을 저장했어요. 편집 단계부터 이어서 돌아요.');
+        } finally { st.busy = false; }
+      }
       else if (a === 'continue') { const r = await runnerFetch('/continue', { ep: cur.ep }); runnerSelectedStep = runnerOpenLog = r.from || null; toast('편집 단계부터 이어서 돌아요.'); }
       else if (a === 'stop') { await runnerFetch('/stop', { ep: cur.ep }); toast('멈췄어요.'); }
       else if (a === 'open') { await runnerFetch('/open', { ep: cur.ep }); }
     }
-  } catch (err) { toast('실행기: ' + err.message); }
+  } catch (err) {
+    const ph = PH_RE.test(err.message) && !err.fromSave;
+    toast(ph ? runnerFriendly(err.message) : '실행기: ' + err.message);
+    if (ph) { if (cur) { const st = ytScr(cur.ep); st.loaded = false; st.hasPh = true; } if (typeof ytGoScript === 'function') ytGoScript(); }
+  }
   finally { runnerBusy = false; runnerRefresh(); }
 });
 
