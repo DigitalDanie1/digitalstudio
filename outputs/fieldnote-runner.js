@@ -12,14 +12,24 @@ function runnerEp() {
 let runnerSyncing = false;
 async function runnerSyncIdeas() {
   if (runnerSyncing || !runnerData || typeof db !== 'object') return;
+  const epCh = e => (typeof ytValidCh === 'function' && ytValidCh(e.channel)) || '';
+  const epTopic = ch => { let t = ''; try { t = (typeof ytTabDefs === 'function' && (ytTabDefs(ch)[0] || {}).id) || ''; } catch (_) {} return t || (ch === 'yt-wrestling' ? 'yt-wrestling-athletes' : ''); };
+  // 예전에 레슬링으로 잘못 올라간 연결 주제는 실행기의 채널로 한 번 바로잡는다
+  let fixed = false;
+  for (const e of runnerData.episodes) {
+    const ch = epCh(e); if (!ch || !e.ideaId) continue;
+    const idea = db.ideas.find(i => i.id === e.ideaId);
+    if (idea && ch !== 'yt-wrestling' && (idea.ytChannel === 'yt-wrestling' || idea.topicId === 'yt-wrestling-athletes')) { idea.ytChannel = ch; idea.topicId = epTopic(ch); fixed = true; }
+  }
   const lost = runnerData.episodes.filter(e => !e.ideaId || !db.ideas.some(i => i.id === e.ideaId));
-  if (!lost.length) return;
+  if (!lost.length) { if (fixed) { persist(); render(); } return; }
   runnerSyncing = true;
   try {
     for (const e of lost) {
       const id = e.ideaId && !db.ideas.some(i => i.id === e.ideaId) ? e.ideaId : 'ep-' + e.ep;
+      const ch = epCh(e) || 'yt-wrestling';
       if (!db.ideas.some(i => i.id === id)) db.ideas.unshift({ id, title: e.title, note: e.note || '', sources: e.sources.map(s => s.url).join('\n'),
-        preferredChannel: 'youtube', ytChannel: 'yt-wrestling', ytFormat: 'shorts', topicId: 'yt-wrestling-athletes', sample: false, created: Date.now() });
+        preferredChannel: 'youtube', ytChannel: ch, ytFormat: e.format === 'long' ? 'long' : 'shorts', topicId: epTopic(ch), sample: false, created: Date.now() });
       if (e.ideaId !== id) { await runnerFetch('/link', { ep: e.ep, ideaId: id }); e.ideaId = id; }
     }
     persist(); render();
