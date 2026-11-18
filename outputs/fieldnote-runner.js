@@ -106,7 +106,7 @@ function ytAutoLive() {
 }
 function runnerFlow(at, pct) {
   const step = (n, label, sub, act) => `<li class="${n < at ? 'done' : n === at ? 'now' : ''}"><span>${n}</span><div><b>${label}</b><small>${sub}</small></div>${act || ''}</li>`;
-  return `<ol class="ya-flow" aria-label="작업 흐름">${step(1, '주제 발굴', '주제 고르기 · 소스 찾기', '<button class="linkbtn" data-view="youtubePlan">AI 주제 발굴 →</button><button class="linkbtn" data-view="ytSources">소스 탭 →</button>')}
+  return `<ol class="ya-flow" aria-label="작업 흐름">${step(1, '주제 정하기', '주제를 고르세요', '<button class="linkbtn" data-view="youtubePlan">AI 주제 발굴 →</button>')}${step(1.5, '소스 전달', '영상 주소 · 구간 넣기', '<button class="linkbtn" data-view="ytSources">소스 탭 →</button>')}
     ${step(2, '제작 진행', at >= 2 ? `진척률 ${pct ?? 0}%` : '제작 시작 전')}${step(3, '결과물 확인', at >= 3 ? '최종본 완성' : '영상·업로드 패키지')}</ol>`;
 }
 // Poll without replacing unchanged controls or clearing a source being typed.
@@ -166,7 +166,9 @@ document.addEventListener('click', async e => {
       if (a === 'create') {
         const v = k => document.querySelector(`[data-ya-new="${k}"]`)?.value || '';
         const idea = runnerIdea(); if (!idea) throw new Error('주제를 먼저 고르세요');
-        const r = await runnerFetch('/episodes', { title: idea.title, note: idea.note || '', url: v('url'), ranges: v('ranges'), ideaId: idea.id });
+        let channel = ''; try { channel = (typeof ytValidCh === 'function' && ytValidCh(idea.ytChannel)) || (typeof ytChannelOfTopic === 'function' && ytChannelOfTopic(idea.topicId)) || (typeof ytTab === 'function' && ytTab()) || ''; } catch (e) { channel = ''; }
+        let voice = ''; try { voice = typeof ytChVoice === 'function' && channel ? ytChVoice(channel) : ''; } catch (e) { voice = ''; }
+        const r = await runnerFetch('/episodes', { title: idea.title, note: idea.note || '', url: v('url'), ranges: v('ranges'), ideaId: idea.id, channel, voice });
         runnerSelectedStep = runnerOpenLog = null;
         toast('에피소드를 만들었어요: ' + r.ep);
       } else if (a === 'addsrc') {

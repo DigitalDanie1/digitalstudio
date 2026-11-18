@@ -451,7 +451,7 @@
     finish: '자막과 효과를 얹은 완성본을 만들어요.',
     upload: '제목·설명란·태그·썸네일 문구를 한 파일로 만들어요.',
   };
-  const YT_PLACEHOLDER = ['주제·소스', '대본', '편집', '녹음·음악', '업로드 패키지'];
+  const YT_PLACEHOLDER = ['주제 정하기', '소스 전달', '대본', '편집', '녹음·음악', '업로드 패키지'];
   function ytCh(i) { return ytValidCh(i.ytChannel) || (typeof ytChannelOfTopic === 'function' && ytChannelOfTopic(i.topicId)) || 'yt-wrestling'; }
   function ytIdeas() { return db.ideas.filter(i => ideaPlatform(i) === 'YouTube' && ytFormatOf(i) === ytPipe.format && ytCh(i) === ytTab()).sort((a, b) => ytRank(a) - ytRank(b) || (b.created || 0) - (a.created || 0)); }
   function ytEp(idea) { return idea && runnerData ? (runnerData.episodes || []).find(e => e.ideaId === idea.id) || null : null; }
@@ -468,27 +468,44 @@
   function ytStepsFor(it) {
     const ep = it.ep, off = runnerOnline === false;
     const offMsg = '<p class="pl-error" role="alert"><b>실행기가 꺼져 있어요.</b> 맥에서 <code>~/Desktop/유투브/실행기/실행기 켜기.command</code> 를 더블클릭하세요. 켜진 창은 닫지 마세요.<br><span class="small">이 맥의 크롬에서만 돼요. "로컬 네트워크 접근"을 물으면 허용을 누르세요.</span></p>';
-    const first = {
-      id: 'src', name: '주제·소스', title: '주제·소스 정하기', desc: '작업할 주제를 고르고, 소스 영상 주소와 쓸 구간을 넣으세요. 한 구간은 15초까지예요.',
-      btn: it => !it.idea ? '이 주제로 정하기' : '이 주제로 제작 시작',
-      attrs: it => it.idea ? 'data-ya-act="create"' : 'data-pl-run',
-      disabled: it => it.idea && (off || runnerOnline === null),
+    const topic = {
+      id: 'topic', name: '주제 정하기', title: '주제 정하기', desc: '이번에 만들 주제를 하나 고르세요.',
+      btn: '이 주제로 정하기',
+      hideBtn: it => !!it.idea,
+      isDone: it => !!it.idea,
+      result: it => it.idea ? `<b>${esc(it.idea.title)}</b>${it.ep ? '' : ' <button type="button" class="pl-link" data-pl-ytchange>주제 바꾸기</button>'}` : '',
+      body: it => {
+        if (it.idea) return '';
+        const tabs = ytLock ? '' : `<div class="filters yt-tabs pl-ytabs" role="tablist" aria-label="유튜브 채널">${YT_CHANNELS.filter(y => !YT_LOCKS[y.id]).map(y => `<button class="filter ${ytTab() === y.id ? 'active' : ''}" role="tab" aria-selected="${ytTab() === y.id}" data-yt-tab="${y.id}" title="${esc(ytChName(y.id))}">${esc(y.tab)}</button>`).join('')}</div>`;
+        const fmt = f => `<button type="button" class="pl-chip ${ytPipe.format === f ? 'on' : ''}" data-yp-format="${f}" aria-pressed="${ytPipe.format === f}">${f === 'long' ? '🎬 롱폼' : '📱 쇼츠'}</button>`;
+        const list = ytIdeas(), pg = (T.page.youtube || 0) % Math.max(1, Math.ceil(list.length / PAGE)), shown = list.slice(pg * PAGE, pg * PAGE + PAGE);
+        const picker = `<div class="pl-topics" role="radiogroup" aria-label="주제">${shown.map(t => `<button type="button" role="radio" aria-checked="false" class="pl-topic" data-pl-ytpick="${esc(t.id)}"><span>${esc(t.title)}</span></button>`).join('') || `<div class="pl-empty"><p class="small"><b>이 채널 주제가 아직 없어요.</b> 아래에서 주제를 찾거나 직접 적어 주세요.</p><div class="pl-chips"><button type="button" class="pl-chip" data-view="${ytRoute('youtubePlan', ytLock)}">AI 주제 발굴</button><button type="button" class="pl-chip" data-action="newIdea">직접 적기</button></div></div>`}</div>${list.length > PAGE ? `<button type="button" class="pl-link" data-pl-more>다른 주제 보기 (${pg + 1}/${Math.ceil(list.length / PAGE)})</button>` : ''}`;
+        return tabs + `<div class="pl-chips">${fmt('shorts')}${fmt('long')}</div>` + picker;
+      },
+      run: it => { const id = T.ytPick || (ytIdeas()[0] || {}).id; if (!it.idea && id) { selectYt(id); T.view.youtube = null; } else if (!it.idea) toast('주제를 하나 골라 주세요.'); },
+    };
+    const src = {
+      id: 'src', name: '소스 전달', title: '소스 전달', desc: it => it.idea ? '소스 영상 주소와 쓸 구간을 넣으세요. 한 구간은 15초까지예요.' : '앞 단계를 끝내면 열려요.',
+      btn: '이 소스로 제작 시작',
+      attrs: () => 'data-ya-act="create"',
+      disabled: it => !it.idea || off || runnerOnline === null,
       hideBtn: it => !!it.ep,
       isDone: it => !!it.ep,
       result: it => it.ep ? `<b>${esc(it.ep.ep)}</b> 폴더 만듦 · 소스 ${it.ep.sources.length}개${it.ep.sources[0] ? ' · ' + esc(it.ep.sources[0].url) : ''}` : '',
       body: it => {
-        const tabs = ytLock ? '' : `<div class="filters yt-tabs pl-ytabs" role="tablist" aria-label="유튜브 채널">${YT_CHANNELS.filter(y => !YT_LOCKS[y.id]).map(y => `<button class="filter ${ytTab() === y.id ? 'active' : ''}" role="tab" aria-selected="${ytTab() === y.id}" data-yt-tab="${y.id}" title="${esc(ytChName(y.id))}">${esc(y.tab)}</button>`).join('')}</div>`;
-        const fmt = f => `<button type="button" class="pl-chip ${ytPipe.format === f ? 'on' : ''}" data-yp-format="${f}" aria-pressed="${ytPipe.format === f}">${f === 'long' ? '🎬 롱폼' : '📱 쇼츠'}</button>`;
-        if (it.ep) return '';
-        const list = ytIdeas(), pg = (T.page.youtube || 0) % Math.max(1, Math.ceil(list.length / PAGE)), shown = list.slice(pg * PAGE, pg * PAGE + PAGE);
-        const picker = `<div class="pl-topics" role="radiogroup" aria-label="주제">${shown.map(t => `<button type="button" role="radio" aria-checked="${it.idea && t.id === it.idea.id}" class="pl-topic ${it.idea && t.id === it.idea.id ? 'on' : ''}" data-pl-ytpick="${esc(t.id)}"><span>${esc(t.title)}</span></button>`).join('') || `<div class="pl-empty"><p class="small"><b>이 채널 주제가 아직 없어요.</b> 아래에서 주제를 찾거나 직접 적어 주세요.</p><div class="pl-chips"><button type="button" class="pl-chip" data-view="${ytRoute('youtubePlan', ytLock)}">AI 주제 발굴</button><button type="button" class="pl-chip" data-action="newIdea">직접 적기</button></div></div>`}</div>${list.length > PAGE ? `<button type="button" class="pl-link" data-pl-more>다른 주제 보기 (${pg + 1}/${Math.ceil(list.length / PAGE)})</button>` : ''}`;
-        const inputs = it.idea ? `<div class="pl-ya-form"><label>소스 영상 주소<input class="pl-input" data-ya-new="url" placeholder="https://www.youtube.com/watch?v=…" value="${esc(ytPipe.url || ytFirstUrl(it.idea))}"></label><label>구간 (쉼표로 여러 개)<input class="pl-input" data-ya-new="ranges" placeholder="0:30-0:42, 1:05-1:12" value="${esc(ytPipe.ranges || '')}"></label></div>` : '';
-        return (off ? offMsg : '') + tabs + `<div class="pl-chips">${fmt('shorts')}${fmt('long')}</div>` + picker + inputs;
+        if (!it.idea || it.ep) return '';
+        let chips = '';
+        try {
+          const vids = (typeof ytPromptSources === 'function' ? ytPromptSources(it.idea.topicId) : []).filter(x => x.video && x.video.url).slice(0, 4);
+          if (vids.length) chips = `<div class="pl-chips" role="group" aria-label="추천 소스 영상">${vids.map(x => `<button type="button" class="pl-chip" data-pl-ysrc="${esc(x.video.url)}" title="${esc(x.video.title || '')}">${esc(x.name)}</button>`).join('')}</div>`;
+        } catch (e) { chips = ''; }
+        const inputs = `<div class="pl-ya-form"><label>소스 영상 주소<input class="pl-input" data-ya-new="url" placeholder="https://www.youtube.com/watch?v=…" value="${esc(ytPipe.url || ytFirstUrl(it.idea))}"></label>${chips}<label>구간 (쉼표로 여러 개)<input class="pl-input" data-ya-new="ranges" placeholder="0:30-0:42, 1:05-1:12" value="${esc(ytPipe.ranges || '')}"></label></div>`;
+        return (off ? offMsg : '') + inputs;
       },
-      run: it => { const id = T.ytPick || (ytIdeas()[0] || {}).id; if (!it.idea && id) { selectYt(id); } else if (!it.idea) toast('주제를 하나 골라 주세요.'); },
+      run: () => {},
     };
     let mid;
-    if (!ep) mid = YT_PLACEHOLDER.slice(1).map((n, k) => ({ id: 'ph' + k, name: n, title: n, desc: '앞 단계를 끝내면 열려요.', btn: '실행', disabled: () => true, isDone: () => false, result: () => '', run: () => {} }));
+    if (!ep) mid = YT_PLACEHOLDER.slice(2).map((n, k) => ({ id: 'ph' + k, name: n, title: n, desc: '앞 단계를 끝내면 열려요.', btn: '실행', disabled: () => true, isDone: () => false, result: () => '', run: () => {} }));
     else mid = ep.steps.map(s => {
       const reviewing = ep.gate && s.gate, running = ep.running === s.id, done = s.status === 'done' && !reviewing;
       const files = s.outputs.filter(o => o.exists), vid = files.find(o => /\.(mp4|mov|webm)$/i.test(o.path));
@@ -530,7 +547,7 @@
         recordUrl('youtube', it.key, it.idea, it.idea.title);
       },
     };
-    return [first, ...mid, last];
+    return [topic, src, ...mid, last];
   }
   function selectYt(id) { const idea = db.ideas.find(i => i.id === id); if (!idea) return; ytPick(id); S.sel.youtube = { ideaId: id }; T.ytPick = id; save(); }
 
@@ -838,7 +855,9 @@
     if (t.hasAttribute('data-pl-new')) { adapter(c).fresh(); T.link[c] = null; T.view[c] = 0; T.err[c] = ''; T.manual[c] = false; T.askCopied[c] = false; repaint(c, true); return; }
     if (t.dataset.plPick) { T.pick[c] = t.dataset.plPick; T.custom[c] = ''; repaint(c, true); return; }
     if (t.hasAttribute('data-pl-more')) { T.page[c] = (T.page[c] || 0) + 1; repaint(c, true); return; }
-    if (t.dataset.plYtpick) { selectYt(t.dataset.plYtpick); T.view.youtube = 0; repaint('youtube', true); return; }
+    if (t.dataset.plYtpick) { selectYt(t.dataset.plYtpick); T.view.youtube = null; repaint('youtube', true); return; }
+    if (t.hasAttribute('data-pl-ytchange')) { adapter('youtube').fresh(); T.view.youtube = 0; repaint('youtube', true); return; }
+    if (t.dataset.plYsrc) { const u = t.dataset.plYsrc, i = document.querySelector('#plRoot [data-ya-new="url"]'); ytPipe.url = u; if (i) i.value = u; return; }
     if (t.dataset.plInstamode) { S.instaMode = t.dataset.plInstamode; save(); adapter('insta').fresh(); T.view.insta = 0; repaint('insta', true); return; }
     if (t.hasAttribute('data-pl-manualmode')) { T.manual[c] = true; T.err[c] = ''; repaint(c, true); return; }
     if (t.hasAttribute('data-pl-retryauto')) { T.manual[c] = false; T.err[c] = ''; T.askCopied[c] = false; repaint(c, true); return; }
