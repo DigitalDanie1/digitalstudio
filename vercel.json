@@ -31,6 +31,10 @@
       "destination": "/outputs/fieldnote-pipeline.js"
     },
     {
+      "source": "/fieldnote-ytformula.js",
+      "destination": "/outputs/fieldnote-ytformula.js"
+    },
+    {
       "source": "/instatoon.js",
       "destination": "/outputs/instatoon.js"
     },

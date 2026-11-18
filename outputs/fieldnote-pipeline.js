@@ -693,7 +693,7 @@
   const CXI = () => window.CodexImg;
   function postOpts(c, it) {
     const p = it.post; if (!p || p.status !== 'approved') return null;
-    const a = igOf(p), lang = IG_BY_ID[a].lang, pc = CXI().postCards(a, lang, p.title, igName(a), p.body);
+    const a = igOf(p), lang = (IG_BY_ID[a] || {}).lang, pc = CXI().postCards(a, lang, p.title, igName(a), p.body);
     if (!pc.cards.length) return null;
     return { c, account: a, projectId: p.id, lang, title: p.title, item: p, save: () => persist(), cards: pc.cards };
   }
