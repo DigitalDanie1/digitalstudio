@@ -39,6 +39,14 @@
       "destination": "/outputs/assets/singbubu-logo.png"
     },
     {
+      "source": "/assets/insta-jury-climax.png",
+      "destination": "/outputs/assets/insta-jury-climax.png"
+    },
+    {
+      "source": "/assets/insta-jury-first-pass.png",
+      "destination": "/outputs/assets/insta-jury-first-pass.png"
+    },
+    {
       "source": "/",
       "destination": "/outputs/fieldnote-studio.html"
     }
