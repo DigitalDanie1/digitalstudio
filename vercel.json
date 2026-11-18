@@ -19,6 +19,10 @@
       "destination": "/outputs/fieldnote-steps.js"
     },
     {
+      "source": "/fieldnote-pipeline.js",
+      "destination": "/outputs/fieldnote-pipeline.js"
+    },
+    {
       "source": "/instatoon.js",
       "destination": "/outputs/instatoon.js"
     },

@@ -138,7 +138,11 @@
         </ol>
         <p class="it-muted">그림은 이 브라우저에만 저장됩니다 · <span id="itArtCount">${done}</span>/${project.cards.length}장 완료</p></div>
       </div>
-      <div class="it-art-grid">${project.cards.map((card, index) => `<article class="it-art-card" data-card-id="${safe(card.id)}">
+      ${artGrid(project)}`;
+  }
+
+  function artGrid(project) {
+    return `<div class="it-art-grid">${project.cards.map((card, index) => `<article class="it-art-card" data-card-id="${safe(card.id)}">
         <h3>${String(index + 1).padStart(2, '0')} / ${project.cards.length}</h3>
         <div class="it-art-drop" data-it-drop="${safe(card.id)}" tabindex="0" role="button" aria-label="${index + 1}번째 카드 그림 올리기">
           <canvas class="it-art-canvas" data-it-canvas="${safe(card.id)}" width="540" height="540"></canvas>
@@ -294,6 +298,7 @@
       canvas.closest('.it-art-drop')?.classList.toggle('has-img', !!image);
     }
     const count = document.querySelector('#itArtCount'); if (count) count.textContent = done;
+    if (project.imgDone !== done) { project.imgDone = done; persist(); window.dispatchEvent(new Event('it-art')); }
   }
   function slug(text) { return String(text || '이번편').replace(/[\\/:*?"<>|\s]+/g, '-').slice(0, 40); }
   async function savePng(card, index) {
@@ -312,6 +317,7 @@
       if (!(await loadImg(imgKey(project, card)))) continue;
       await savePng(card, index); n++; await new Promise(r => setTimeout(r, 350));
     }
+    if (n) { project.pngAt = Date.now(); project.pngCount = n; persist(); window.dispatchEvent(new Event('it-art')); }
     toast(n ? `PNG ${n}장을 저장했어요.` : '아직 그림을 넣은 카드가 없어요.');
   }
 
@@ -402,16 +408,12 @@
     catch (_) { toast('복사할 수 없습니다. 브라우저 클립보드 권한을 확인하세요.'); }
   }
 
-  document.addEventListener('DOMContentLoaded', () => {
-    const originalPlatformPage = platformPage;
-    platformPage = function (channel) {
-      if (channel !== 'insta') return originalPlatformPage(channel);
-      // 주제 목록(상단 소개 + 주제 보드) → 만화 작업대 → 원고·프로그램
-      const base = originalPlatformPage(channel), cut = base.indexOf('<section class="pf-section"');
-      return cut < 0 ? base + page() : base.slice(0, cut) + page() + base.slice(cut);
-    };
-    if (view === 'insta' && !editing) render();
-  });
+  // 인스타 화면은 fieldnote-pipeline.js 의 공통 단계 틀 안에서 이 API 로 각 단계를 그린다.
+  window.InstaToon = {
+    safe, list, current, remember, makeProject, flush, state, flowPrompt, cardMarkup, artGrid,
+    generateCards, approve, copyBrief, saveAll, hydrateArt, header, storyPage, cardsPage, artPage, page
+  };
+  document.addEventListener('DOMContentLoaded', () => { if (view === 'insta' && !editing) render(); });
 
   document.addEventListener('input', event => {
     const target = event.target;
