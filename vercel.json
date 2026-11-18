@@ -39,6 +39,14 @@
       "destination": "/outputs/instatoon.css"
     },
     {
+      "source": "/krsg-references.js",
+      "destination": "/outputs/krsg-references.js"
+    },
+    {
+      "source": "/krsg-references.css",
+      "destination": "/outputs/krsg-references.css"
+    },
+    {
       "source": "/assets/singbubu-logo.png",
       "destination": "/outputs/assets/singbubu-logo.png"
     },
