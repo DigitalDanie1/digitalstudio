@@ -103,7 +103,8 @@
     if (title.length > 200) throw Error('첫 줄이 너무 길어요. 첫 줄에는 제목만 있어야 해요.');
     return { title, body, sources: '' };
   }
-  const postText = (c, p) => c === 'blog' ? naverCopyText(p) : markdownToPlain(p.body);
+  const igCaption = p => { const cap = window.CodexImg && CodexImg.splitDraft(p.body).caption; return cap ? markdownToPlain(cap) : markdownToPlain(p.body); };
+  const postText = (c, p) => c === 'blog' ? naverCopyText(p) : c === 'insta' ? igCaption(p) : markdownToPlain(p.body);
 
   // 올렸는지(복사·열기·브리지 전송을 했는지)
   const uploaded = (key, p) => !!(S.opened[key] || (p && ['queued', 'published'].includes(p.publish?.state)));
@@ -429,7 +430,18 @@
         recordUrl(c, p.id, p, p.title);
       },
     };
-    return blog ? [S1, S2, fill, review, upload] : [S1, S2, review, upload];
+    if (c !== 'insta') return blog ? [S1, S2, fill, review, upload] : [S1, S2, review, upload];
+    // 인스타(카드뉴스): 확인·승인 뒤에 그림(Codex) 단계, 업로드에서는 캡션 복사 + 그림 파일 저장
+    const art = codexArtStep(c, it => postOpts(c, it));
+    const b0 = upload.body;
+    upload.desc = '캡션을 복사하고 인스타를 열어요. 아래에서 그림을 파일로 저장해 순서대로 올리고, \'AI 정보\' 표시를 켠 뒤 글 주소를 남기세요.';
+    upload.btn = it => !it.post ? '올리기' : uploaded(it.post.id, it.post) ? '주소 남기기' : '캡션 복사 · 인스타 열기';
+    upload.body = it => {
+      const o = postOpts(c, it);
+      const imgs = o ? `<div class="pl-imgs"><p class="pl-note"><b>올릴 그림 ${CodexImg.doneCount(o)}/${o.cards.length}장</b> · 인스타에는 아래 순서대로 올리세요.</p>${CodexImg.gallery(o)}<p><button type="button" class="pl-nav-btn" data-pl-cxdl ${CodexImg.doneCount(o) ? '' : 'disabled'}>그림 전부 파일로 저장</button></p></div>` : '';
+      return b0(it) + imgs;
+    };
+    return [S1, S2, review, art, upload];
   }
 
   // ===== YouTube (맥 실행기 단계를 같은 틀에 그린다) =====
@@ -523,6 +535,37 @@
   function selectYt(id) { const idea = db.ideas.find(i => i.id === id); if (!idea) return; ytPick(id); S.sel.youtube = { ideaId: id }; T.ytPick = id; save(); }
 
   // ===== Instagram: 싱부부 인스타툰 단계 =====
+
+  // ===== 인스타 그림 (ChatGPT Codex) — 세 계정 공통 단계 =====
+  const CXI = () => window.CodexImg;
+  function postOpts(c, it) {
+    const p = it.post; if (!p || p.status !== 'approved') return null;
+    const a = igOf(p), lang = IG_BY_ID[a].lang, pc = CXI().postCards(a, lang, p.title, igName(a), p.body);
+    if (!pc.cards.length) return null;
+    return { c, account: a, projectId: p.id, lang, title: p.title, item: p, save: () => persist(), cards: pc.cards };
+  }
+  function toonOpts(pr) {
+    if (!pr || !pr.cards || !pr.cards.length) return null;
+    return { c: 'insta', account: 'insta-sing', projectId: pr.id, lang: 'ko', title: pr.title || '싱부부', item: pr, save: () => window.InstaToon.flush(),
+      cards: pr.cards.map(cd => ({
+        label: cd.top || String(cd.scene || '').slice(0, 24),
+        scene: [cd.scene || cd.top, cd.artNote ? 'Expression / props / composition: ' + cd.artNote : '', 'Draw this card as ONE full-image scene (a single panel, not a multi-panel page).'].filter(Boolean).join('. '),
+        text: [{ role: 'top caption', text: cd.top }, { role: 'speech bubble', text: cd.dialogue }, { role: 'bottom caption', text: cd.bottom }].filter(t => String(t.text || '').trim()),
+      })) };
+  }
+  function codexArtStep(c, getOpts, extra, alsoDone) {
+    return {
+      id: 'art', name: '그림', title: '그림 만들기 (Codex)',
+      desc: 'ChatGPT Codex가 카드마다 그림을 그려요 (말풍선·글자까지). 그림체를 고르고 큰 버튼을 누르세요. 마음에 안 드는 카드만 다시 그릴 수 있어요.',
+      btn: it => CXI().btnLabel(getOpts(it)), disabled: it => CXI().btnDisabled(getOpts(it)),
+      isDone: it => { const o = getOpts(it); return !!o && o.cards.length > 0 && (CXI().doneCount(o) >= o.cards.length || !!(alsoDone && alsoDone(it, o))); },
+      result: it => { const o = getOpts(it); if (!o) return ''; const n = CXI().doneCount(o); return n ? `<b>${n}/${o.cards.length}장</b> 그림 준비됨` : ''; },
+      body: it => { const o = getOpts(it); return (o ? CXI().panel(o) : '<p class="pl-note">먼저 앞 단계를 끝내 주세요. (승인된 원고가 있어야 카드가 나뉘어요)</p>') + (extra ? extra(it) : ''); },
+      run: it => CXI().drawAll(getOpts(it)),
+    };
+  }
+  window.addEventListener('cx-change', () => repaint());
+
   function toonItem() {
     const IT = window.InstaToon, pr = IT && IT.current();
     return { c: 'insta', toon: pr, key: pr ? 't:' + pr.id : '', title: pr ? (pr.title || pr.raw.slice(0, 24) || '제목 없는 이야기') : '' };
@@ -532,6 +575,7 @@
     if (p.caption != null) return p.caption;
     return `${p.title || '이번 편'}\n\n#싱부부의외노자일기 #인스타툰 #싱가포르 #외노자`;
   }
+  const pngMode = it => (it.toon && it.toon.pngMode) || 'codex';
   function toonSteps() {
     const IT = window.InstaToon;
     const need = (it, fn) => it.toon ? fn(it.toon) : '';
@@ -549,18 +593,26 @@
         result: it => need(it, p => p.approvedAt && p.stage === 'art' ? `<b>✓ 컷 ${toonCount(p)}장 확정</b>` : toonCount(p) ? `컷 ${toonCount(p)}장 · 확정 전` : ''),
         body: it => it.toon && toonCount(it.toon) ? `<div class="it pl-it"><div class="it-board"><div class="it-grid">${it.toon.cards.map(IT.cardMarkup).join('')}</div></div><div class="it-actions"><button type="button" class="it-button it-button-quiet" data-it="add-card">＋ 컷 추가</button></div></div>` : '<p class="pl-note">먼저 이야기 단계에서 컷 대본을 만들어 주세요.</p>',
         run: () => IT.approve() },
-      { id: 'art', name: '그림', title: '그림 넣기', desc: '구글 Flow에서 컷마다 그림을 만들어 아래 칸에 끌어다 놓으세요. 먼저 요청서를 한 번에 복사해요.',
-        btn: '그림 요청서 전체 복사', disabled: it => !it.toon || it.toon.stage !== 'art',
-        isDone: it => !!(it.toon && it.toon.stage === 'art' && toonCount(it.toon) && (it.toon.imgDone || 0) >= toonCount(it.toon)),
-        result: it => need(it, p => `<b>${p.imgDone || 0}/${toonCount(p)}장</b> 그림 넣음`),
-        body: it => it.toon && it.toon.stage === 'art' ? `<div class="it pl-it"><div class="it-free"><img src="./assets/singbubu-logo.png" alt="수달 부부 캐릭터 기준 이미지"><div><ol><li><a class="it-link" href="./assets/singbubu-logo.png" download="싱부부-기준이미지.png">기준 이미지 저장</a></li><li><a class="it-link" href="https://labs.google/fx/tools/flow" target="_blank" rel="noopener noreferrer">구글 Flow 열기 ↗</a> — 기준 이미지를 첨부하고 요청서를 붙여 넣어 생성</li><li>마음에 드는 그림을 카드 칸에 <b>끌어다 놓기</b> (클릭·⌘V 도 돼요)</li></ol></div></div>${IT.artGrid(it.toon)}</div>` : '<p class="pl-note">먼저 컷 대본을 확정해 주세요.</p>',
-        run: () => IT.copyBrief() },
-      { id: 'png', name: 'PNG 합성', title: 'PNG로 합성해 저장', desc: '대사와 문장이 그림 위에 자동으로 얹혀요. 버튼을 누르면 컷마다 PNG 파일이 저장돼요.',
-        btn: '전체 PNG 저장', disabled: it => !it.toon || !(it.toon.imgDone > 0),
+      Object.assign(codexArtStep('insta', it => it.toon && it.toon.stage === 'art' ? toonOpts(it.toon) : null,
+        it => it.toon && it.toon.stage === 'art' ? `<details class="pl-peek"><summary>예전 방식 · 구글 Flow로 직접 만들 때</summary><p class="small">Flow에서 컷마다 그림을 만들고, 다음 단계의 "말풍선 직접 넣기"에서 카드 칸에 끌어다 놓으면 대사·문장이 글자로 얹혀요.</p><p><a class="it-link" href="./assets/singbubu-logo.png" download="싱부부-기준이미지.png">기준 이미지 저장</a> · <a class="it-link" href="https://labs.google/fx/tools/flow" target="_blank" rel="noopener noreferrer">구글 Flow 열기 ↗</a> · <button type="button" class="pl-link" data-pl-copybrief>그림 요청서 전체 복사</button></p></details>` : '',
+        (it, o) => (it.toon.imgDone || 0) >= o.cards.length), { desc: 'ChatGPT Codex가 컷마다 그림을 그려요 — 말풍선과 한국어 대사까지 그림 안에 그려 줘요. 그림체를 고르고 큰 버튼을 누르세요.' }),
+      { id: 'png', name: 'PNG 저장', title: it => pngMode(it) === 'bubble' ? 'PNG로 합성해 저장 (말풍선 직접 넣기)' : 'PNG로 모아 저장',
+        desc: it => pngMode(it) === 'bubble' ? '그림을 직접 넣으면 대사와 문장이 위에 얹혀요. 버튼을 누르면 컷마다 PNG 파일이 저장돼요.' : 'Codex가 글자까지 그렸어요. 고른 그림을 컷 순서대로 파일로 저장해요.',
+        btn: it => pngMode(it) === 'bubble' ? '전체 PNG 저장' : '고른 그림 전체 저장',
+        disabled: it => !it.toon || (pngMode(it) === 'bubble' ? !(it.toon.imgDone > 0) : !(toonOpts(it.toon) && CXI().doneCount(toonOpts(it.toon)) > 0)),
         isDone: it => !!(it.toon && it.toon.pngAt),
         result: it => need(it, p => p.pngAt ? `<b>✓ PNG ${p.pngCount || ''}장 저장</b> · ${relative(p.pngAt)}` : ''),
-        body: it => it.toon && it.toon.stage === 'art' ? `<div class="pl-gallery">${it.toon.cards.map((c, k) => `<figure><canvas data-it-canvas="${IT.safe(c.id)}" width="540" height="540"></canvas><figcaption>${String(k + 1).padStart(2, '0')}</figcaption></figure>`).join('')}</div>` : '',
-        run: () => IT.saveAll() },
+        body: it => {
+          if (!it.toon || it.toon.stage !== 'art') return '';
+          const m = pngMode(it), chips = `<div class="pl-chips" role="group" aria-label="저장 방식"><button type="button" class="pl-chip ${m === 'codex' ? 'on' : ''}" data-pl-pngmode="codex">Codex 그림 그대로</button><button type="button" class="pl-chip ${m === 'bubble' ? 'on' : ''}" data-pl-pngmode="bubble">말풍선 직접 넣기</button></div>`;
+          if (m === 'bubble') return chips + `<p><button type="button" class="pl-nav-btn" data-pl-cx2old>Codex 그림을 아래 칸으로 가져오기</button></p><div class="it pl-it">${IT.artGrid(it.toon)}</div>`;
+          const o = toonOpts(it.toon); return chips + (o ? `<p class="pl-note"><b>${CXI().doneCount(o)}/${o.cards.length}장</b> 고름 · 그림 단계에서 카드별로 다른 버전을 고를 수 있어요.</p>${CXI().gallery(o)}` : '');
+        },
+        run: it => {
+          if (pngMode(it) === 'bubble') return IT.saveAll();
+          const p = it.toon;
+          return CXI().downloadAll(toonOpts(p)).then(n => { if (n) { p.pngAt = Date.now(); p.pngCount = n; IT.flush(); } });
+        } },
       { id: 'upload', name: '캡션·업로드', title: '캡션 쓰고 인스타에 올리기', desc: '캡션을 복사하고 인스타를 열어요. 저장한 PNG를 순서대로 올리고, \'AI 정보\' 표시를 켜세요.',
         btn: it => it.toon && uploaded(it.key, null) ? '주소 남기기' : '캡션 복사 · 인스타 열기', disabled: it => !it.toon,
         hideBtn: it => !!(it.toon && it.toon.publicationCheck),
@@ -697,6 +749,7 @@
     afterPaint(root.dataset.c);
   }
   function afterPaint(c) {
+    if (window.CodexImg) setTimeout(() => CodexImg.hydrate(), 0);
     if (c === 'insta') setTimeout(() => window.InstaToon && window.InstaToon.hydrateArt(), 0);
     if (c === 'youtube' && T.logOpen) { const el = document.getElementById('plLog'), ep = ytItem().ep; if (el && ep) runnerFetch(`/log?ep=${encodeURIComponent(ep.ep)}&step=${T.logOpen}&tail=6000`).then(t => { el.textContent = t || '(로그 없음)'; el.scrollTop = el.scrollHeight; }).catch(e => { el.textContent = '로그를 못 읽었어요: ' + e.message; }); }
   }
@@ -771,6 +824,14 @@
     if (t.hasAttribute('data-pl-lkparse')) { linkParse(c); return; }
     if (t.dataset.plLkpick !== undefined) { linkPick(c, +t.dataset.plLkpick); return; }
     if (t.hasAttribute('data-pl-lkcommit')) { if (commitTopic(c)) { T.view[c] = 1; repaint(c, true); } return; }
+    if (t.dataset.plPngmode) { const pr = window.InstaToon.current(); if (pr) { pr.pngMode = t.dataset.plPngmode; window.InstaToon.flush(); } repaint(c, true); return; }
+    if (t.hasAttribute('data-pl-copybrief')) { window.InstaToon.copyBrief(); return; }
+    if (t.hasAttribute('data-pl-cxdl')) { const { it } = ctx(), o = it.toon ? toonOpts(it.toon) : postOpts(c, it); if (o) CXI().downloadAll(o); return; }
+    if (t.hasAttribute('data-pl-cx2old')) {
+      const { it } = ctx(), o = toonOpts(it.toon); if (!o) return;
+      CXI().chosenBlobs(o).then(async list => { for (const x of list) await window.InstaToon.setCardImage(it.toon.cards[x.index].id, x.blob); toast(list.length ? `그림 ${list.length}장을 가져왔어요.` : '가져올 그림이 없어요.'); }).catch(() => toast('그림을 가져오지 못했어요. 실행기가 켜져 있나요?'));
+      return;
+    }
     if (t.hasAttribute('data-pl-go')) { go(c, +t.dataset.plGo); return; }
     if (t.hasAttribute('data-pl-prev')) { go(c, Math.max(0, v - 1)); return; }
     if (t.hasAttribute('data-pl-next')) { go(c, v + 1); return; }

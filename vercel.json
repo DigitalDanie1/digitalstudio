@@ -23,6 +23,10 @@
       "destination": "/outputs/fieldnote-link.js"
     },
     {
+      "source": "/fieldnote-codex-img.js",
+      "destination": "/outputs/fieldnote-codex-img.js"
+    },
+    {
       "source": "/fieldnote-pipeline.js",
       "destination": "/outputs/fieldnote-pipeline.js"
     },

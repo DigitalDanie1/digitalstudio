@@ -411,7 +411,7 @@
   // 인스타 화면은 fieldnote-pipeline.js 의 공통 단계 틀 안에서 이 API 로 각 단계를 그린다.
   window.InstaToon = {
     safe, list, current, remember, makeProject, flush, state, flowPrompt, cardMarkup, artGrid,
-    generateCards, approve, copyBrief, saveAll, hydrateArt, header, storyPage, cardsPage, artPage, page
+    generateCards, approve, copyBrief, saveAll, hydrateArt, setCardImage, header, storyPage, cardsPage, artPage, page
   };
   document.addEventListener('DOMContentLoaded', () => { if (view === 'insta' && !editing) render(); });
 
