@@ -851,13 +851,12 @@ const CHRISTIAN_SOURCES = [
   },
 ];
 
-// 유튜브 3개 채널별 소스 묶음 — 탭으로 골라 박스 그리드로 본다
+// 유튜브 채널별 소스 묶음 — 현재 채널 것만 보여 주고, 채널에 없는 묶음은 '공통 · 기타'로
 const YT_SOURCE_CHANNELS = [
   { id:'yt-wrestling', tab:'레슬링 소스 채널', emoji:'🤼', sources:WRESTLING_SOURCES },
   { id:'yt-christian', tab:'기독교 소스 채널', emoji:'🙏', sources:CHRISTIAN_SOURCES },
   { id:'yt-indochina', tab:'중국 및 인도 소스 채널', emoji:'🌏', sources:[] },
 ];
-let ytSrcTab = 'yt-wrestling';
 
 function wrestlingSourceLibrary(list) {
   list = list || WRESTLING_SOURCES;
@@ -1445,27 +1444,33 @@ document.addEventListener('click', async e => {
 
 // ===== YouTube '소스' 탭: 내가 준 레슬링 소스 채널 전부 =====
 function ytSourcesPage() {
-  const cur = YT_SOURCE_CHANNELS.find(c => c.id === ytSrcTab) || YT_SOURCE_CHANNELS[0];
-  const total = YT_SOURCE_CHANNELS.reduce((n, c) => n + c.sources.length, 0);
-  const tabs = `<div class="yp-fmts" style="margin-bottom:14px">${YT_SOURCE_CHANNELS.map(c => `<button class="yp-fmt ${c.id === cur.id ? 'active' : ''}" data-src-ch="${c.id}" aria-pressed="${c.id === cur.id}">${c.emoji} ${esc(c.tab)} <b>${c.sources.length}</b></button>`).join('')}</div>`;
-  const body = cur.sources.length
+  const chId = ytLock || ytTab();
+  const chDef = YT_CHANNELS.find(c => c.id === chId);
+  const cur = YT_SOURCE_CHANNELS.find(c => c.id === chId);
+  const others = YT_SOURCE_CHANNELS.filter(g => !YT_CHANNELS.some(c => c.id === g.id) && g.sources.length);
+  const otherN = others.reduce((n, g) => n + g.sources.length, 0);
+  const title = cur ? `${cur.emoji} ${esc(cur.tab)}` : esc((chDef ? chDef.tab : '이') + ' 소스 채널');
+  const body = cur && cur.sources.length
     ? wrestlingSourceLibrary(cur.sources)
-    : `<div class="empty" style="border:1px dashed var(--line);border-radius:10px">${cur.emoji} <b>${esc(cur.tab)}</b>가 아직 비어 있습니다.<br><span class="small">참고할 유튜브 채널을 알려주면 이 탭에 박스로 추가됩니다.</span></div>`;
-  return head('YouTube 소스', `3개 채널 · 소스 ${total}곳 · 탭으로 채널을 고르세요. '⬇ 제작 라인'을 누르면 그 영상이 소스 다운로드 칸에 들어갑니다`, false)
-    + mustAthletesPanel()
-    + tabs
-    + `<section class="panel"><div class="sectionhead" style="margin-top:0"><h2>${cur.emoji} ${esc(cur.tab)}</h2><span class="small">${cur.sources.length}개 채널</span></div>${body}</section>`
+    : `<div class="empty" style="border:1px dashed var(--line);border-radius:10px">이 채널 소스가 아직 없어요.<br><span class="small">참고할 유튜브 채널을 알려 주면 여기에 추가돼요.</span></div>`;
+  const common = otherN
+    ? `<details class="panel" style="margin-top:14px"><summary style="cursor:pointer"><b>공통 · 기타 소스</b> <span class="small">${otherN}곳</span></summary><div style="margin-top:10px">${others.map(g => `<div class="sectionhead"><h2>${g.emoji} ${esc(g.tab)}</h2><span class="small">${g.sources.length}곳</span></div>${wrestlingSourceLibrary(g.sources)}`).join('')}</div></details>`
+    : '';
+  return head('소스', `${esc(chDef ? chDef.name : '이 채널')}의 소스만 모았어요. '⬇ 제작 라인'을 누르면 영상 주소가 소스 전달 단계에 들어가요.`, false)
+    + (chId === 'yt-wrestling' ? mustAthletesPanel() : '')
+    + `<section class="panel"><div class="sectionhead" style="margin-top:0"><h2>${title}</h2><span class="small">${cur ? cur.sources.length : 0}곳</span></div>${body}</section>`
+    + common
     + `<div class="actions" style="margin-top:14px"><button class="btn ghost" data-workflow="import">쇼츠 백업 가져오기</button></div>`;
 }
-document.addEventListener('click', e => {
-  const t = e.target.closest('button[data-src-ch]'); if (!t) return;
-  ytSrcTab = t.dataset.srcCh; render();
-});
 document.addEventListener('click', e => {
   const b = e.target.closest('button[data-yp-src]'); if (!b) return;
   ytPipe.url = b.dataset.ypSrc; ytPipe.ranges = '';
   navigate(ytLock || 'youtube');
-  setTimeout(() => { const manual = document.getElementById('ytManual'); if (manual) manual.open = true; document.querySelector('[data-yp-field="ranges"]')?.focus(); document.querySelectorAll('.yp-stage')[1]?.scrollIntoView({ behavior: 'smooth', block: 'center' }); toast('소스 다운로드 칸에 영상을 넣었어요. 구간을 적고 명령을 복사하세요.'); }, 50);
+  setTimeout(() => {
+    const r = document.querySelector('[data-ya-new="ranges"]');
+    if (r) { r.focus(); r.scrollIntoView({ behavior: 'smooth', block: 'center' }); toast('영상 주소를 넣었어요. 구간을 적으세요.'); }
+    else toast('먼저 주제를 고르면 소스 전달 단계에 이 주소가 들어가요.');
+  }, 80);
 });
 
 // ===== YouTube 음악 · 음성 가이드 =====
