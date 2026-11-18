@@ -451,7 +451,55 @@
     finish: '자막과 효과를 얹은 완성본을 만들어요.',
     upload: '제목·설명란·태그·썸네일 문구를 한 파일로 만들어요.',
   };
-  const YT_PLACEHOLDER = ['주제 정하기', '소스 전달', '대본', '편집', '녹음·음악', '업로드 패키지'];
+  const YT_PLACEHOLDER = ['링크 전달', '구간 정하기', '대본', '편집', '녹음·음악', '업로드 패키지'];
+  // ===== 링크 전달 (1단계): 유튜브 링크 → 제목 → 주제 =====
+  const YL = { url: '', title: '', view: '', orig: '', author: '', state: '', vid: '', edited: false, timer: 0 };
+  const YT_URL_RE = /^https?:\/\/(?:www\.|m\.)?(?:youtube\.com\/(?:watch\?(?:[^#]*&)?v=|shorts\/)|youtu\.be\/)([\w-]{6,})/;
+  const ytVidOf = u => { const m = String(u || '').trim().match(YT_URL_RE); return m ? m[1] : ''; };
+  function ytLinkSources(ch) {
+    const g = (typeof YT_SOURCE_CHANNELS !== 'undefined' ? YT_SOURCE_CHANNELS : []).find(x => x.id === ch), seen = {};
+    return (g ? g.sources : []).filter(s => s.enabled !== false && s.candidate && s.candidate.url && !seen[s.candidate.url] && (seen[s.candidate.url] = 1)).slice(0, 4);
+  }
+  function ytLinkReset() { Object.assign(YL, { url: '', title: '', view: '', orig: '', author: '', state: '', vid: '', edited: false }); clearTimeout(YL.timer); }
+  function ylPaint() {
+    const o = document.getElementById('plYlOrig'), t = document.getElementById('plYlTitle'), h = document.getElementById('plYlHint');
+    if (o) o.textContent = YL.orig ? `원본: ${YL.orig}${YL.author ? ' · ' + YL.author : ''}` : '';
+    if (t && t.value !== YL.title) t.value = YL.title;
+    if (t) t.placeholder = YL.state === 'fail' ? '제목을 직접 적어 주세요' : '링크를 넣으면 제목이 들어와요';
+    if (h) h.textContent = YL.state === 'fail' ? '제목을 직접 적어 주세요.' : '한국어 제목으로 바꿔도 돼요.';
+  }
+  function ylFetch() {
+    const url = YL.url.trim(), vid = ytVidOf(url);
+    if (!vid) { YL.vid = ''; YL.orig = ''; YL.author = ''; YL.state = ''; ylPaint(); return; }
+    if (vid !== YL.vid) { YL.vid = vid; YL.orig = ''; YL.author = ''; YL.edited = false; }
+    YL.state = 'load'; ylPaint();
+    fetch('https://www.youtube.com/oembed?format=json&url=' + encodeURIComponent(url))
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(d => { if (YL.vid !== vid) return; YL.orig = d.title || ''; YL.author = d.author_name || ''; YL.state = YL.orig ? 'ok' : 'fail'; if (!YL.edited && YL.orig) YL.title = YL.orig; ylPaint(); })
+      .catch(() => { if (YL.vid !== vid) return; YL.state = 'fail'; ylPaint(); });
+  }
+  function ylSetUrl(u, now) {
+    YL.url = u; const i = document.getElementById('plYlUrl'); if (i && i.value !== u) i.value = u;
+    clearTimeout(YL.timer); YL.timer = setTimeout(ylFetch, now ? 0 : 450);
+  }
+  function ytLinkStart(it) {
+    if (it.idea) return;
+    const url = YL.url.trim(), vid = ytVidOf(url), title = YL.title.trim();
+    if (!vid) { toast('유튜브 영상 링크를 넣어 주세요.'); return; }
+    if (!title) { toast('영상 제목을 적어 주세요.'); return; }
+    const ch = ytLock || ytTab();
+    let idea = db.ideas.find(i => ideaPlatform(i) === 'YouTube' && ytCh(i) === ch && String(i.sources || '').includes(vid));
+    if (!idea) {
+      const g = (typeof YT_SOURCE_CHANNELS !== 'undefined' ? YT_SOURCE_CHANNELS : []).find(x => x.id === ch);
+      const hit = g && g.sources.find(s => s.candidate && ytVidOf(s.candidate.url) === vid);
+      const def = typeof ytTabDefs === 'function' ? ytTabDefs(ch)[0] : null;
+      const topicId = (hit && hit.candidate.topic) || (def && def.id) || (g && g.sources[0] && g.sources[0].topics[0]) || '';
+      const note = [YL.view.trim(), YL.orig ? '원본 영상: ' + YL.orig + (YL.author ? ' · ' + YL.author : '') : ''].filter(Boolean).join('\n\n');
+      idea = { id: uid(), title, note, sources: url, preferredChannel: 'youtube', ytChannel: ch, ytFormat: ytPipe.format === 'long' ? 'long' : 'shorts', topicId, sample: false, created: Date.now() };
+      db.ideas.unshift(idea); persist();
+    }
+    selectYt(idea.id); ytPipe.url = url; T.view.youtube = null; ytLinkReset();
+  }
   function ytCh(i) { return ytValidCh(i.ytChannel) || (typeof ytChannelOfTopic === 'function' && ytChannelOfTopic(i.topicId)) || 'yt-wrestling'; }
   function ytIdeas() { return db.ideas.filter(i => ideaPlatform(i) === 'YouTube' && ytFormatOf(i) === ytPipe.format && ytCh(i) === ytTab()).sort((a, b) => ytRank(a) - ytRank(b) || (b.created || 0) - (a.created || 0)); }
   function ytEp(idea) { return idea && runnerData ? (runnerData.episodes || []).find(e => e.ideaId === idea.id) || null : null; }
@@ -469,24 +517,32 @@
     const ep = it.ep, off = runnerOnline === false;
     const offMsg = '<p class="pl-error" role="alert"><b>실행기가 꺼져 있어요.</b> 맥에서 <code>~/Desktop/유투브/실행기/실행기 켜기.command</code> 를 더블클릭하세요. 켜진 창은 닫지 마세요.<br><span class="small">이 맥의 크롬에서만 돼요. "로컬 네트워크 접근"을 물으면 허용을 누르세요.</span></p>';
     const topic = {
-      id: 'topic', name: '주제 정하기', title: '주제 정하기', desc: '이번에 만들 주제를 하나 고르세요.',
-      btn: '이 주제로 정하기',
+      id: 'topic', name: '링크 전달', title: '링크 전달', desc: '만들고 싶은 유튜브 영상 링크를 넣으세요. 그 영상으로 주제를 정해요.',
+      btn: '이 링크로 시작',
       hideBtn: it => !!it.idea,
       isDone: it => !!it.idea,
-      result: it => it.idea ? `<b>${esc(it.idea.title)}</b>${it.ep ? '' : ' <button type="button" class="pl-link" data-pl-ytchange>주제 바꾸기</button>'}` : '',
+      result: it => it.idea ? `<b>${esc(it.idea.title)}</b>${ytFirstUrl(it.idea) ? ` · <a class="pl-link" href="${esc(ytFirstUrl(it.idea))}" target="_blank" rel="noopener noreferrer">원본 링크 ↗</a>` : ''}${it.ep ? '' : ' <button type="button" class="pl-link" data-pl-ytchange>다른 링크로 바꾸기</button>'}` : '',
       body: it => {
         if (it.idea) return '';
         const tabs = ytLock ? '' : `<div class="filters yt-tabs pl-ytabs" role="tablist" aria-label="유튜브 채널">${YT_CHANNELS.filter(y => !YT_LOCKS[y.id]).map(y => `<button class="filter ${ytTab() === y.id ? 'active' : ''}" role="tab" aria-selected="${ytTab() === y.id}" data-yt-tab="${y.id}" title="${esc(ytChName(y.id))}">${esc(y.tab)}</button>`).join('')}</div>`;
         const fmt = f => `<button type="button" class="pl-chip ${ytPipe.format === f ? 'on' : ''}" data-yp-format="${f}" aria-pressed="${ytPipe.format === f}">${f === 'long' ? '🎬 롱폼' : '📱 쇼츠'}</button>`;
+        const vids = ytLinkSources(ytLock || ytTab());
+        const chips = vids.length ? `<div class="pl-chips" role="group" aria-label="추천 소스 영상">${vids.map(x => `<button type="button" class="pl-chip" data-pl-ylchip="${esc(x.candidate.url)}" title="${esc(x.candidate.title || '')}">${esc(x.name)}</button>`).join('')}</div>` : '';
+        const orig = YL.orig ? `원본: ${esc(YL.orig)}${YL.author ? ' · ' + esc(YL.author) : ''}` : '';
+        const form = `<div class="pl-yl"><label>유튜브 영상 링크<input class="pl-input pl-yl-url" id="plYlUrl" data-yl="url" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off" value="${esc(YL.url)}"></label>${chips}
+          <p class="small pl-yl-orig" id="plYlOrig" aria-live="polite">${orig}</p>
+          <label>영상 제목<input class="pl-input" id="plYlTitle" data-yl="title" placeholder="${esc(YL.state === 'fail' ? '제목을 직접 적어 주세요' : '링크를 넣으면 제목이 들어와요')}" value="${esc(YL.title)}"></label>
+          <p class="small" id="plYlHint">${esc(YL.state === 'fail' ? '제목을 직접 적어 주세요.' : '한국어 제목으로 바꿔도 돼요.')}</p>
+          <label>내 관점 한 줄 (선택)<textarea class="pl-input" rows="2" id="plYlView" data-yl="view" placeholder="이 영상에서 내가 말하고 싶은 것">${esc(YL.view)}</textarea></label></div>`;
         const list = ytIdeas(), pg = (T.page.youtube || 0) % Math.max(1, Math.ceil(list.length / PAGE)), shown = list.slice(pg * PAGE, pg * PAGE + PAGE);
-        const picker = `<div class="pl-topics" role="radiogroup" aria-label="주제">${shown.map(t => `<button type="button" role="radio" aria-checked="false" class="pl-topic" data-pl-ytpick="${esc(t.id)}"><span>${esc(t.title)}</span></button>`).join('') || `<div class="pl-empty"><p class="small"><b>이 채널 주제가 아직 없어요.</b> 아래에서 주제를 찾거나 직접 적어 주세요.</p><div class="pl-chips"><button type="button" class="pl-chip" data-view="${ytRoute('youtubePlan', ytLock)}">AI 주제 발굴</button><button type="button" class="pl-chip" data-action="newIdea">직접 적기</button></div></div>`}</div>${list.length > PAGE ? `<button type="button" class="pl-link" data-pl-more>다른 주제 보기 (${pg + 1}/${Math.ceil(list.length / PAGE)})</button>` : ''}`;
-        return tabs + `<div class="pl-chips">${fmt('shorts')}${fmt('long')}</div>` + picker;
+        const saved = list.length ? `<details class="pl-peek"><summary>저장된 주제에서 고르기 (${list.length})</summary><div class="pl-topics" role="radiogroup" aria-label="주제">${shown.map(t => `<button type="button" role="radio" aria-checked="false" class="pl-topic" data-pl-ytpick="${esc(t.id)}"><span>${esc(t.title)}</span></button>`).join('')}</div>${list.length > PAGE ? `<button type="button" class="pl-link" data-pl-more>다른 주제 보기 (${pg + 1}/${Math.ceil(list.length / PAGE)})</button>` : ''}</details>` : '';
+        return tabs + `<div class="pl-chips">${fmt('shorts')}${fmt('long')}</div>` + form + saved;
       },
-      run: it => { const id = T.ytPick || (ytIdeas()[0] || {}).id; if (!it.idea && id) { selectYt(id); T.view.youtube = null; } else if (!it.idea) toast('주제를 하나 골라 주세요.'); },
+      run: it => ytLinkStart(it),
     };
     const src = {
-      id: 'src', name: '소스 전달', title: '소스 전달', desc: it => it.idea ? '소스 영상 주소와 쓸 구간을 넣으세요. 한 구간은 15초까지예요.' : '앞 단계를 끝내면 열려요.',
-      btn: '이 소스로 제작 시작',
+      id: 'src', name: '구간 정하기', title: '구간 정하기', desc: it => it.idea ? '쓸 구간을 넣으세요. 한 구간은 15초까지예요.' : '앞 단계를 끝내면 열려요.',
+      btn: '이 구간으로 제작 시작',
       attrs: () => 'data-ya-act="create"',
       disabled: it => !it.idea || off || runnerOnline === null,
       hideBtn: it => !!it.ep,
@@ -494,12 +550,7 @@
       result: it => it.ep ? `<b>${esc(it.ep.ep)}</b> 폴더 만듦 · 소스 ${it.ep.sources.length}개${it.ep.sources[0] ? ' · ' + esc(it.ep.sources[0].url) : ''}` : '',
       body: it => {
         if (!it.idea || it.ep) return '';
-        let chips = '';
-        try {
-          const vids = (typeof ytPromptSources === 'function' ? ytPromptSources(it.idea.topicId) : []).filter(x => x.video && x.video.url).slice(0, 4);
-          if (vids.length) chips = `<div class="pl-chips" role="group" aria-label="추천 소스 영상">${vids.map(x => `<button type="button" class="pl-chip" data-pl-ysrc="${esc(x.video.url)}" title="${esc(x.video.title || '')}">${esc(x.name)}</button>`).join('')}</div>`;
-        } catch (e) { chips = ''; }
-        const inputs = `<div class="pl-ya-form"><label>소스 영상 주소<input class="pl-input" data-ya-new="url" placeholder="https://www.youtube.com/watch?v=…" value="${esc(ytPipe.url || ytFirstUrl(it.idea))}"></label>${chips}<label>구간 (쉼표로 여러 개)<input class="pl-input" data-ya-new="ranges" placeholder="0:30-0:42, 1:05-1:12" value="${esc(ytPipe.ranges || '')}"></label></div>`;
+        const inputs = `<div class="pl-ya-form"><label>구간 (쉼표로 여러 개)<input class="pl-input" data-ya-new="ranges" placeholder="0:30-0:42, 1:05-1:12" value="${esc(ytPipe.ranges || '')}"></label><label class="small">소스 링크<input class="pl-input" data-ya-new="url" placeholder="https://www.youtube.com/watch?v=…" value="${esc(ytPipe.url || ytFirstUrl(it.idea))}"></label></div>`;
         return (off ? offMsg : '') + inputs;
       },
       run: () => {},
@@ -856,7 +907,8 @@
     if (t.dataset.plPick) { T.pick[c] = t.dataset.plPick; T.custom[c] = ''; repaint(c, true); return; }
     if (t.hasAttribute('data-pl-more')) { T.page[c] = (T.page[c] || 0) + 1; repaint(c, true); return; }
     if (t.dataset.plYtpick) { selectYt(t.dataset.plYtpick); T.view.youtube = null; repaint('youtube', true); return; }
-    if (t.hasAttribute('data-pl-ytchange')) { adapter('youtube').fresh(); T.view.youtube = 0; repaint('youtube', true); return; }
+    if (t.dataset.plYlchip) { ylSetUrl(t.dataset.plYlchip, true); return; }
+    if (t.hasAttribute('data-pl-ytchange')) { ytLinkReset(); adapter('youtube').fresh(); T.view.youtube = 0; repaint('youtube', true); return; }
     if (t.dataset.plYsrc) { const u = t.dataset.plYsrc, i = document.querySelector('#plRoot [data-ya-new="url"]'); ytPipe.url = u; if (i) i.value = u; return; }
     if (t.dataset.plInstamode) { S.instaMode = t.dataset.plInstamode; save(); adapter('insta').fresh(); T.view.insta = 0; repaint('insta', true); return; }
     if (t.hasAttribute('data-pl-manualmode')) { T.manual[c] = true; T.err[c] = ''; repaint(c, true); return; }
@@ -902,6 +954,7 @@
     else if (t.id === 'plAnswer') T.answer[c] = t.value;
     else if (t.dataset.plUrlinput) T.url[t.dataset.plUrlinput] = t.value;
     else if (t.hasAttribute('data-pl-caption')) { const p = c === 'insta' && window.InstaToon.current(); if (p) { p.caption = t.value; persist(); } }
+    else if (t.dataset.yl) { if (t.dataset.yl === 'url') ylSetUrl(t.value); else if (t.dataset.yl === 'title') { YL.title = t.value; YL.edited = true; } else YL.view = t.value; }
     else if (t.dataset.yaNew) { if (t.dataset.yaNew === 'url') ytPipe.url = t.value; else ytPipe.ranges = t.value; }
   });
   document.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing && e.target.id === 'plLinkUrl') { e.preventDefault(); const c = e.target.closest('#plRoot').dataset.c; linkRead(c, false); } });
@@ -998,6 +1051,10 @@
 .pl-peek summary{cursor:pointer;color:#c3c8cf;min-height:38px;display:flex;align-items:center;font-size:14px}
 .pl-peek pre{white-space:pre-wrap;font-family:inherit;font-size:14px;line-height:1.6;background:#0f1216;border:1px solid var(--line);border-radius:10px;padding:12px;max-height:260px;overflow:auto;margin:6px 0 0}
 .pl-log{white-space:pre-wrap;font-size:12px;background:#0f1216;border:1px solid var(--line);border-radius:8px;padding:10px;max-height:220px;overflow:auto;margin:6px 0 0}
+.pl-yl{display:grid;gap:8px;margin:12px 0}
+.pl-yl label{display:grid;gap:4px;font-size:13px;color:#c3c8cf}
+.pl-yl-url{font-size:16px;padding:12px}
+.pl-yl-orig:empty{display:none}
 .pl-ya-form{display:grid;gap:10px;grid-template-columns:1fr 1fr;margin:10px 0}
 .pl-ya-form label{display:grid;gap:4px;font-size:13px;color:#c3c8cf}
 .pl-ytabs{margin:0 0 8px}

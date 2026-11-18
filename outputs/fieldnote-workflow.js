@@ -1456,7 +1456,7 @@ function ytSourcesPage() {
   const common = otherN
     ? `<details class="panel" style="margin-top:14px"><summary style="cursor:pointer"><b>공통 · 기타 소스</b> <span class="small">${otherN}곳</span></summary><div style="margin-top:10px">${others.map(g => `<div class="sectionhead"><h2>${g.emoji} ${esc(g.tab)}</h2><span class="small">${g.sources.length}곳</span></div>${wrestlingSourceLibrary(g.sources)}`).join('')}</div></details>`
     : '';
-  return head('소스', `${esc(chDef ? chDef.name : '이 채널')}의 소스만 모았어요. '⬇ 제작 라인'을 누르면 영상 주소가 소스 전달 단계에 들어가요.`, false)
+  return head('소스', `${esc(chDef ? chDef.name : '이 채널')}의 소스만 모았어요. '⬇ 제작 라인'을 누르면 영상 주소가 구간 정하기 단계에 들어가요.`, false)
     + (chId === 'yt-wrestling' ? mustAthletesPanel() : '')
     + `<section class="panel"><div class="sectionhead" style="margin-top:0"><h2>${title}</h2><span class="small">${cur ? cur.sources.length : 0}곳</span></div>${body}</section>`
     + common
@@ -1469,7 +1469,7 @@ document.addEventListener('click', e => {
   setTimeout(() => {
     const r = document.querySelector('[data-ya-new="ranges"]');
     if (r) { r.focus(); r.scrollIntoView({ behavior: 'smooth', block: 'center' }); toast('영상 주소를 넣었어요. 구간을 적으세요.'); }
-    else toast('먼저 주제를 고르면 소스 전달 단계에 이 주소가 들어가요.');
+    else toast('먼저 주제를 고르면 구간 정하기 단계에 이 주소가 들어가요.');
   }, 80);
 });
 
