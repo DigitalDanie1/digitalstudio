@@ -30,7 +30,13 @@ const css=`.yr-wrap{display:grid;gap:16px}
 .yr-others{display:grid;gap:12px}
 .yr-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}`;
 const st=document.createElement('style');st.textContent=css;document.head.appendChild(st);
-let sortMode='new';
+let sortMode='views';
+const topBusy={};
+async function fetchTop(ch,r){   // 채널 링크 → 실행기(yt-dlp)로 대표 영상 하나 찾기
+ if(topBusy[r.id]||typeof runnerFetch!=='function')return;topBusy[r.id]=1;
+ try{const d=await runnerFetch('/yt/top?url='+encodeURIComponent(r.url));const a=list(ch),x=a.find(y=>y.id===r.id);if(x){x.top={videoId:d.videoId,title:d.title,views:d.views};persist();render()}}
+ catch(e){topBusy[r.id]='fail:'+(e&&e.message||'');render()}
+}
 const chId=()=>(typeof ytLock==='string'&&ytLock)||ytTab();
 function store(){if(!db.ytRefs||typeof db.ytRefs!=='object'||Array.isArray(db.ytRefs))db.ytRefs={};return db.ytRefs}
 function list(ch){const a=store()[ch];return Array.isArray(a)?a.filter(r=>r&&typeof r==='object'&&typeof r.id==='string'):[]}
@@ -57,13 +63,14 @@ function videoCard(vid,href,title,views,memo,delId){
 function builtin(ch){
  const b=BUILTIN[ch];if(!b)return '';
  let s=b.shorts.slice();if(sortMode==='views')s.sort((x,y)=>y.views-x.views);
- return `<section class="yr-card"><div class="yr-top"><div><h2>${esc(b.name)} <span class="small">${esc(b.handle)}</span></h2><div class="yr-meta">구독자 ${esc(fmtN(b.subs))} · 기준일 ${esc(b.checked)} · 쇼츠 ${s.length}개</div></div><div class="yr-actions"><button type="button" class="filter ${sortMode==='new'?'active':''}" data-yr-sort="new">최신순</button><button type="button" class="filter ${sortMode==='views'?'active':''}" data-yr-sort="views">조회수순</button><a class="btn ghost" href="${esc(b.url)}" target="_blank" rel="noopener">채널 열기 ↗</a></div></div><div class="yr-grid">${s.map(v=>videoCard(v.id,'https://www.youtube.com/shorts/'+v.id,v.title,v.views)).join('')}</div></section>`;
+ const n=s.length;s=s.slice(0,1);
+ return `<section class="yr-card"><div class="yr-top"><div><h2>${esc(b.name)} <span class="small">${esc(b.handle)}</span></h2><div class="yr-meta">구독자 ${esc(fmtN(b.subs))} · 기준일 ${esc(b.checked)} · 쇼츠 ${n}개 중 대표 영상</div></div><div class="yr-actions"><button type="button" class="filter ${sortMode==='new'?'active':''}" data-yr-sort="new">최신순</button><button type="button" class="filter ${sortMode==='views'?'active':''}" data-yr-sort="views">조회수순</button><a class="btn ghost" href="${esc(b.url)}" target="_blank" rel="noopener">채널 열기 ↗</a></div></div><div class="yr-grid">${s.map(v=>videoCard(v.id,'https://www.youtube.com/shorts/'+v.id,v.title,v.views)).join('')}</div></section>`;
 }
 function userRefs(ch){
  const a=list(ch);
  const vids=a.filter(r=>r.kind==='video'&&r.videoId),chans=a.filter(r=>r.kind!=='video');
  if(!a.length)return BUILTIN[ch]?'':`<div class="empty" style="border:1px dashed var(--line);border-radius:10px">아직 레퍼런스가 없어요.<br><span class="small">위 칸에 유튜브 링크를 붙여 넣으면 여기에 모여요.</span></div>`;
- return `<section class="yr-card"><div class="yr-top"><h2>내가 추가한 레퍼런스</h2><span class="small">${a.length}개</span></div>${chans.length?`<div class="yr-others" style="margin-bottom:${vids.length?14:0}px">${chans.map(r=>`<div class="yr-chan"><div><b>${esc(r.handle||r.url)}</b>${r.memo?`<div class="yr-memo">${esc(r.memo)}</div>`:''}</div><div class="yr-actions"><a class="btn ghost" href="${esc(r.url)}" target="_blank" rel="noopener">채널 열기 ↗</a><button type="button" class="btn ghost" data-yr-del="${esc(r.id)}">삭제</button></div></div>`).join('')}</div>`:''}${vids.length?`<div class="yr-list">${vids.map(r=>videoCard(r.videoId,r.url||'https://www.youtube.com/shorts/'+r.videoId,'',null,r.memo,r.id)).join('')}</div>`:''}</section>`;
+ return `<section class="yr-card"><div class="yr-top"><h2>내가 추가한 레퍼런스</h2><span class="small">${a.length}개</span></div>${chans.length?`<div class="yr-others" style="margin-bottom:${vids.length?14:0}px">${chans.map(r=>{if(!r.top&&!topBusy[r.id])setTimeout(()=>fetchTop(ch,r),0);const f=String(topBusy[r.id]||'');return `<div class="yr-chan"><div style="display:flex;gap:12px;align-items:flex-start">${r.top?`<div style="width:120px;flex:none">${videoCard(r.top.videoId,'https://www.youtube.com/shorts/'+r.top.videoId,r.top.title,r.top.views)}</div>`:''}<div><b>${esc(r.handle||r.url)}</b><div class="yr-meta">${r.top?'대표 영상 (최근 50개 중 조회수 1위)':f.startsWith('fail:')?'대표 영상을 못 찾았어요: '+esc(f.slice(5)||'실행기를 켜 주세요'):'대표 영상 찾는 중… (실행기 필요)'}</div>${r.memo?`<div class="yr-memo">${esc(r.memo)}</div>`:''}</div></div><div class="yr-actions"><a class="btn ghost" href="${esc(r.url)}" target="_blank" rel="noopener">채널 열기 ↗</a><button type="button" class="btn ghost" data-yr-del="${esc(r.id)}">삭제</button></div></div>`}).join('')}</div>`:''}${vids.length?`<div class="yr-list">${vids.map(r=>videoCard(r.videoId,r.url||'https://www.youtube.com/shorts/'+r.videoId,'',null,r.memo,r.id)).join('')}</div>`:''}</section>`;
 }
 window.ytRefsPage=function(){
  const ch=chId();

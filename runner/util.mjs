@@ -58,7 +58,7 @@ export function run(cmd, args, ctx = {}, opts = {}) {
     const child = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, PATH: `${path.join(HOME, '.local/bin')}:/usr/bin:/bin:/usr/sbin:/sbin:${process.env.PATH || ''}` } });
     ctx.setChild?.(child);
     let out = '', err = '';
-    child.stdout.on('data', d => { out += d; if (out.length > 4e6) out = out.slice(-2e6); if (opts.tee) ctx.log?.(String(d).trim().split(/\r?\n/).pop()); });
+    child.stdout.on('data', d => { opts.onOut?.(d); out += d; if (out.length > 4e6) out = out.slice(-2e6); if (opts.tee) ctx.log?.(String(d).trim().split(/\r?\n/).pop()); });
     child.stderr.on('data', d => { err += d; if (err.length > 4e6) err = err.slice(-2e6); });
     child.on('error', e => reject(new StepError(`프로그램을 못 켰어요(${path.basename(cmd)}): ${e.message}`)));
     child.on('close', (code, sig) => {
@@ -86,7 +86,12 @@ export async function probe(file, ctx) {
   };
 }
 
-export const ff = (args, ctx) => run(FFMPEG, ['-hide_banner', '-nostdin', '-y', '-loglevel', 'error', ...args], ctx);
+// ctx.onTime(초) 가 있으면 ffmpeg 진행(지금까지 만든 길이)을 알려 줘요 (작업판 퍼센트)
+export const ff = (args, ctx) => {
+  if (!ctx?.onTime) return run(FFMPEG, ['-hide_banner', '-nostdin', '-y', '-loglevel', 'error', ...args], ctx);
+  const onOut = d => { const all = [...String(d).matchAll(/out_time_(?:us|ms)=(\d+)/g)]; if (all.length) ctx.onTime(+all[all.length - 1][1] / 1e6); };
+  return run(FFMPEG, ['-hide_banner', '-nostdin', '-y', '-loglevel', 'error', '-nostats', '-progress', 'pipe:1', ...args], ctx, { onOut });
+};
 
 export function isLocalSource(u) { return /^(file:\/\/|\/|~\/)/.test(u); }
 export function localPath(u) {

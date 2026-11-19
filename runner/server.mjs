@@ -5,7 +5,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { HOME, StepError, StopError, sanitize, exists, parseRanges, isLocalSource, localPath, run, FFMPEG, lastLines, fmtTime, MAX_RANGE } from './util.mjs';
+import { HOME, StepError, StopError, sanitize, exists, parseRanges, isLocalSource, localPath, run, FFMPEG, YTDLP, lastLines, fmtTime, MAX_RANGE } from './util.mjs';
 import { createHighlights, LEN_MIN, LEN_MAX } from './highlights.mjs';
 import { listStyles, saveStyle, enqueue, cancelJob, listJobs, resolveReadable, thumbOf, shutdownImages, ImgError } from './images.mjs';
 import { STEP_DEFS, STEP_FN, outputsFor, listAssets, checkScript, cleanPasted, parseScript, parseBanner, parseHook, PLACEHOLDER, SCRIPT_MAX_LINES, CHANNEL_PROFILES, LOOK_CHOICES, lookKeyOf, FX_PACKS, fxPackOf, parseFxTimes, migrateState, layoutLines, draftText, draftTranscript, splitAnswer, feedbackPrompt, callClaude, parseCredit, previewPlan, renderPreview } from './steps.mjs';
@@ -67,6 +67,7 @@ function view(E) {
       return o;
     }),
     running: E.running, gate: !!E.s.gate,
+    progress: E.prog ? editPct(E) : null,
     round: E.s.round || 0, editRound: E.s.editRound || 0, editAt: E.s.editAt || 0, feedbackAt: E.s.feedbackAt || 0, hasScript: hasScript(E),
   };
 }
@@ -77,10 +78,15 @@ const logFile = (E, id) => E.p('로그', id + '.log');
 function makeCtx(E, id) {
   fs.mkdirSync(E.p('로그'), { recursive: true });
   const f = logFile(E, id);
-  return {
+  const ctx = {
     log: l => { if (l == null || l === '') return; try { fs.appendFileSync(f, `[${stamp()}] ${l}\n`); } catch {} },
     aborted: () => E.ctrl.aborted, setChild: c => { E.ctrl.child = c; },
   };
+  if (E.prog && EDIT_W[id]) {   // 편집 중이면 ffmpeg 진행을 퍼센트로 (여러 번 돌면 이어서 더해요)
+    const P = E.prog; P.cur = id; P.sub = 0; let base = 0, last = 0; const exp = expectSecs(E);
+    ctx.onTime = t => { if (t + 0.5 < last) base += last; last = t; P.sub = Math.min(1, (base + t) / exp); };
+  }
+  return ctx;
 }
 async function runStep(E, id) {
   const st = E.s.steps[id], ctx = makeCtx(E, id), def = STEP_DEFS.find(d => d.id === id);
@@ -116,9 +122,19 @@ function launch(E, ids, chain) {
     E.running = null;
   })();
 }
+// ---------- 1차·2차 편집 진행 퍼센트 ----------
+// 단계 무게(합 100): 자르기·이펙트·합치기가 오래 걸려요. 단계 안에서는 ffmpeg 가 만든 길이 / 예상 길이.
+const EDIT_W = { clip: 30, plan: 2, rough: 15, subs: 10, fx: 20, script: 3, mix: 20 };
+const editPct = E => { const P = E.prog; let done = 0; for (const id of Object.keys(EDIT_W)) { if (id === P.cur) return Math.min(99, Math.round(done + EDIT_W[id] * Math.min(1, P.sub || 0))); done += EDIT_W[id]; } return 99; };   // cur 앞 단계는 끝난(또는 건너뛴) 것
+function expectSecs(E) {   // 결과 영상 예상 길이 (편집 계획이 있으면 그 길이)
+  try { const P = JSON.parse(fs.readFileSync(E.p('편집/편집계획.json'), 'utf8')); if (P.total > 0) return P.total; } catch {}
+  let t = 0, info = []; try { info = JSON.parse(fs.readFileSync(E.p('소스.json'), 'utf8')); } catch {}
+  for (const [i, s] of E.s.sources.entries()) for (const r of s.ranges) { if (r === '전체') { t += Math.min(58, info[i]?.duration || 58); continue; } const m = /^(\d+(?::\d+)*)-(\d+(?::\d+)*)(?:x([\d.]+))?$/.exec(r); if (!m) continue; const sec = x => x.split(':').reduce((a, n) => a * 60 + +n, 0); t += (sec(m[2]) - sec(m[1])) / (m[3] ? +m[3] : 1); }
+  return t || 30;
+}
 // 1차·2차 편집: 자르기 → 계획 → 가편집 → 자막 → 이펙트 → (대본이 없으면 양식) → 대본 자막·소리 합치기(최종본). 대본 확인에서 멈추지 않아요.
 function launchEdit(E, round) {
-  E.ctrl.aborted = false; E.s.editRound = round; E.running = 'clip'; save(E);
+  E.ctrl.aborted = false; E.s.editRound = round; E.running = 'clip'; E.prog = { cur: 'clip', sub: 0 }; save(E);
   (async () => {
     try {
       for (const id of ['clip', 'plan', 'rough', 'subs', 'fx']) { if (E.ctrl.aborted || !(await runStep(E, id))) return; }
@@ -135,7 +151,7 @@ function launchEdit(E, round) {
         if (keep) try { fs.writeFileSync(logFile(E, 'mix'), keep + fs.readFileSync(logFile(E, 'mix'), 'utf8')); } catch {}
         E.s.round = Math.max(E.s.round || 0, round); E.s.editAt = Date.now(); save(E);
       }
-    } finally { E.running = null; }
+    } finally { E.running = null; E.prog = null; }
   })();
 }
 // 고친 구간 저장 (바뀌면 자르기부터 다시 해야 해요)
@@ -308,6 +324,7 @@ async function previewRun(E, spec) {
   return job.promise;
 }
 
+const topCache = new Map();
 const routes = {
   'GET /img/styles': imgWrap(() => ({ json: { styles: listStyles() } })),
   'POST /img/styles': imgWrap(({ body }) => ({ json: { ok: true, style: saveStyle(body) } })),
@@ -317,6 +334,21 @@ const routes = {
   'GET /hl/list': () => ({ json: { jobs: HL.list(), dir: HL.dir, limits: { lenMin: LEN_MIN, lenMax: LEN_MAX } } }),
   'POST /hl/start': async ({ body }) => { const J = await hlStart(body); return { json: { ok: true, id: J.id } }; },
   'GET /': () => ({ text: '실행기가 켜져 있어요.' }),
+  // 레퍼런스 탭: 채널 링크의 대표 영상(최근 쇼츠 50개 중 조회수 1위). 한 번 찾으면 기억해요.
+  'GET /yt/top': async ({ q }) => {
+    let u = String(q.get('url') || '').trim();
+    if (!/^https:\/\/(www\.|m\.)?youtube\.com\/(@[^/?#]+|channel\/[^/?#]+|c\/[^/?#]+|user\/[^/?#]+)/i.test(u)) throw new HttpError(400, '유튜브 채널 주소가 아니에요.');
+    u = u.replace(/[?#].*$/, '').replace(/\/(shorts|videos|featured|streams)\/?$/i, '').replace(/\/$/, '');
+    if (topCache.has(u)) return { json: topCache.get(u) };
+    const pick = async tab => {
+      let r; try { r = await run(YTDLP, ['--flat-playlist', '-I', '1:50', '--no-warnings', '--print', '%(id)s\t%(view_count)s\t%(title)s', `${u}/${tab}`]); } catch { return null; }
+      const rows = r.out.split('\n').map(l => l.split('\t')).filter(x => /^[\w-]{11}$/.test(x[0] || '')).map(([id, v, ...t]) => ({ videoId: id, views: +v || 0, title: t.join('\t') }));
+      return rows.sort((a, b) => b.views - a.views)[0] || null;
+    };
+    const best = (await pick('shorts')) || (await pick('videos'));
+    if (!best) throw new HttpError(404, '이 채널에서 영상을 찾지 못했어요.');
+    const out = { ok: true, ...best }; topCache.set(u, out); return { json: out };
+  },
   'GET /health': () => ({ json: { ok: true, api: API_LEVEL, version: VERSION, ffmpeg: exists(FFMPEG), data: DATA, ai: !!process.env.ANTHROPIC_API_KEY } }),
   'GET /status': () => { pruneGone(); return { json: { looks: LOOK_CHOICES, fxPacks: FX_PACKS, episodes: [...episodes.values()].sort((a, b) => b.s.created - a.s.created).map(view) } }; },
   'GET /episodes': () => routes['GET /status'](),

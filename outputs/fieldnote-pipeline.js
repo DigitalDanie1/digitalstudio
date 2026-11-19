@@ -869,7 +869,8 @@
     const fbNew = (ep.feedbackAt || 0) > (ep.editAt || 0), busyOther = !!ep.running && !editing;
     const EDIT_IDS = ['clip', 'plan', 'rough', 'subs', 'fx', 'mix'];
     const failed = EDIT_IDS.map(st).find(x => x.status === 'failed');
-    const runLine = () => editing ? `실행 중… (${esc(YT_STEP_NAME[ep.running] || ep.running)}) 끝나면 자동으로 바뀌어요.` : '';
+    const pct = Number.isFinite(ep.progress) ? ep.progress : null;
+    const runLine = () => editing ? `<b>${pct != null ? pct + '%' : '실행 중…'}</b> · ${esc(YT_STEP_NAME[ep.running] || ep.running)} 하는 중. 끝나면 자동으로 바뀌어요.${pct != null ? `<div style="height:8px;border-radius:99px;background:var(--line);margin-top:6px;overflow:hidden"><div style="height:100%;width:${pct}%;background:var(--accent,#ff5b5b);transition:width .6s"></div></div>` : ''}` : '';
     const logs = () => `<div class="pl-logs">${EDIT_IDS.map(id => `<button type="button" class="pl-link" data-pl-log="${id}" aria-expanded="${T.logOpen === id}">${esc(YT_STEP_NAME[id])} 로그${T.logOpen === id ? ' 닫기' : ''}</button>`).join('')}</div>${EDIT_IDS.includes(T.logOpen) ? '<pre class="pl-log" id="plLog">불러오는 중…</pre>' : ''}`;
     const redo = !!(T.redo1 && T.redo1[it.key]) && round >= 1;
     const redoBtn = (hint, cls) => round >= 1 && !editing && !ep.running ? `<p class="${cls || 'small'}"><button type="button" class="pl-nav-btn" data-pl-redo1>↺ 1차 편집 다시</button>${hint ? ' ' + esc(hint) : ''}</p>` : '';
