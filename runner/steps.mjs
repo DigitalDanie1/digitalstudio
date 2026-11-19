@@ -82,6 +82,14 @@ export const CHANNEL_PROFILES = {
     transcript: false,
   },
 };
+// 레퍼런스 쇼츠를 본뜬 레슬링 룩 4개 (펀치 룩 틀을 값으로만 바꿔요). 전부 꽉 찬 화면 + 원본 경기 소리. 이펙트 팩과 짝이 있어요.
+const wrestlingLook = look => ({ persona: CHANNEL_PROFILES['yt-mat'].persona, rules: [], look: { audio: 'orig', origVol: 1.0, bgmVol: 0.22, hookDur: 0, watermark: '', plain: true, ...look },
+  tags: ['레슬링', '주짓수', 'MMA'], disclaimer: '경기 장면은 해설·분석 목적으로 일부만 사용했습니다.', transcript: false });
+CHANNEL_PROFILES['yt-raw'] = wrestlingLook({ kind: 'punch', accent: '#FFD400', capColor: '#FFD400', capFs: 84, capY: 0.72, capBord: 10, subBox: false });
+CHANNEL_PROFILES['yt-steps'] = wrestlingLook({ kind: 'punch', accent: '#FFD400', capFs: 70, capY: 0.82, capBord: 8, subBox: false,
+  hookDur: 2.5, hookScale: 1, hookY: 0.075, hookFs: 66, hookWrap: 14, hookColor: '#FFFFFF', hookBox: true });
+CHANNEL_PROFILES['yt-words'] = wrestlingLook({ kind: 'punch', accent: '#3EE6FF', capFs: 88, capY: 0.62, capBord: 11, capItalic: true, subBox: false });
+CHANNEL_PROFILES['yt-tags'] = wrestlingLook({ kind: 'punch', accent: '#FFE100', bg: '#1E88FF', capFs: 64, capY: 0.76, capBord: 0, subBox: true, boxAlpha: 0, boxPad: 38, boxMinW: 240, boxMinH: 118, boxR: 59, boxLineH: 1.1 });
 export const profileOf = E => CHANNEL_PROFILES[E?.s?.channel] || CHANNEL_PROFILES['yt-wrestling'];
 // 편집 룩: 영상마다 고를 수 있어요 (state.look). 비어 있으면 채널 자기 룩. 룩 이름 = 룩을 가진 채널 설정의 이름.
 export const LOOK_CHOICES = [
@@ -89,7 +97,13 @@ export const LOOK_CHOICES = [
   { id: 'yt-christian', name: '배너 룩', desc: '남색 배너 + 민트 강조 + 흑백 인트로 + 한·영 자막 (기독교 채널 기본)' },
   { id: 'yt-politics', name: '펀치 룩', desc: '첫 1초 훅 제목 + 굵은 자막 + 노란 강조 + 워터마크 (정치 채널 기본)' },
   { id: 'yt-mat', name: '매트 스토리 룩', desc: '검은 바탕 + 위 2줄 제목(노랑·빨강) + 굵은 자막 + 선수 태그·점수 도장·SLOW 표시 + 원본 경기 소리 (레슬링 추천)' },
+  { id: 'yt-raw', name: '리얼 룩', desc: '꽉 찬 경기 화면 + 노란 굵은 자막(검은 테두리) + 제목 카드 없음 + 원본 소리 · 참고: Lethal Double Leg 쇼츠 310만 회', pack: 'raw' },
+  { id: 'yt-steps', name: '단계 룩', desc: '위에 검은 상자 흰 글씨 제목 + 아래 흰 굵은 자막 + 원본 소리 · 참고: 더블렉 단계 강의 쇼츠 180만 회', pack: 'steps' },
+  { id: 'yt-words', name: '말자막 룩', desc: '굵은 기울임 흰 자막(두꺼운 검은 테두리) + 하늘색 강조 단어 + 원본 소리 · 참고: 코치 말자막 강의 쇼츠 71만 회', pack: 'words' },
+  { id: 'yt-tags', name: '라벨 룩', desc: '파란 둥근 알약 상자에 흰 굵은 자막 + 아래쪽 배치 + 원본 소리 · 참고: 라벨 태그 기술 쇼츠 150만 회', pack: 'tags' },
 ];
+// 룩과 짝인 이펙트 팩 (직접 고른 팩이 없을 때만 써요)
+export const LOOK_PACK = Object.fromEntries(LOOK_CHOICES.filter(l => l.pack).map(l => [l.id, l.pack]));
 export const lookKeyOf = E => (CHANNEL_PROFILES[E?.s?.look] ? E.s.look : CHANNEL_PROFILES[E?.s?.channel] ? E.s.channel : 'yt-wrestling');
 // 배너 룩 기본값 (채널의 look 이 덮어써요). 글자 크기는 1080x1920 기준 px.
 export const LOOK_DEFAULTS = { kind: 'banner', bg: '#0E1B33', accent: '#3DE0C0', bannerH: 440, introBW: true, bilingual: true,
@@ -115,35 +129,82 @@ export const keepsAudio = E => lookOf(E)?.audio === 'orig';
 // desc 는 " · " 로 효과를 나열해요 (작업판이 목록으로 보여 줘요). ref = 예시 영상 링크 ('' = 없음, 사용자가 직접 넣어요).
 export const FX_PACKS = [
   { id: 'none', name: '이펙트 없음', desc: '지금처럼 그대로 · 줌·흔들림·효과음 없음', ref: '' },
+  { id: 'raw', name: '한 방 리얼', desc: '진짜 경기 화면 그대로 · 훅 문구를 영상 내내 고정 · 줌·흔들림 없음 · 끝에 마지막 2초 0.5배 REPLAY', ref: 'https://www.youtube.com/shorts/vvXC-IW5oOE', views: '310만 회',
+    hookFixed: true, replay: true, hitSrc: [], sfx: {} },
+  { id: 'steps', name: '단계 강의', desc: '처음 2.5초 제목 상자 · 구간마다 번호 라벨 · 움직임 순간에 잔상 · 마지막은 "다 합치면"', ref: 'https://www.youtube.com/shorts/hML9vjR6wX0', views: '180만 회',
+    steps: true, titleDur: 2.5, ghost: 0.5, hitSrc: [], sfx: {} },
+  { id: 'words', name: '말자막 강의', desc: '말 자막이 2~4단어씩 나타남 · 강조 단어 하늘색 · ✕ ✓ 아이콘 팝 · 컷마다 빠른 줌 · "띵"/"팡"', ref: 'https://www.youtube.com/shorts/mJIVHZUGw40', views: '71만 회',
+    words: true, punchZoom: 0.15, punchDur: 0.3, hitSrc: [], sfx: { ok: '띵', x: '팡' }, sfxVol: 0.55 },
+  { id: 'tags', name: '라벨 태그', desc: '핵심 순간마다 파란 알약 라벨이 톡 · 슬로우 시작에 흔들림 · 라벨마다 "휙"', ref: 'https://www.youtube.com/shorts/qDD40BckF20', views: '150만 회',
+    tags: true, pill: 1.2, flash: 0.06, flashAlpha: 0.5, shake: 0.4, shakeAmp: 16, shakeOn: 'slow', hitSrc: ['hl'], maxHits: 4, sfx: { label: '휙' } },
+  { id: 'match', name: '경기 하이라이트', desc: '슬로우 시작에 흰 플래시 + 줌인 유지 · 컷마다 "휙" · 점수 도장·강조에 흔들림 + "쾅"', ref: 'https://www.youtube.com/shorts/H-wcWuDSIvg',
+    slowZoom: 0.10, flash: 0.08, flashAlpha: 0.8, shake: 0.3, shakeAmp: 18, flashOn: 'slow', hitSrc: ['stamp', 'punch'], maxHits: 8, sfx: { cut: '휙', hit: '쾅' } },
   { id: 'calm', name: '잔잔', desc: '클립마다 천천히 줌인 · 컷 사이 짧게 어둡다 밝아짐 · 첫 강조점에 부드러운 "띵"', ref: 'https://www.youtube.com/shorts/op51yRlhjjI',
     kenburns: 0.06, dip: 0.12, dipDepth: 0.45, hitSrc: ['punch', 'stamp', 'hl'], maxHits: 1, sfx: { hit: '띵' } },
   { id: 'punch', name: '펀치', desc: '컷마다 빠른 줌 펀치 · 강조 순간 흔들림 + 흰 플래시 · "팡" 효과음 · 강조 단어 팝', ref: 'https://www.youtube.com/shorts/1zpjOi8_LH0',
     punchZoom: 0.12, punchDur: 0.35, shake: 0.3, shakeAmp: 18, flash: 0.08, flashAlpha: 0.8, pop: true, hitSrc: ['punch', 'hl'], maxHits: 12, sfx: { hit: '팡' } },
-  { id: 'match', name: '경기 하이라이트', desc: '슬로우 시작에 흰 플래시 + 줌인 유지 · 컷마다 "휙" · 점수 도장·강조에 흔들림 + "쾅"', ref: '',
-    slowZoom: 0.10, flash: 0.08, flashAlpha: 0.8, shake: 0.3, shakeAmp: 18, flashOn: 'slow', hitSrc: ['stamp', 'punch'], maxHits: 8, sfx: { cut: '휙', hit: '쾅' } },
 ];
 export const FX_DEFAULT = { 'yt-christian': 'calm', 'yt-politics': 'punch' };
-export const fxPackOf = E => FX_PACKS.find(p => p.id === E?.s?.fxPack) || FX_PACKS.find(p => p.id === (FX_DEFAULT[E?.s?.channel] || 'match'));
-// "0:03, 0:07.5" → { text: '0:03, 0:07.5', secs: [3, 7.5] } (모양이 이상하면 StepError)
+// 고른 팩 > 룩과 짝인 팩(레퍼런스 룩) > 채널 기본
+export const fxPackOf = E => FX_PACKS.find(p => p.id === E?.s?.fxPack) || FX_PACKS.find(p => p.id === LOOK_PACK[E?.s?.look]) || FX_PACKS.find(p => p.id === (FX_DEFAULT[E?.s?.channel] || 'match'));
+// "0:03, 0:07.5" 또는 "0:03 벽처럼 서기, 0:06 레벨 체인지" → { text, secs, entries:[{t, text}] } (모양이 이상하면 StepError). 문구는 선택이에요.
 export function parseFxTimes(input) {
-  const toks = String(input || '').split(/[,\s]+/).map(x => x.trim()).filter(Boolean);
-  if (toks.length > 30) throw new StepError('강조할 시간은 30개까지예요.');
-  const secs = toks.map(t => { const n = parseTime(t); if (!Number.isFinite(n)) throw new StepError(`시간 모양이 이상해요: "${t}" (예: 0:03, 0:07.5)`); return n; });
-  return { text: toks.join(', '), secs };
+  const entries = [], raws = [];
+  for (const ch of String(input || '').split(/[,;，\n]+/).map(x => x.trim()).filter(Boolean)) {
+    const toks = ch.split(/\s+/); let i = 0;
+    while (i < toks.length) {
+      const t = parseTime(toks[i]);
+      if (!Number.isFinite(t)) throw new StepError(`시간 모양이 이상해요: "${toks[i]}" (예: 0:03, 0:07.5, 0:03 문구)`);
+      const raw = toks[i++], rest = [];
+      while (i < toks.length && !Number.isFinite(parseTime(toks[i]))) rest.push(toks[i++]);
+      const text = rest.join(' ').replace(/[{}\\]/g, '').slice(0, 24);
+      entries.push({ t, text }); raws.push(text ? raw + ' ' + text : raw);
+    }
+  }
+  if (entries.length > 30) throw new StepError('강조할 시간은 30개까지예요.');
+  return { text: raws.join(', '), secs: entries.map(e => e.t), entries };
+}
+// 줄 앞의 ✕/X (틀린 예) · ✓/O (맞는 예) 표시 → { mark: 'x'|'ok'|'', text }
+export function parseMark(raw) {
+  const s = String(raw || '');
+  let m = /^\s*(?:[✕✗✖×]\s*|X\s+)/.exec(s); if (m) return { mark: 'x', text: s.slice(m[0].length).trim() };
+  m = /^\s*(?:[✓✔]\s*|O\s+)/.exec(s); if (m) return { mark: 'ok', text: s.slice(m[0].length).trim() };
+  return { mark: '', text: s.trim() };
+}
+// 말자막: 한 줄을 2~4단어씩 나눠 글자 수에 비례해 줄의 시작~끝에 배분 → [{start,end,words:[{t,hl}]}] (*강조* 표시는 hl)
+export function chunkLine(raw, start, end) {
+  const toks = []; let hl = false;
+  for (const part of String(raw || '').split(/(\*)/)) { if (part === '*') { hl = !hl; continue; } for (const w of part.split(/\s+/).filter(Boolean)) toks.push({ t: w, hl }); }
+  if (!toks.length) return [];
+  const n = toks.length, k = Math.max(1, Math.round(n / 3)), base = Math.floor(n / k), extra = n % k, groups = [];
+  for (let g = 0, i = 0; g < k; g++) { const size = base + (g < extra ? 1 : 0); groups.push(toks.slice(i, i + size)); i += size; }
+  const wts = groups.map(g => g.reduce((a, w) => a + [...w.t].length, 0)), sum = wts.reduce((a, b) => a + b, 0), span = end - start;
+  let cum = 0;
+  return groups.map((g, i) => { const a = start + span * cum / sum; cum += wts[i]; const b = i === groups.length - 1 ? end : start + span * cum / sum; return { start: +a.toFixed(2), end: +b.toFixed(2), words: g }; });
+}
+// 단계 강의 라벨: 구간 하나 = 단계 하나. 이름이 없으면 "1단계"…, 구간이 3개 이상이면 마지막은 "다 합치면"
+export function stepLabels(labels, n) {
+  return Array.from({ length: n }, (_, i) => {
+    const l = String((labels || [])[i] || '').trim().slice(0, 20);
+    if (l) return `${i + 1}. ${l}`;
+    return n >= 3 && i === n - 1 ? '다 합치면' : `${i + 1}단계`;
+  });
 }
 // 강조 순간 목록 [{t, kind}] — cut(컷 이음새) / slow(슬로우 구간 시작) / hit(강조·펀치·점수 도장·직접 적은 시간). 0~총길이로 자르고, 같은 종류끼리 0.25초 안은 하나로 합쳐요.
 export function buildFxEvents(E, P, pack) {
   const T = P.total, out = [], clips = P.clips || [];
   clips.forEach((c, i) => { if (i > 0 && c.start > 0.05) out.push({ t: c.start, kind: 'cut' }); if (c.speed < 1) out.push({ t: c.start, kind: 'slow' }); });
   const src = pack.hitSrc || [], hits = [];
+  const kw = l => (/\*([^*\n]+)\*/.exec(l.ko ?? '') || [])[1] || '';
   const grade = l => (l.punch && src.includes('punch') ? 0 : l.stamp && src.includes('stamp') ? 0 : /\*[^*\n]+\*/.test(l.ko ?? '') && src.includes('hl') ? 1 : -1);
-  const cand = (P.lines || []).map(l => ({ t: l.start, g: grade(l) })).filter(x => x.g >= 0);
-  const manual = parseFxTimes(E.s.fxTimes).secs.map(t => ({ t, g: -1 }));   // 직접 적은 시간은 항상 넣어요
+  const cand = (P.lines || []).map(l => ({ t: l.start, g: grade(l), text: pack.tags ? kw(l) : '' })).filter(x => x.g >= 0);
+  const manual = parseFxTimes(E.s.fxTimes).entries.map(e => ({ t: e.t, g: -1, text: e.text }));   // 직접 적은 시간은 항상 넣어요
   let picked = pack.maxHits === 1 ? [...cand, ...manual].sort((a, b) => a.t - b.t).slice(0, 1)   // 잔잔: 첫 강조점 하나
     : [...[...cand].sort((a, b) => a.g - b.g || a.t - b.t).slice(0, pack.maxHits || 99), ...manual];
-  for (const x of picked) hits.push({ t: x.t, kind: 'hit' });
+  for (const x of picked) hits.push({ t: x.t, kind: pack.tags && x.text ? 'label' : 'hit', ...(x.text ? { text: x.text } : {}) });
   if (pack.maxHits === 1 && !hits.length) hits.push({ t: Math.min(0.5, T / 2), kind: 'hit' });
   out.push(...hits);
+  if (pack.words) for (const l of P.lines || []) { const m = parseMark(l.ko ?? l.text).mark; if (m) out.push({ t: l.start, kind: m }); }   // ✕ ✓ 줄
   const res = [], last = {};
   for (const e of out.map(e => ({ ...e, t: +Math.max(0, Math.min(T, e.t)).toFixed(2) })).sort((a, b) => a.t - b.t)) {
     if (last[e.kind] != null && e.t - last[e.kind] < 0.25) continue;
@@ -161,7 +222,7 @@ export function fxVideoFilter(pack, P, evs, wA, hA) {
   if (pack.kenburns) for (const c of clips) z.push(`${win(c.start, c.start + c.duration)}*${pack.kenburns}*(t-${n(c.start)})/${n(c.duration)}`);
   if (pack.punchZoom) for (const e of cuts) z.push(`${win(e.t, e.t + pack.punchDur)}*${pack.punchZoom}*sin(PI*(t-${n(e.t)})/${pack.punchDur})`);
   if (pack.slowZoom) for (const c of clips) if (c.speed < 1) z.push(`${win(c.start, c.start + c.duration)}*${pack.slowZoom}*min(1,(t-${n(c.start)})/0.15)`);
-  if (pack.shake) for (const e of hits) {
+  if (pack.shake) for (const e of (pack.shakeOn === 'slow' ? slows : hits)) {
     const a = e.t, b = e.t + pack.shake, w = `${win(a, b)}*(1-(t-${n(a)})/${pack.shake})`;
     z.push(`${win(a, b)}*0.04`);   // 흔들려도 가장자리가 안 보이게 살짝 키워 둬요
     dx.push(`${w}*${pack.shakeAmp}*sin(t*61)`); dy.push(`${w}*${n(pack.shakeAmp * 0.7)}*cos(t*79)`);
@@ -175,7 +236,12 @@ export function fxVideoFilter(pack, P, evs, wA, hA) {
   }
   if (flash.length) f.push(`drawbox=x=0:y=0:w=iw:h=ih:color=white@${pack.flashAlpha}:t=fill:enable='${flash.join('+')}'`);
   if (pack.dip && cuts.length) f.push(`eq=brightness='${cuts.map(e => `-${pack.dipDepth}*max(0,1-abs(t-${n(e.t)})/${n(pack.dip / 2)})`).join('')}':eval=frame`);
-  return f.join(',');
+  let out = f.join(',');
+  if (pack.ghost) {   // 잔상: 구간(단계)마다 가운데 ghost 초 동안 최근 프레임을 겹쳐 흐리게 남겨요 (split → tmix → overlay). 이 필터 뒤에는 ','로 이어 붙일 수 있어요.
+    const wins = clips.filter(c => c.duration >= 0.8).map(c => { const m = c.start + c.duration / 2; return `between(t,${n(m - pack.ghost / 2)},${n(m + pack.ghost / 2)})`; });
+    if (wins.length) out += (out ? ',' : '') + `split[gha][ghb];[ghb]tmix=frames=9,format=yuva420p,colorchannelmixer=aa=0.7[ghc];[gha][ghc]overlay=0:0:enable='${wins.join('+')}'`;
+  }
+  return out;
 }
 // 효과음: 소리/효과음 폴더의 파일(팡·휙·쾅·띵 + 확장자)이 있으면 그걸, 없으면 ffmpeg 로 간단히 만들어요 (lavfi 입력 글)
 export const SFX_SYNTH = {
@@ -410,13 +476,23 @@ function clipFilter0(E) {
     `[b]scale=${w}:${h}:force_original_aspect_ratio=decrease[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2,fps=30,format=yuv420p,setsar=1[v]`;
 }
 // 클립 번호(clip_NN) 순서 = 소스 순서 × 구간 순서. 이 목록으로 클립이 어느 소스의 어디였는지 알아요.
-export const clipMap = E => E.s.sources.flatMap((s, si) => s.ranges.map(range => { const [a, b] = rangeSecs(range); return { si, range, a, b, speed: rangeSpeed(range) }; }));
+// 한 방 리얼 팩이면 맨 끝에 "마지막 2초 0.5배" 리플레이 클립을 하나 더 붙여요 (replay:true). 사용자가 적는 구간(E.s.sources)에는 들어가지 않아요.
+// info(소스.json)가 있으면 "전체" 구간의 끝도 알아요. 마지막 클립이 2초보다 짧거나 이미 슬로우면 붙이지 않아요.
+export const clipMap = (E, info) => {
+  const map = E.s.sources.flatMap((s, si) => s.ranges.map(range => { const [a, b] = rangeSecs(range); return { si, range, a, b, speed: rangeSpeed(range) }; }));
+  const last = map[map.length - 1];
+  if (last && fxPackOf(E).replay && last.speed === 1) {
+    const b = isFinite(last.b) ? last.b : Math.min(info?.[last.si]?.duration || 0, specOf(E).maxTotal);
+    if (b - last.a >= 2) map.push({ si: last.si, range: `${fmtTime(b - 2)}-${fmtTime(b)}x0.5`, a: b - 2, b, speed: 0.5, replay: true });
+  }
+  return map;
+};
 // atempo 는 0.5~2 만 돼서 더 느리면 여러 번 이어요
 const atempoChain = sp => { const out = []; let r = sp; while (r < 0.5 - 1e-9) { out.push('atempo=0.5'); r /= 0.5; } if (Math.abs(r - 1) > 1e-6) out.push(`atempo=${+r.toFixed(4)}`); return out.join(','); };
 async function clip(E, ctx) {
   const info = readJson(E.p('소스.json'));
   if (!info) throw new StepError('소스 확인이 먼저예요. "소스 확인" 단계를 실행하세요.');
-  const map = clipMap(E);
+  const map = clipMap(E, info);
   if (!map.length) throw new StepError('구간이 아직 없어요. 컷 편집에서 쓸 구간을 먼저 넣어 주세요. (한 구간은 15초까지)');
   if (info.length !== E.s.sources.length) throw new StepError('소스가 바뀌었어요. 소스 확인부터 다시 실행하세요.');
   fs.mkdirSync(E.p('원본'), { recursive: true });
@@ -484,7 +560,10 @@ export const promptFor = (E, info, clips, T) => {
     rules.splice(0, rules.length, ...MAT_RULES(Math.max(6, Math.min(16, Math.round(T / 3.2)))), ...P.rules);
   } else if (look?.kind === 'punch') {
     // 펀치 룩: 한국어 자막만 + "!" 펀치 줄 (훅 제목은 이펙트 단계)
-    rules.splice(0, rules.length, rules[0], rules[1], rules[2], rules[3], ...P.rules,
+    if (look.plain) rules.splice(0, rules.length, rules[0], rules[1], rules[2], rules[3], ...P.rules,   // 레퍼런스 레슬링 룩: 경기 해설이라 시사 규칙·영어 줄·펀치 줄은 빼요
+      '줄마다 핵심 단어 1~2개를 *별표*로 감싸 (강조 색으로 나와요). 한 줄은 두 줄로 나뉘어 보여도 되게 20자 이내.',
+      '번호, 따옴표, 머리말, 설명 없이 대사 줄만 출력해.');
+    else rules.splice(0, rules.length, rules[0], rules[1], rules[2], rules[3], ...P.rules,
       '정책·주장·행동은 날카롭게 비판해도 되지만, 특정 국적·인종·종교의 사람들을 집단으로 조롱하거나 비하하지 마.',
       '대사 줄은 모두 한국어 자막이야. 영어 줄은 쓰지 마. 한 줄은 두 줄로 나뉘어 보여도 되게 24자 이내.',
       '장면이 확 바뀌는 순간에는 줄 맨 앞에 "!" 를 붙여 한 단어 펀치로 써 (예: "!그 순간!"). 전체에서 1~3개, 6자 이내.',
@@ -661,13 +740,13 @@ export function bwSpans(L) {
 async function plan(E, ctx) {
   const look = lookOf(E), clips = await clipDurations(E, ctx);
   if (!clips.length) throw new StepError('클립이 없어요. "구간 자르기"를 먼저 실행하세요.');
-  const map = clipMap(E), max = specOf(E).maxTotal;
+  const map = clipMap(E, readJson(E.p('소스.json'), [])), max = specOf(E).maxTotal;
   let T = 0; const used = [];
   for (const c of clips) {
     if (T >= max - 0.05) break;
     const d = Math.min(c.duration, max - T); if (d < 0.2) continue;
     const m0 = map[(+/clip_(\d+)/.exec(c.file)?.[1] || 0) - 1], m = m0 && !isFinite(m0.b) ? { ...m0, b: m0.a + c.duration } : m0;   // "전체"는 실제 길이로   // 이 클립이 소스의 어디였는지 (자막 자동화가 써요)
-    used.push({ file: c.file, start: +T.toFixed(3), duration: +d.toFixed(3), ...(m ? { si: m.si, range: m.range, a: m.a, b: m.b, ...(m.speed < 1 ? { speed: m.speed } : {}) } : {}) }); T += d;
+    used.push({ file: c.file, start: +T.toFixed(3), duration: +d.toFixed(3), ...(m ? { si: m.si, range: m.range, a: m.a, b: m.b, ...(m.speed < 1 ? { speed: m.speed } : {}), ...(m.replay ? { replay: true } : {}) } : {}) }); T += d;
   }
   const P = { title: E.s.title, format: E.s.format, width: specOf(E).w, height: specOf(E).h, total: +T.toFixed(2), clips: used, lines: [] };
   if (look) P.look = look;
@@ -737,9 +816,9 @@ function wrapKo(text, max) {
 const assEsc = s => s.replace(/[{}\\]/g, '').replace(/\r?\n/g, '\\N');
 // 강조(*단어*)를 색으로: 표시를 먼저 글자로 바꿔 두고 줄바꿈한 뒤 ASS 색 코드로
 const hexBgr = h => { const x = (/^#?([0-9a-f]{6})$/i.exec(h) || [0, 'FFFFFF'])[1].toUpperCase(); return x.slice(4, 6) + x.slice(2, 4) + x.slice(0, 2); };
-function hlText(raw, wrapAt, accent, pop = false) {   // pop: 강조 단어가 커졌다 제자리로 (이펙트 팩 '펀치')
+function hlText(raw, wrapAt, accent, pop = false, base = 'FFFFFF') {   // pop: 강조 단어가 커졌다 제자리로 (이펙트 팩 '펀치')
   const marked = String(raw || '').replace(/\*([^*\n]+)\*/g, '\u0001$1\u0002').replace(/\*/g, '');
-  return assEsc(wrapKo(marked, wrapAt).join('\n')).replace(/\u0001/g, `{\\c&H${hexBgr(accent)}&${pop ? '\\fscx125\\fscy125\\t(0,160,\\fscx100\\fscy100)' : ''}}`).replace(/\u0002/g, '{\\c&HFFFFFF&}');
+  return assEsc(wrapKo(marked, wrapAt).join('\n')).replace(/\u0001/g, `{\\c&H${hexBgr(accent)}&${pop ? '\\fscx125\\fscy125\\t(0,160,\\fscx100\\fscy100)' : ''}}`).replace(/\u0002/g, `{\\c&H${base}&}`);
 }
 // 자막 뒤 상자: 글자 폭을 어림해서 크기를 정하고, 둥근 모서리 ASS 도형으로 그려요. 색은 look.bg(또는 검정) + 투명도 boxAlpha
 const chW = (c, fs) => (/\s/.test(c) ? 0.3 : c.charCodeAt(0) > 0x2e80 ? 0.95 : /[A-Z]/.test(c) ? 0.68 : 0.58) * fs;
@@ -805,21 +884,28 @@ ${ev.join('\n')}
 function buildPunchAss(P, part = 'all') {
   const L = P.look, W = P.width, H = P.height, C = Math.round(W / 2), ac = L.accent, y = f => Math.round(H * f);
   const font = L.font || FONT_NAME, pfont = L.punchFont || font, end = assTime(P.total), hd = P.hook?.dur || 0;
-  const ev = [], fxOn = part !== 'lines', lnOn = part !== 'fx';
-  if (fxOn && P.hook?.text && hd > 0) ev.push(`Dialogue: 2,${assTime(0)},${assTime(hd)},Hook,,0,0,0,,{\\an5\\pos(${C},${y(L.hookY)})}${assEsc(wrapKo(P.hook.text, 7).slice(0, 2).join('\n'))}`);
+  const ev = [], fxOn = part !== 'lines', lnOn = part !== 'fx', capCol = hexBgr(L.capColor || '#FFFFFF');
+  if (fxOn && P.hook?.text && hd > 0) {
+    const hl = wrapKo(P.hook.text, L.hookWrap || 7).slice(0, 2);
+    if (L.hookBox) {   // 단계 룩: 검은 상자 위 흰 글씨 (위쪽)
+      const bw = Math.min(W - 40, Math.max(...hl.map(t => lineW(t, L.hookFs) * 0.9)) + 70), bh = hl.length * L.hookFs * 1.15 + 44;
+      ev.push(boxEv({ ...L, boxAlpha: 0x10 }, 0, hd, C, y(L.hookY) - bh / 2, bw, bh, '#000000'));
+    }
+    ev.push(`Dialogue: 2,${assTime(0)},${assTime(hd)},Hook,,0,0,0,,{\\an5\\pos(${C},${y(L.hookY)})}${assEsc(hl.join('\n'))}`);
+  }
   for (const l of lnOn ? P.lines : []) {
     const a = Math.max(l.start, hd); if (a >= l.end - 0.01) continue;  // 훅이 나오는 동안은 자막을 쉬어요
-    if (l.punch) ev.push(`Dialogue: 1,${assTime(a)},${assTime(l.end)},Punch,,0,0,0,,{\\an5\\pos(${C},${y(L.punchY)})\\frz${L.punchRot}\\fscx130\\fscy130\\t(0,120,\\fscx100\\fscy100)}${hlText(l.ko ?? l.text, 6, ac, !!P.fxPop)}`);
+    if (l.punch) ev.push(`Dialogue: 1,${assTime(a)},${assTime(l.end)},Punch,,0,0,0,,{\\an5\\pos(${C},${y(L.punchY)})\\frz${L.punchRot}\\fscx130\\fscy130\\t(0,120,\\fscx100\\fscy100)}${hlText(l.ko ?? l.text, 6, ac, !!P.fxPop, capCol)}`);
     else {
       if (L.subBox) {
         const ls = plainLines(l.ko ?? l.text, 11), h = Math.max(L.boxMinH, ls.length * L.capFs * L.boxLineH + 2 * L.boxPad);
         ev.push(boxEv(L, a, l.end, C, y(L.capY) - h / 2, Math.max(L.boxMinW, Math.max(...ls.map(t => lineW(t, L.capFs))) + 2 * L.boxPad), h, L.bg || '#000000'));
       }
-      ev.push(`Dialogue: ${L.subBox ? 1 : 0},${assTime(a)},${assTime(l.end)},Cap,,0,0,0,,{\\an5\\pos(${C},${y(L.capY)})}${hlText(l.ko ?? l.text, 11, ac, !!P.fxPop)}`);
+      ev.push(`Dialogue: ${L.subBox ? 1 : 0},${assTime(a)},${assTime(l.end)},Cap,,0,0,0,,{\\an5\\pos(${C},${y(L.capY)})}${hlText(l.ko ?? l.text, 11, ac, !!P.fxPop, capCol)}`);
     }
   }
   if (fxOn && L.watermark) ev.push(`Dialogue: 3,${assTime(0)},${end},WM,,0,0,0,,{\\an7\\pos(${L.wmX},${L.wmY})\\frz4\\alpha&H40&}${assEsc(L.watermark)}`);
-  const sty = (n, f, fs, col, bord, sh, al) => `Style: ${n},${f},${fs},&H00${col},&H000000FF,&H00000000,&H96000000,1,0,0,0,100,100,0,0,1,${bord},${sh},${al},60,60,0,1`;
+  const sty = (n, f, fs, col, bord, sh, al, it = 0) => `Style: ${n},${f},${fs},&H00${col},&H000000FF,&H00000000,&H96000000,1,${it},0,0,100,100,0,0,1,${bord},${sh},${al},60,60,0,1`;
   return `[Script Info]
 ScriptType: v4.00+
 PlayResX: ${W}
@@ -829,11 +915,11 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-${sty('Hook', font, L.hookFs, hexBgr(ac), L.hookBord, 2, 5)}
-${sty('Cap', font, L.capFs, 'FFFFFF', L.capBord, 3, 5)}
-${sty('Punch', pfont, L.punchFs, 'FFFFFF', L.capBord + 2, 4, 5)}
+${sty('Hook', font, L.hookFs, hexBgr(L.hookColor || ac), L.hookBox ? 0 : L.hookBord, L.hookBox ? 0 : 2, 5)}
+${sty('Cap', font, L.capFs, capCol, L.capBord, 3, 5, L.capItalic ? -1 : 0)}
+${sty('Punch', pfont, L.punchFs, capCol, L.capBord + 2, 4, 5)}
 ${sty('WM', font, L.wmFs, 'FFFFFF', 2, 1, 7)}
-
+${L.subBox || L.hookBox ? sty('Bar', font, 20, 'FFFFFF', 0, 0, 7) + '\n' : ''}
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 ${ev.join('\n')}
@@ -859,7 +945,7 @@ function buildMatAss(P, part = 'all') {
     if (L.watermark) { const [w1, ...w2] = String(L.watermark).split(' ');
       ev.push(`Dialogue: 3,${assTime(0)},${end},WM,,0,0,0,,{\\an3\\pos(${L.wmX},${L.wmY})\\fscx78}${assEsc(w1)}${w2.length ? ` {\\1c&H${hexBgr(ac)}&}${assEsc(w2.join(' '))}` : ''}`); }
     for (const c of P.clips || []) {   // 슬로우 구간에는 오른쪽 위에 SLOW 0.5x
-      if (!(c.speed < 1)) continue;
+      if (!(c.speed < 1) || c.replay) continue;   // 리플레이 클립은 REPLAY 표시가 대신해요
       const a = c.start, e = c.start + c.duration, t = `SLOW ${c.speed}x`, bw = matW(t, L.slowFs) * 0.82 + 44;
       ev.push(rectEv(3, a, e, L.slowRight - bw, L.slowY, bw, L.slowH, ac, 0, 4));
       ev.push(`Dialogue: 4,${assTime(a)},${assTime(e)},Slow,,0,0,0,,{\\an5\\pos(${Math.round(L.slowRight - bw / 2)},${Math.round(L.slowY + L.slowH / 2)})\\fscx82}${assEsc(t)}`);
@@ -913,7 +999,78 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 ${ev.join('\n')}
 `;
 }
+// ---------- 이펙트 팩 글자·도형 (룩의 영상 칸 안에, 룩 ASS 위에 얹어요) ----------
+// 영상 칸: 기본·펀치 = 전체 / 배너 = 배너 아래 / 매트 = footY~footY+footH
+const videoArea = P => { const L = P.look; if (L && P.height > P.width) { if (L.kind === 'mat') return { y0: L.footY, h: L.footH }; if (L.kind === 'banner') return { y0: L.bannerH, h: P.height - L.bannerH }; } return { y0: 0, h: P.height }; };
+// 룩의 대본 자막 자리 (말자막이 같은 자리에 나와요): an = ASS 정렬, y = 세로 px
+const capPos = P => { const L = P.look, H = P.height; if (L && H > P.width) { if (L.kind === 'mat') return { an: 8, y: L.capY }; if (L.kind === 'banner') return { an: 8, y: L.subTop }; if (L.kind === 'punch') return { an: 5, y: Math.round(H * L.capY) }; } return { an: 2, y: H - 460 }; };
+const rrPath = (x, y, w, h, r) => { x = Math.round(x); y = Math.round(y); w = Math.round(w); h = Math.round(h); r = Math.min(r, Math.floor(h / 2));
+  return `m ${x + r} ${y} l ${x + w - r} ${y} b ${x + w} ${y} ${x + w} ${y} ${x + w} ${y + r} l ${x + w} ${y + h - r} b ${x + w} ${y + h} ${x + w} ${y + h} ${x + w - r} ${y + h} l ${x + r} ${y + h} b ${x} ${y + h} ${x} ${y + h} ${x} ${y + h - r} l ${x} ${y + r} b ${x} ${y} ${x} ${y} ${x + r} ${y}`; };
+// ✕ / ✓ 아이콘 도형 (가운데 0,0, 반지름 100 × k)
+const iconPath = (kind, k) => { const p = kind === 'x' ? [[-55, -100], [0, -45], [55, -100], [100, -55], [45, 0], [100, 55], [55, 100], [0, 45], [-55, 100], [-100, 55], [-45, 0], [-100, -55]]
+  : [[-100, 0], [-62, -38], [-30, -6], [60, -96], [98, -58], [-30, 70]]; return 'm ' + p.map(([x, y]) => `${Math.round((x + 100) * k)} ${Math.round((y + 100) * k)}`).join(' l '); };   // libass 는 도형을 (0,0)~오른쪽 아래 칸 기준으로 맞추니, 좌표를 전부 양수로 두어야 \\an5 가 도형 가운데예요
+const pst = (n, fs, col, { bold = -1, italic = 0, bord = 0, sh = 0, al = 5, out = '000000' } = {}) => `Style: ${n},${FONT_NAME},${fs},&H00${col},&H000000FF,&H00${out},&H96000000,${bold},${italic},0,0,100,100,0,0,1,${bord},${sh},${al},40,40,0,1`;
+// 팩이 얹는 { styles, events } (없으면 null). part: 'fx' = 영상에 들어가는 제목·라벨·REPLAY / 'lines' = 대본 줄 말자막·아이콘
+function packAss(P, part) {
+  const id = P.fxPack; if (!id || id === 'none' || P.height <= P.width) return null;
+  const W = P.width, C = Math.round(W / 2), { y0, h } = videoArea(P), ev = [], st = [], fxOn = part !== 'lines', lnOn = part !== 'fx', end = P.total;
+  const box = (layer, a, e, x, y, w, hh, col, r, tags = '') => `Dialogue: ${layer},${assTime(a)},${assTime(e)},FxBox,,0,0,0,,{\\p1\\pos(0,0)\\bord0\\shad0\\1c&H${hexBgr(col)}&${tags}}${rrPath(x, y, w, hh, r)}`;
+  st.push(pst('FxBox', 20, 'FFFFFF', { bold: 0, al: 7 }));
+  if (fxOn && id === 'raw' && P.fxTitle?.text) {   // 훅 문구를 영상 내내 아래쪽에: 노랑 굵은 글씨 + 검은 테두리
+    st.push(pst('FxHook', 84, 'D4FF'.padStart(6, '0'), { bord: 9, sh: 2, al: 2 }));
+    ev.push(`Dialogue: 6,${assTime(0)},${assTime(end)},FxHook,,0,0,0,,{\\an2\\pos(${C},${Math.round(y0 + h * 0.88)})}${assEsc(wrapKo(P.fxTitle.text, 11).slice(0, 2).join('\n'))}`);
+  }
+  if (fxOn && id === 'raw') for (const c of P.clips || []) if (c.replay) {   // 리플레이 표시: 오른쪽 위
+    const bw = 300, bh = 84, x = W - 36 - bw, y = y0 + 36;
+    st.push(pst('FxBadge', 50, 'FFFFFF', { al: 5 }));
+    ev.push(box(6, c.start, c.start + c.duration, x, y, bw, bh, '#E02020', 14));
+    ev.push(`Dialogue: 7,${assTime(c.start)},${assTime(c.start + c.duration)},FxBadge,,0,0,0,,{\\an5\\pos(${x + bw / 2},${y + bh / 2})}REPLAY`);
+  }
+  if (fxOn && id === 'steps') {   // 위쪽: 처음엔 제목 상자, 그다음엔 구간마다 번호 라벨 (검은 상자 + 흰 굵은 글씨)
+    st.push(pst('FxStep', 64, 'FFFFFF', { al: 5 }));
+    const put = (a, e, text, fs) => {
+      const ls = wrapKo(text, 13).slice(0, 2), bw = Math.min(W - 60, Math.max(...ls.map(t => lineW(t, fs) * 0.9)) + 70), bh = ls.length * fs * 1.15 + 40, y = y0 + 44;
+      ev.push(box(6, a, e, C - bw / 2, y, bw, bh, '#000000', 10, '\\1a&H10&'));
+      ev.push(`Dialogue: 7,${assTime(a)},${assTime(e)},FxStep,,0,0,0,,{\\an5\\pos(${C},${Math.round(y + bh / 2)})\\fs${fs}}${assEsc(ls.join('\n'))}`);
+    };
+    const td = P.fxTitle ? Math.min(P.fxTitle.dur, end) : 0;
+    if (P.fxTitle?.text && td > 0) put(0, td, P.fxTitle.text, 64);
+    for (const c of P.fxSteps || []) { const a = Math.max(c.start, td); if (c.end - a >= 0.3) put(a, c.end, c.label, 60); }
+  }
+  if (fxOn && id === 'tags') for (const e of P.fxEvents || []) if (e.kind === 'label' && e.text) {   // 파란 알약 라벨: 톡 튀어나왔다가 1.2초
+    const fs = 56, w = Math.min(W - 80, lineW(e.text, fs) * 0.9 + 90), hh = 100, cy = Math.round(y0 + h * 0.58), b = Math.min(end, e.t + 1.2);
+    st.push(pst('FxPill', fs, 'FFFFFF', { al: 5 }));
+    const pop = '\\fscx60\\fscy60\\t(0,130,\\fscx108\\fscy108)\\t(130,230,\\fscx100\\fscy100)\\fad(0,160)';
+    ev.push(`Dialogue: 6,${assTime(e.t)},${assTime(b)},FxBox,,0,0,0,,{\\p1\\an5\\pos(${C},${cy})\\bord0\\shad0\\1c&H${hexBgr('#1E88FF')}&${pop}}${rrPath(0, 0, w, hh, 50)}`);
+    ev.push(`Dialogue: 7,${assTime(e.t)},${assTime(b)},FxPill,,0,0,0,,{\\an5\\pos(${C},${cy})${pop}}${assEsc(e.text)}`);
+  }
+  if (lnOn && id === 'words') {   // 말 자막: 2~4단어씩, 룩의 자막 자리에. 강조 단어는 하늘색, ✕/✓ 줄은 아이콘이 0.8초 팝
+    const cp = capPos(P), fs = 88; st.push(pst('FxWd', fs, 'FFFFFF', { italic: -1, bord: 10, sh: 2, al: cp.an }));
+    const cyan = hexBgr('#3EE6FF');
+    for (const l of P.lines || []) {
+      const { mark, text } = parseMark(l.ko ?? l.text);
+      for (const c of chunkLine(text, l.start, l.end)) {
+        let lines = [[]], len = 0;
+        for (const w of c.words) { const n = [...w.t].length; if (len && len + 1 + n > 11) { lines.push([]); len = 0; } lines[lines.length - 1].push(w); len += (len ? 1 : 0) + n; }
+        const txt = lines.map(ws => ws.map(w => (w.hl ? `{\\1c&H${cyan}&}${assEsc(w.t)}{\\1c&HFFFFFF&}` : assEsc(w.t))).join(' ')).join('\\N');
+        ev.push(`Dialogue: 5,${assTime(c.start)},${assTime(c.end)},FxWd,,0,0,0,,{\\an${cp.an}\\pos(${C},${cp.y})\\fscx92\\fscy92\\t(0,90,\\fscx100\\fscy100)}${txt}`);
+      }
+      if (mark) {
+        const a = Math.min(l.start + 0.05, end), b = Math.min(end, a + 0.8), cy = Math.round(y0 + h * 0.34), col = mark === 'x' ? '#FF2B2B' : '#2ECC71';
+        const pop = '\\fscx40\\fscy40\\t(0,140,\\fscx115\\fscy115)\\t(140,260,\\fscx100\\fscy100)\\fad(0,140)';
+        ev.push(`Dialogue: 8,${assTime(a)},${assTime(b)},FxBox,,0,0,0,,{\\p1\\an5\\pos(${C},${cy})\\bord7\\shad0\\1c&H${hexBgr(col)}&\\3c&H000000&${pop}}${iconPath(mark, 1.3)}`);
+      }
+    }
+  }
+  return ev.length ? { styles: [...new Set(st)].join('\n'), events: ev } : null;
+}
 export function buildAss(P, part = 'all') {
+  const x = packAss(P, part);
+  const base = buildAss0(P.fxPack === 'words' && part !== 'fx' ? { ...P, lines: [] } : P, part);   // 말자막은 룩의 줄 자막을 대신해요
+  if (!x) return base;
+  return base.replace('\n\n[Events]', '\n' + x.styles + '\n\n[Events]').replace(/\n*$/, '\n') + x.events.join('\n') + '\n';
+}
+function buildAss0(P, part = 'all') {
   if (P.look?.kind === 'mat' && P.height > P.width) return buildMatAss(P, part);
   if (P.look?.kind === 'punch' && P.height > P.width) return buildPunchAss(P, part);
   if (P.look && P.height > P.width) return buildBannerAss(P, part);
@@ -948,7 +1105,7 @@ const escFilterPath = p => p.replace(/\\/g, '\\\\').replace(/'/g, "\\\\\\'").rep
 export function srcCues(E, P, info) {
   const out = [], cache = new Map();
   for (const c of P.clips) {
-    if (c.si == null || c.a == null) continue;
+    if (c.si == null || c.a == null || c.replay) continue;   // 리플레이 클립은 같은 장면의 반복이라 원본 자막을 또 넣지 않아요
     if (!cache.has(c.si)) cache.set(c.si, info[c.si] ? cuesOf(E, info[c.si]) : []);
     for (const q of cache.get(c.si)) {
       const t = q.text.replace(/^>>+\s*/, '').trim();
@@ -1048,6 +1205,15 @@ async function fx(E, ctx) {
     P.banner = { small: b.small, big: b.big }; P.bw = look.introBW && end > 0 ? [[0, end]] : [];
     ctx.log(`  배너: ${b.small || '(없음)'} / ${b.big}${P.bw.length ? ` · 흑백 인트로 0~${end}초` : ''}`);
   }
+  const pk0 = fxPackOf(E);
+  delete P.fxTitle; delete P.fxSteps;
+  if (pk0.hookFixed || pk0.steps) {   // 한 방 리얼·단계 강의: 팩이 제목 문구를 직접 보여 줘요 (룩의 훅 칸은 비켜요)
+    const h = parseHook(txt) || hookFromTitle(E.s.title);
+    P.fxTitle = { text: h.text, dur: pk0.steps ? +Math.min(pk0.titleDur, P.total * 0.3).toFixed(2) : P.total };
+    if (P.hook) P.hook.dur = 0;
+    ctx.log(`  제목 문구: ${h.text}${pk0.steps ? ` (처음 ${P.fxTitle.dur}초)` : ' (영상 내내)'}`);
+  }
+  if (pk0.steps) { P.fxSteps = stepLabels(E.s.fxLabels, P.clips.length).map((label, i) => ({ start: P.clips[i].start, end: +(P.clips[i].start + P.clips[i].duration).toFixed(2), label })); ctx.log(`  단계 라벨: ${P.fxSteps.map(x => x.label).join(' / ')}`); }
   writeJson(E.p('편집/편집계획.json'), P);
   // 이펙트 팩(최종 결과물 레퍼런스): 강조 순간을 모아 영상 칸에 줌·흔들림·플래시를 입혀요. 효과음은 목소리·음악 단계가 같은 목록으로 넣어요.
   const pack = fxPackOf(E), area = look?.kind === 'mat' ? [W, look.footH] : look?.kind === 'punch' || !look ? [W, H] : [W, H - look.bannerH];
@@ -1059,7 +1225,7 @@ async function fx(E, ctx) {
     writeJson(E.p('편집/편집계획.json'), P);
     fxv = fxVideoFilter(pack, P, P.fxEvents, area[0], area[1]);
     const cnt = k => P.fxEvents.filter(e => e.kind === k).length;
-    ctx.log(`이펙트 팩: ${pack.name} · 컷 ${cnt('cut')}곳 · 슬로우 ${cnt('slow')}곳 · 강조 ${cnt('hit')}곳${pack.pop ? ' · 강조 단어 팝' : ''}`);
+    ctx.log(`이펙트 팩: ${pack.name} · 컷 ${cnt('cut')}곳 · 슬로우 ${cnt('slow')}곳 · 강조 ${cnt('hit')}곳${pack.tags ? ` · 라벨 ${cnt('label')}곳` : ''}${pack.pop ? ' · 강조 단어 팝' : ''}`);
   }
   const assFile = E.p('편집/효과.ass');
   fs.writeFileSync(assFile, buildAss(P, 'fx'));
@@ -1107,8 +1273,9 @@ export async function mix(E, ctx) {
   if (P) P.lines = P.lines || [];
   if (!P || !exists(E.p('편집/완성본.mp4'))) throw new StepError('이펙트(완성본)가 먼저예요.');
   const T = P.total, inputs = ['-i', E.p('편집/완성본.mp4')], chains = []; let idx = 1;
-  const burn = !E.s.legacyBurn && P.lines?.length > 0, capAss = E.p('편집/대본자막.ass');
+  const burn = !E.s.legacyBurn && P.lines?.length > 0 && P.fxPack !== 'raw', capAss = E.p('편집/대본자막.ass');
   if (burn) { fs.writeFileSync(capAss, buildAss(P, 'lines')); ctx.log(`대본 자막 ${P.lines.length}줄을 영상에 입혀요.`); }
+  else if (P.fxPack === 'raw' && P.lines?.length) ctx.log('한 방 리얼: 훅 문구만 보여 주려고 대본 줄 자막은 영상에 넣지 않아요.');
   else if (!P.lines?.length) ctx.log('대본 줄이 없어서 자막은 넣지 않아요.');
   const capVf = `ass='${escFilterPath(capAss)}':fontsdir='${FONT_DIR}'`;
   const voiceLabels = [];
@@ -1157,10 +1324,10 @@ export async function mix(E, ctx) {
     const name = fxp.sfx?.[e.kind]; if (!name) continue;
     const file = findSfx(E, name);
     if (file) inputs.push('-i', file); else inputs.push('-f', 'lavfi', '-t', String(SFX_SYNTH[name].d), '-i', SFX_SYNTH[name].src);
-    chains.push(`[${idx}:a]aresample=44100,aformat=channel_layouts=stereo,atrim=0:${file ? 2 : SFX_SYNTH[name].d},asetpts=PTS-STARTPTS,adelay=${Math.round(e.t * 1000)}:all=1,volume=0.8[x${idx}]`);
+    chains.push(`[${idx}:a]aresample=44100,aformat=channel_layouts=stereo,atrim=0:${file ? 2 : SFX_SYNTH[name].d},asetpts=PTS-STARTPTS,adelay=${Math.round(e.t * 1000)}:all=1,volume=${fxp.sfxVol ?? 0.8}[x${idx}]`);
     mixIn.push(`[x${idx}]`); idx++;
     if (!said.has(name)) { said.add(name); ctx.log(`  효과음 "${name}": ${file ? path.basename(file) : '소리/효과음 폴더에 파일이 없어서 기본 소리로 만들어요'}`); }
-    ctx.log(`  효과음 ${name} · ${e.t.toFixed(1)}초 (${{ cut: '컷', slow: '슬로우', hit: '강조' }[e.kind]})`);
+    ctx.log(`  효과음 ${name} · ${e.t.toFixed(1)}초 (${{ cut: '컷', slow: '슬로우', hit: '강조', label: '라벨', ok: '✓', x: '✕' }[e.kind]})`);
   }
   let args;
   if (mixIn.length) {

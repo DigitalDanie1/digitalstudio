@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { FFMPEG, probe, run } from './util.mjs';
 import { parseRanges, rangeSecs, rangeSpeed } from './util.mjs';
-import { matItems, splitAnswer, CHANNEL_PROFILES, profileOf, promptFor, parseVtt, transcriptFor, parseScript, parseHook, hookFromTitle, parseLine, parseBanner, bannerFromTitle, bwSpans, buildAss, resolveLook, lookOf, LOOK_CHOICES, lookKeyOf, migrateState, srcCues, translateCues, buildSrcAss, STEP_DEFS, FX_PACKS, fxPackOf, buildFxEvents, fxVideoFilter, parseFxTimes, SFX_SYNTH } from './steps.mjs';
+import { matItems, splitAnswer, CHANNEL_PROFILES, profileOf, promptFor, parseVtt, transcriptFor, parseScript, parseHook, hookFromTitle, parseLine, parseBanner, bannerFromTitle, bwSpans, buildAss, resolveLook, lookOf, LOOK_CHOICES, lookKeyOf, migrateState, srcCues, translateCues, buildSrcAss, STEP_DEFS, FX_PACKS, fxPackOf, buildFxEvents, fxVideoFilter, parseFxTimes, parseMark, chunkLine, stepLabels, clipMap, LOOK_PACK, SFX_SYNTH } from './steps.mjs';
 // 옛 버전과 비교하는 검사: backup-20261118-banner 폴더가 있는 맥에서만 실행 (없으면 건너뜀)
 let oldBuildAss = null;
 try { ({ buildAss: oldBuildAss } = await import('./backup-20261118-banner/steps.mjs')); } catch {}
@@ -361,9 +361,9 @@ try {
   // ---------- 새 순서 (링크 → 룩 → 영상 → 컷 → 자막 → 이펙트 → 대본·녹음 → 패키지) ----------
   let L1;
   await check('룩: 편집 레퍼런스 목록 + 기본 = 채널 룩 (영상마다 고를 수 있음)', async () => {
-    assert.deepEqual(LOOK_CHOICES.map(l => l.id), ['yt-wrestling', 'yt-christian', 'yt-politics', 'yt-mat']);
+    assert.deepEqual(LOOK_CHOICES.map(l => l.id), ['yt-wrestling', 'yt-christian', 'yt-politics', 'yt-mat', 'yt-raw', 'yt-steps', 'yt-words', 'yt-tags']);
     assert.ok(LOOK_CHOICES.every(l => /룩/.test(l.name) && l.desc));
-    assert.deepEqual((await J('/status')).d.looks.map(l => l.id), ['yt-wrestling', 'yt-christian', 'yt-politics', 'yt-mat']);
+    assert.deepEqual((await J('/status')).d.looks.map(l => l.id), LOOK_CHOICES.map(l => l.id));
     assert.equal(lookKeyOf(fakeE('yt-politics')), 'yt-politics'); assert.equal(lookKeyOf(fakeE('yt-politics', { look: 'yt-christian' })), 'yt-christian');
     assert.equal(lookKeyOf(fakeE('yt-politics', { look: 'nope' })), 'yt-politics'); assert.equal(lookKeyOf(fakeE('')), 'yt-wrestling');
     assert.equal(lookOf(fakeE('yt-politics', { look: 'yt-christian' })).kind, 'banner'); assert.equal(lookOf(fakeE('yt-christian', { look: 'yt-wrestling' })), null);
@@ -425,12 +425,48 @@ try {
   const fxPlan = { total: 6, width: 1080, height: 1920, title: 'T', clips: [{ start: 0, duration: 2 }, { start: 2, duration: 2, speed: 0.5 }, { start: 4, duration: 2 }],
     lines: [{ i: 0, start: 1, end: 3, text: '이 정책', ko: '이 *정책*', punch: false }, { i: 1, start: 3, end: 4, text: '그 순간', ko: '!그 순간!', punch: true, stamp: { main: '4 : 0' } }, { i: 2, start: 4.5, end: 6, text: '끝', ko: '끝' }] };
   await check('이펙트 팩: 팩 4개 · 채널별 기본(기독교=잔잔, 정치=펀치, 나머지=경기) · 직접 고른 것이 먼저', () => {
-    assert.deepEqual(FX_PACKS.map(p => p.id), ['none', 'calm', 'punch', 'match']);
+    assert.deepEqual(FX_PACKS.map(p => p.id), ['none', 'raw', 'steps', 'words', 'tags', 'match', 'calm', 'punch']);
     for (const p of FX_PACKS) { assert.ok(p.name && p.desc && typeof p.ref === 'string', p.id); assert.ok(p.desc.split(' · ').length >= 2, p.id + ' desc 는 효과를 " · " 로 나열'); }
-    assert.equal(fxP('calm').ref, 'https://www.youtube.com/shorts/op51yRlhjjI'); assert.equal(fxP('punch').ref, 'https://www.youtube.com/shorts/1zpjOi8_LH0'); assert.equal(fxP('match').ref, '');
+    assert.equal(fxP('calm').ref, 'https://www.youtube.com/shorts/op51yRlhjjI'); assert.equal(fxP('punch').ref, 'https://www.youtube.com/shorts/1zpjOi8_LH0'); assert.equal(fxP('match').ref, 'https://www.youtube.com/shorts/H-wcWuDSIvg');
+    assert.deepEqual(['raw', 'steps', 'words', 'tags'].map(i => fxP(i).ref), ['vvXC-IW5oOE', 'hML9vjR6wX0', 'mJIVHZUGw40', 'qDD40BckF20'].map(x => 'https://www.youtube.com/shorts/' + x)); assert.ok(['raw', 'steps', 'words', 'tags'].every(i => /회$/.test(fxP(i).views)));
     assert.equal(fxPackOf(fakeE('yt-christian')).id, 'calm'); assert.equal(fxPackOf(fakeE('yt-politics')).id, 'punch');
     for (const c of ['yt-wrestling', 'yt-mat', '', 'nope', undefined]) assert.equal(fxPackOf(fakeE(c)).id, 'match', String(c));
     assert.equal(fxPackOf(fakeE('yt-politics', { fxPack: 'none' })).id, 'none'); assert.equal(fxPackOf(fakeE('yt-politics', { fxPack: 'zzz' })).id, 'punch');
+  });
+  await check('레슬링 레퍼런스 룩 4개: 풀리고 ASS 가 오류 없이 나오며 짝 팩이 정해져요 (직접 고른 팩이 먼저, 채널 기본은 그대로)', () => {
+    const pairs = { 'yt-raw': 'raw', 'yt-steps': 'steps', 'yt-words': 'words', 'yt-tags': 'tags' };
+    assert.deepEqual(LOOK_PACK, pairs);
+    for (const [id, pk] of Object.entries(pairs)) {
+      const L = resolveLook(CHANNEL_PROFILES[id].look); assert.equal(L.kind, 'punch'); assert.equal(L.audio, 'orig'); assert.equal(L.hookScale === 1 || L.hookDur === 0, true, id); assert.equal(L.watermark, '');
+      assert.equal(lookOf(fakeE('yt-wrestling', { look: id })).kind, 'punch'); assert.equal(lookKeyOf(fakeE('yt-wrestling', { look: id })), id);
+      assert.equal(fxPackOf(fakeE('yt-wrestling', { look: id })).id, pk); assert.equal(fxPackOf(fakeE('yt-wrestling', { look: id, fxPack: 'none' })).id, 'none');
+      const P = { title: 'T', width: 1080, height: 1920, total: 10, look: L, hook: { text: '훅 문구', dur: L.hookDur }, bw: [], fxPack: pk, fxTitle: { text: '훅', dur: 2.5 }, fxSteps: [{ start: 0, end: 5, label: '1단계' }], fxEvents: [{ t: 2, kind: 'label', text: '라벨' }], clips: [{ start: 0, duration: 8 }, { start: 8, duration: 2, speed: 0.5, replay: true }],
+        lines: [{ i: 0, text: '이 정책', ko: '이 *정책*', start: 1, end: 4 }, { i: 1, text: '✕ 이러면 안 돼', ko: '✕ 이러면 안 돼', start: 4, end: 6 }, { i: 2, text: '✓ 이렇게', ko: '✓ 이렇게', start: 6, end: 8 }] };
+      for (const part of ['fx', 'lines', 'all']) assert.match(buildAss(P, part), /\[Events\]/, id + part);
+    }
+    assert.equal(fxPackOf(fakeE('yt-wrestling')).id, 'match'); assert.equal(fxPackOf(fakeE('yt-wrestling', { look: 'yt-mat' })).id, 'match');
+    assert.equal(CHANNEL_PROFILES['yt-raw'].look.capColor, '#FFD400'); assert.equal(CHANNEL_PROFILES['yt-tags'].look.bg, '#1E88FF'); assert.equal(CHANNEL_PROFILES['yt-words'].look.accent, '#3EE6FF');
+    assert.match(promptFor(fakeE('yt-wrestling', { look: 'yt-raw' }), [{ title: 'T', channel: 'C' }], [{ duration: 12 }], 12), /\*별표\*/);
+  });
+  await check('새 팩 계산: 한 방 리얼 = 끝에 리플레이 클립 정확히 1개 (다른 팩은 0개) · 시간+문구 읽기 · 말자막 쪼개기 · ✕✓ · 단계 라벨', () => {
+    const E = (pack, ranges = ['0:10-0:20']) => ({ s: { title: 't', format: 'shorts', channel: 'yt-wrestling', fxPack: pack, sources: [{ ranges: ['0:01-0:05', ...ranges] }] } });
+    const m = clipMap(E('raw')); assert.equal(m.length, 3); assert.equal(m.filter(c => c.replay).length, 1); assert.deepEqual({ ...m[2], range: 0 }, { si: 0, range: 0, a: 18, b: 20, speed: 0.5, replay: true }); assert.equal(m[2].range, '0:18-0:20x0.5');
+    for (const p of ['none', 'steps', 'words', 'tags', 'match', 'calm', 'punch']) assert.equal(clipMap(E(p)).length, 2, p);
+    assert.equal(clipMap(E('raw', ['0:10-0:11'])).length, 2, '2초보다 짧으면 안 붙여요'); assert.equal(clipMap(E('raw', ['0:10-0:14x0.5'])).length, 2, '이미 슬로우면 안 붙여요');
+    assert.equal(clipMap(E('raw', ['전체']), [{ duration: 1 }]).length, 2); assert.equal(clipMap(E('raw', ['전체']), [{ duration: 30 }]).at(-1).a, 28);
+    assert.deepEqual(parseFxTimes('0:03 벽처럼 서기, 0:06 레벨 체인지').entries, [{ t: 3, text: '벽처럼 서기' }, { t: 6, text: '레벨 체인지' }]);
+    assert.equal(parseFxTimes('0:03 벽처럼 서기, 0:06').text, '0:03 벽처럼 서기, 0:06'); assert.deepEqual(parseFxTimes('0:03 0:07').secs, [3, 7]); assert.deepEqual(parseFxTimes('0:03, 0:07').entries.map(e => e.text), ['', '']);
+    assert.throws(() => parseFxTimes('벽 0:03'), /시간 모양/);
+    const ev = buildFxEvents({ s: { fxTimes: '0:03 벽처럼 서기, 0:05' } }, fxPlan, fxP('tags'));
+    assert.deepEqual(ev.filter(e => e.kind === 'label').map(e => [e.t, e.text]), [[1, '정책'], [3, '벽처럼 서기']].slice(0, 2)); assert.deepEqual(ev.filter(e => e.kind === 'hit').map(e => e.t), [5]);
+    const ch = chunkLine('이 *기술* 을 쓰면 상대가 무너져요 정말로', 2, 8); assert.ok(ch.length >= 2);
+    assert.ok(ch.every(c => c.words.length >= 2 && c.words.length <= 4), JSON.stringify(ch)); assert.equal(ch[0].start, 2); assert.equal(ch.at(-1).end, 8);
+    assert.ok(ch.every((c, i) => i === 0 || c.start === ch[i - 1].end)); assert.equal(ch.flatMap(c => c.words).filter(w => w.hl).map(w => w.t).join(), '기술');
+    for (const n of [2, 3, 4, 5, 7, 10, 13, 22]) { const c = chunkLine(Array.from({ length: n }, (_, i) => 'w' + i).join(' '), 0, 10); assert.ok(c.every(x => x.words.length >= 2 && x.words.length <= 4), n); assert.equal(c.reduce((a, x) => a + x.words.length, 0), n); assert.equal(c.at(-1).end, 10); }
+    const lenTotal = chunkLine('가나다라마 바 사아', 0, 9); assert.ok(lenTotal[0].end - lenTotal[0].start > 0); assert.equal(chunkLine('', 0, 1).length, 0);
+    assert.deepEqual(parseMark('✕ 이러면 안 돼'), { mark: 'x', text: '이러면 안 돼' }); assert.deepEqual(parseMark('X 틀림'), { mark: 'x', text: '틀림' }); assert.deepEqual(parseMark('✓좋아'), { mark: 'ok', text: '좋아' }); assert.deepEqual(parseMark('O 맞음'), { mark: 'ok', text: '맞음' }); assert.equal(parseMark('Xylophone').mark, '');
+    const wev = buildFxEvents({ s: {} }, { ...fxPlan, lines: [{ start: 1, end: 2, text: '✕ 틀림' }, { start: 3, end: 4, text: '✓ 맞음' }] }, fxP('words')); assert.deepEqual(wev.filter(e => e.kind === 'x' || e.kind === 'ok').map(e => [e.t, e.kind]), [[1, 'x'], [3, 'ok']]);
+    assert.deepEqual(stepLabels([], 3), ['1단계', '2단계', '다 합치면']); assert.deepEqual(stepLabels(['낮추기', '밀기'], 3), ['1. 낮추기', '2. 밀기', '다 합치면']); assert.deepEqual(stepLabels([], 2), ['1단계', '2단계']);
   });
   await check('이펙트 팩: 직접 적은 시간 읽기(모양·개수 검사) + 강조 순간 목록(0~총길이로 자르고 0.25초 안은 합침)', () => {
     assert.deepEqual(parseFxTimes('0:03, 0:07.5').secs, [3, 7.5]); assert.equal(parseFxTimes('').text, ''); assert.deepEqual(parseFxTimes('5 9').secs, [5, 9]);
@@ -488,6 +524,23 @@ try {
     for (const id of ['fx', 'mix', 'upload']) assert.equal(step(e, id).status, 'todo', id);
     for (const id of ['research', 'download', 'clip', 'plan', 'rough', 'subs']) assert.equal(step(e, id).status, 'done', id);
     assert.equal((await J('/fxpack', { ep: L1, pack: 'calm', times: '0:02,0:03' })).d.reset, false);   // 모양만 다른 같은 시간
+  });
+  await check('/fxpack: 한 방 리얼으로 바꾸거나 돌아올 때는 클립부터 되돌림 · 단계 이름(labels)은 이펙트부터만', async () => {
+    const st = async () => (await J('/status')).d.episodes.find(x => x.ep === L1);
+    await J('/run', { ep: L1, steps: ['clip', 'plan', 'rough', 'subs'] }); let e = await waitIdle(180000);
+    for (const id of ['clip', 'plan', 'rough', 'subs']) assert.equal(step(e, id).status, 'done', id + ' ' + step(e, id).error);
+    let r = await J('/fxpack', { ep: L1, pack: 'steps', labels: ['낮추기', ' 밀기 ', ''] }); assert.equal(r.d.reset, true); assert.deepEqual(r.d.fxLabels, ['낮추기', '밀기']);
+    e = await st(); assert.deepEqual(e.fxLabels, ['낮추기', '밀기']); assert.equal(step(e, 'clip').status, 'done'); assert.equal(step(e, 'fx').status, 'todo');
+    assert.equal((await J('/fxpack', { ep: L1, pack: 'steps', labels: '낮추기,밀기' })).d.reset, false);
+    assert.equal((await J('/fxpack', { ep: L1, pack: 'steps', labels: ['낮추기', '당기기'] })).d.reset, true); assert.equal(step(await st(), 'clip').status, 'done');
+    r = await J('/fxpack', { ep: L1, pack: 'raw' }); assert.equal(r.d.reset, true); e = await st();
+    for (const id of ['clip', 'plan', 'rough', 'subs', 'fx', 'mix', 'upload']) assert.equal(step(e, id).status, 'todo', 'raw 로 ' + id);
+    assert.equal(step(e, 'download').status, 'done');
+    await J('/run', { ep: L1, steps: ['clip', 'plan', 'rough', 'subs'] }); e = await waitIdle(180000);
+    for (const id of ['clip', 'plan', 'rough', 'subs']) assert.equal(step(e, id).status, 'done', id + ' ' + step(e, id).error);
+    r = await J('/fxpack', { ep: L1, pack: 'calm' }); assert.equal(r.d.reset, true); e = await st(); assert.equal(step(e, 'clip').status, 'todo', 'raw 에서 나오면 클립부터');
+    await J('/run', { ep: L1, steps: ['clip', 'plan', 'rough', 'subs'] }); e = await waitIdle(180000);
+    for (const id of ['clip', 'plan', 'rough', 'subs']) assert.equal(step(e, id).status, 'done', id);
   });
   await check('이펙트 팩 실제 실행: 펀치 팩 이펙트 → 완성본 크기·길이 그대로 + fxEvents/fxPop 기록 + 효과음 기본 소리 → 최종본 + 업로드에 [이펙트]', async () => {
     const dir = path.join(tmp, 'data', L1), planF = path.join(dir, '편집/편집계획.json'), read = () => JSON.parse(fs.readFileSync(planF, 'utf8'));

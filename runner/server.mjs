@@ -55,7 +55,7 @@ function view(E) {
   return {
     ep: E.s.ep, title: E.s.title, note: E.s.note || '', ideaId: E.s.ideaId || '', format: E.s.format, channel: E.s.channel || '',
     look: E.s.look || '', lookUsed: lookKeyOf(E),
-    fxPack: E.s.fxPack || '', fxPackUsed: fxPackOf(E).id, fxTimes: E.s.fxTimes || '',
+    fxPack: E.s.fxPack || '', fxPackUsed: fxPackOf(E).id, fxTimes: E.s.fxTimes || '', fxLabels: E.s.fxLabels || [],
     sources: E.s.sources.map(x => ({ url: x.url, ranges: x.ranges })),
     steps: STEP_DEFS.map(d => {
       const st = E.s.steps[d.id], o = { id: d.id, name: d.name, status: st.status, outputs: outputsFor(d.id, E).map(p => { const ex = exists(E.p(p)), r = { path: p, exists: ex }; if (ex) { try { r.mtime = Math.round(fs.statSync(E.p(p)).mtimeMs); } catch {} } return r; }) };
@@ -225,10 +225,13 @@ const routes = {
     const E = getEp(body.ep); mustIdle(E);
     const pack = String(body.pack || ''); if (!FX_PACKS.some(p => p.id === pack)) throw new HttpError(400, '모르는 이펙트 팩이에요: ' + pack);
     let times; try { times = parseFxTimes(body.times).text; } catch (e) { throw new HttpError(400, e.message); }
-    const was = fxPackOf(E).id, wasTimes = E.s.fxTimes || '', changed = pack !== was || times !== wasTimes;
-    E.s.fxPack = pack; E.s.fxTimes = times;
-    if (changed) for (const id of ['fx', 'mix', 'upload']) { const st = E.s.steps[id]; if (st.status !== 'todo') { st.status = 'todo'; delete st.error; } }
-    save(E); return { json: { ok: true, pack, fxPackUsed: fxPackOf(E).id, fxTimes: times, reset: changed } };
+    const labels = (Array.isArray(body.labels) ? body.labels : String(body.labels || '').split(',')).map(x => String(x || '').replace(/[{}\\]/g, '').trim().slice(0, 20)).slice(0, 12);
+    while (labels.length && !labels[labels.length - 1]) labels.pop();
+    const was = fxPackOf(E).id, wasTimes = E.s.fxTimes || '', wasLabels = (E.s.fxLabels || []).join('\n'), changed = pack !== was || times !== wasTimes || labels.join('\n') !== wasLabels;
+    const clipsChange = (pack === 'raw') !== (was === 'raw');   // 한 방 리얼은 끝에 리플레이 클립이 붙어서, 들어가고 나올 때 클립부터 다시 만들어요
+    E.s.fxPack = pack; E.s.fxTimes = times; E.s.fxLabels = labels;
+    if (changed) for (const id of clipsChange ? ['clip', 'plan', 'rough', 'subs', 'fx', 'mix', 'upload'] : ['fx', 'mix', 'upload']) { const st = E.s.steps[id]; if (st.status !== 'todo') { st.status = 'todo'; delete st.error; } }
+    save(E); return { json: { ok: true, pack, fxPackUsed: fxPackOf(E).id, fxTimes: times, fxLabels: labels, reset: changed } };
   },
   // ④ 컷 편집: 쓸 구간 정하기 (소스 하나의 구간 목록을 통째로 바꿔요). 구간이 바뀌면 자르기부터 다시 돌려야 해요.
   'POST /ranges': ({ body }) => {

@@ -318,10 +318,12 @@ document.addEventListener('click', async e => {
       } else if (a === 'fxpack') {
         // ③ 최종 결과물 레퍼런스(이펙트 팩): 고른 팩과 더 강조할 시간을 저장. 바뀌면 이펙트부터 다시 만들어요.
         const pack = act.dataset.yaFxpack || '', times0 = (document.querySelector('[data-ya-new="fxtimes"]')?.value ?? ((typeof ytPipe === 'object' && ytPipe.fxTimes != null) ? ytPipe.fxTimes : cur?.fxTimes) ?? '').trim(), times = pack === 'none' ? '' : times0;
+        const lab0 = document.querySelector('[data-ya-new="fxlabels"]')?.value ?? ((typeof ytPipe === 'object' && ytPipe.fxLabels != null) ? ytPipe.fxLabels : (cur?.fxLabels || []).join(', ')),
+          labels = pack === 'steps' ? String(lab0 || '').split(',').map(x => x.trim()).filter(Boolean) : [];
         if (!cur || !pack) throw new Error('편집 스타일을 먼저 정해 주세요');
-        if ((cur.round || 0) >= 1 && (pack !== cur.fxPackUsed || times !== (cur.fxTimes || '')) && !confirm('레퍼런스를 바꾸면 이펙트부터 다시 만들어요. 계속할까요?')) return;
-        const r = await runnerFetch('/fxpack', { ep: cur.ep, pack, times });
-        if (typeof ytPipe === 'object') { ytPipe.fxPack = ''; ytPipe.fxIdea = ''; ytPipe.fxTimes = null; }
+        if ((cur.round || 0) >= 1 && (pack !== cur.fxPackUsed || times !== (cur.fxTimes || '') || labels.join('\n') !== (cur.fxLabels || []).join('\n')) && !confirm('레퍼런스를 바꾸면 이펙트부터 다시 만들어요. 계속할까요?')) return;
+        const r = await runnerFetch('/fxpack', { ep: cur.ep, pack, times, labels });
+        if (typeof ytPipe === 'object') { ytPipe.fxPack = ''; ytPipe.fxIdea = ''; ytPipe.fxTimes = null; ytPipe.fxLabels = null; }
         toast(r.reset ? '레퍼런스를 바꿨어요. 이펙트부터 다시 만들어요.' : '레퍼런스를 정했어요.');
       } else if (a === 'cut') {
         // ④ 컷 편집: 구간 저장 → 자르기·편집 계획·가편집
