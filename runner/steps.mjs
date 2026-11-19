@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   FFMPEG, YTDLP, FONT_DIR, FONT_NAME, StepError, StopError, run, ff, probe, lastLines, exists,
-  parseRanges, rangeSecs, rangeSpeed, fmtTime, isLocalSource, localPath, MAX_RANGE,
+  parseRanges, rangeSecs, rangeSpeed, fmtTime, parseTime, isLocalSource, localPath, MAX_RANGE,
 } from './util.mjs';
 
 export const STEP_DEFS = [
@@ -109,6 +109,81 @@ export const resolveLook = look => (look ? { ...(LOOK_BASE[look.kind] || LOOK_DE
 export const lookOf = E => (E?.s?.format === 'long' ? null : resolveLook(CHANNEL_PROFILES[lookKeyOf(E)].look));
 // 원본 영상 소리를 살리는 룩인가 (매트 스토리 룩). 다른 룩은 예전처럼 원본 소리를 빼요.
 export const keepsAudio = E => lookOf(E)?.audio === 'orig';
+
+// ---------- 최종 결과물 레퍼런스(이펙트 팩) ----------
+// 룩 = 색·틀·자막 자리 / 이펙트 팩 = 영상 속 강조: 줌 펀치·흔들림·플래시·슬로우 줌·효과음·단어 팝. 이펙트 단계(영상)와 목소리·음악 단계(효과음)에서 실제로 적용돼요.
+// desc 는 " · " 로 효과를 나열해요 (작업판이 목록으로 보여 줘요). ref = 예시 영상 링크 ('' = 없음, 사용자가 직접 넣어요).
+export const FX_PACKS = [
+  { id: 'none', name: '이펙트 없음', desc: '지금처럼 그대로 · 줌·흔들림·효과음 없음', ref: '' },
+  { id: 'calm', name: '잔잔', desc: '클립마다 천천히 줌인 · 컷 사이 짧게 어둡다 밝아짐 · 첫 강조점에 부드러운 "띵"', ref: 'https://www.youtube.com/shorts/op51yRlhjjI',
+    kenburns: 0.06, dip: 0.12, dipDepth: 0.45, hitSrc: ['punch', 'stamp', 'hl'], maxHits: 1, sfx: { hit: '띵' } },
+  { id: 'punch', name: '펀치', desc: '컷마다 빠른 줌 펀치 · 강조 순간 흔들림 + 흰 플래시 · "팡" 효과음 · 강조 단어 팝', ref: 'https://www.youtube.com/shorts/1zpjOi8_LH0',
+    punchZoom: 0.12, punchDur: 0.35, shake: 0.3, shakeAmp: 18, flash: 0.08, flashAlpha: 0.8, pop: true, hitSrc: ['punch', 'hl'], maxHits: 12, sfx: { hit: '팡' } },
+  { id: 'match', name: '경기 하이라이트', desc: '슬로우 시작에 흰 플래시 + 줌인 유지 · 컷마다 "휙" · 점수 도장·강조에 흔들림 + "쾅"', ref: '',
+    slowZoom: 0.10, flash: 0.08, flashAlpha: 0.8, shake: 0.3, shakeAmp: 18, flashOn: 'slow', hitSrc: ['stamp', 'punch'], maxHits: 8, sfx: { cut: '휙', hit: '쾅' } },
+];
+export const FX_DEFAULT = { 'yt-christian': 'calm', 'yt-politics': 'punch' };
+export const fxPackOf = E => FX_PACKS.find(p => p.id === E?.s?.fxPack) || FX_PACKS.find(p => p.id === (FX_DEFAULT[E?.s?.channel] || 'match'));
+// "0:03, 0:07.5" → { text: '0:03, 0:07.5', secs: [3, 7.5] } (모양이 이상하면 StepError)
+export function parseFxTimes(input) {
+  const toks = String(input || '').split(/[,\s]+/).map(x => x.trim()).filter(Boolean);
+  if (toks.length > 30) throw new StepError('강조할 시간은 30개까지예요.');
+  const secs = toks.map(t => { const n = parseTime(t); if (!Number.isFinite(n)) throw new StepError(`시간 모양이 이상해요: "${t}" (예: 0:03, 0:07.5)`); return n; });
+  return { text: toks.join(', '), secs };
+}
+// 강조 순간 목록 [{t, kind}] — cut(컷 이음새) / slow(슬로우 구간 시작) / hit(강조·펀치·점수 도장·직접 적은 시간). 0~총길이로 자르고, 같은 종류끼리 0.25초 안은 하나로 합쳐요.
+export function buildFxEvents(E, P, pack) {
+  const T = P.total, out = [], clips = P.clips || [];
+  clips.forEach((c, i) => { if (i > 0 && c.start > 0.05) out.push({ t: c.start, kind: 'cut' }); if (c.speed < 1) out.push({ t: c.start, kind: 'slow' }); });
+  const src = pack.hitSrc || [], hits = [];
+  const grade = l => (l.punch && src.includes('punch') ? 0 : l.stamp && src.includes('stamp') ? 0 : /\*[^*\n]+\*/.test(l.ko ?? '') && src.includes('hl') ? 1 : -1);
+  const cand = (P.lines || []).map(l => ({ t: l.start, g: grade(l) })).filter(x => x.g >= 0);
+  const manual = parseFxTimes(E.s.fxTimes).secs.map(t => ({ t, g: -1 }));   // 직접 적은 시간은 항상 넣어요
+  let picked = pack.maxHits === 1 ? [...cand, ...manual].sort((a, b) => a.t - b.t).slice(0, 1)   // 잔잔: 첫 강조점 하나
+    : [...[...cand].sort((a, b) => a.g - b.g || a.t - b.t).slice(0, pack.maxHits || 99), ...manual];
+  for (const x of picked) hits.push({ t: x.t, kind: 'hit' });
+  if (pack.maxHits === 1 && !hits.length) hits.push({ t: Math.min(0.5, T / 2), kind: 'hit' });
+  out.push(...hits);
+  const res = [], last = {};
+  for (const e of out.map(e => ({ ...e, t: +Math.max(0, Math.min(T, e.t)).toFixed(2) })).sort((a, b) => a.t - b.t)) {
+    if (last[e.kind] != null && e.t - last[e.kind] < 0.25) continue;
+    last[e.kind] = e.t; res.push(e);
+  }
+  return res;
+}
+// 영상 칸(wA x hA)에 입힐 ffmpeg 필터 글. 글자·배너·틀을 입히기 전에 영상 그림에만 적용해서 글자는 흔들리지 않아요. 이펙트 없음 = ''.
+// 줌 = scale(eval=frame) 후 가운데 crop / 흔들림 = crop 위치를 sin 으로 / 플래시 = drawbox 흰색 / 어둡게 = eq brightness
+export function fxVideoFilter(pack, P, evs, wA, hA) {
+  if (!pack || pack.id === 'none') return '';
+  const n = x => +(+x).toFixed(3), win = (a, b) => `gte(t,${n(a)})*lt(t,${n(b)})`;
+  const clips = (P.clips || []).filter(c => c.duration >= 0.1), cuts = evs.filter(e => e.kind === 'cut'), hits = evs.filter(e => e.kind === 'hit'), slows = evs.filter(e => e.kind === 'slow');
+  const z = [], dx = [], dy = [], flash = [];
+  if (pack.kenburns) for (const c of clips) z.push(`${win(c.start, c.start + c.duration)}*${pack.kenburns}*(t-${n(c.start)})/${n(c.duration)}`);
+  if (pack.punchZoom) for (const e of cuts) z.push(`${win(e.t, e.t + pack.punchDur)}*${pack.punchZoom}*sin(PI*(t-${n(e.t)})/${pack.punchDur})`);
+  if (pack.slowZoom) for (const c of clips) if (c.speed < 1) z.push(`${win(c.start, c.start + c.duration)}*${pack.slowZoom}*min(1,(t-${n(c.start)})/0.15)`);
+  if (pack.shake) for (const e of hits) {
+    const a = e.t, b = e.t + pack.shake, w = `${win(a, b)}*(1-(t-${n(a)})/${pack.shake})`;
+    z.push(`${win(a, b)}*0.04`);   // 흔들려도 가장자리가 안 보이게 살짝 키워 둬요
+    dx.push(`${w}*${pack.shakeAmp}*sin(t*61)`); dy.push(`${w}*${n(pack.shakeAmp * 0.7)}*cos(t*79)`);
+  }
+  if (pack.flash) for (const e of (pack.flashOn === 'slow' ? slows : hits)) flash.push(`between(t,${n(e.t)},${n(e.t + pack.flash)})`);
+  const f = [];
+  if (z.length) {
+    const Z = `1+${z.join('+')}`;
+    f.push(`scale=w='trunc(${wA}*(${Z})/2)*2':h=-2:eval=frame`);
+    f.push(`crop=w=${wA}:h=${hA}:x='max(0,min(in_w-out_w,(in_w-out_w)/2+${dx.length ? dx.join('+') : 0}))':y='max(0,min(in_h-out_h,(in_h-out_h)/2+${dy.length ? dy.join('+') : 0}))'`);
+  }
+  if (flash.length) f.push(`drawbox=x=0:y=0:w=iw:h=ih:color=white@${pack.flashAlpha}:t=fill:enable='${flash.join('+')}'`);
+  if (pack.dip && cuts.length) f.push(`eq=brightness='${cuts.map(e => `-${pack.dipDepth}*max(0,1-abs(t-${n(e.t)})/${n(pack.dip / 2)})`).join('')}':eval=frame`);
+  return f.join(',');
+}
+// 효과음: 소리/효과음 폴더의 파일(팡·휙·쾅·띵 + 확장자)이 있으면 그걸, 없으면 ffmpeg 로 간단히 만들어요 (lavfi 입력 글)
+export const SFX_SYNTH = {
+  '팡': { d: 0.4, src: "aevalsrc='0.8*sin(2*PI*(170-220*t)*t)*exp(-10*t)+0.45*(2*random(0)-1)*exp(-45*t)':d=0.4:s=44100" },
+  '쾅': { d: 0.8, src: "aevalsrc='0.9*sin(2*PI*(90-80*t)*t)*exp(-5*t)+0.5*(2*random(0)-1)*exp(-25*t)':d=0.8:s=44100" },
+  '휙': { d: 0.3, src: 'anoisesrc=d=0.3:c=white:a=0.8:r=44100,bandpass=f=1800:width_type=h:w=1500,volume=3,afade=t=in:st=0:d=0.12,afade=t=out:st=0.14:d=0.16' },
+  '띵': { d: 0.7, src: "aevalsrc='0.5*sin(2*PI*880*t)*exp(-5*t)+0.2*sin(2*PI*1760*t)*exp(-8*t)':d=0.7:s=44100" },
+};
 
 // ---------- 영어 자막(VTT) 읽기 ----------
 const vttSecs = t => { const p = t.replace(',', '.').split(':').map(Number); return p.reduce((a, n) => a * 60 + n, 0); };
@@ -662,9 +737,9 @@ function wrapKo(text, max) {
 const assEsc = s => s.replace(/[{}\\]/g, '').replace(/\r?\n/g, '\\N');
 // 강조(*단어*)를 색으로: 표시를 먼저 글자로 바꿔 두고 줄바꿈한 뒤 ASS 색 코드로
 const hexBgr = h => { const x = (/^#?([0-9a-f]{6})$/i.exec(h) || [0, 'FFFFFF'])[1].toUpperCase(); return x.slice(4, 6) + x.slice(2, 4) + x.slice(0, 2); };
-function hlText(raw, wrapAt, accent) {
+function hlText(raw, wrapAt, accent, pop = false) {   // pop: 강조 단어가 커졌다 제자리로 (이펙트 팩 '펀치')
   const marked = String(raw || '').replace(/\*([^*\n]+)\*/g, '\u0001$1\u0002').replace(/\*/g, '');
-  return assEsc(wrapKo(marked, wrapAt).join('\n')).replace(/\u0001/g, `{\\c&H${hexBgr(accent)}&}`).replace(/\u0002/g, '{\\c&HFFFFFF&}');
+  return assEsc(wrapKo(marked, wrapAt).join('\n')).replace(/\u0001/g, `{\\c&H${hexBgr(accent)}&${pop ? '\\fscx125\\fscy125\\t(0,160,\\fscx100\\fscy100)' : ''}}`).replace(/\u0002/g, '{\\c&HFFFFFF&}');
 }
 // 자막 뒤 상자: 글자 폭을 어림해서 크기를 정하고, 둥근 모서리 ASS 도형으로 그려요. 색은 look.bg(또는 검정) + 투명도 boxAlpha
 const chW = (c, fs) => (/\s/.test(c) ? 0.3 : c.charCodeAt(0) > 0x2e80 ? 0.95 : /[A-Z]/.test(c) ? 0.68 : 0.58) * fs;
@@ -691,7 +766,7 @@ function buildBannerAss(P, part = 'all') {
         const ls = plainLines(l.ko ?? l.text, 9), h = Math.max(L.boxMinH, ls.length * L.narrFs * L.boxLineH + 2 * L.boxPad);
         ev.push(boxEv(L, l.start, l.end, C, midY - h / 2, Math.max(L.boxMinW, Math.max(...ls.map(t => lineW(t, L.narrFs))) + 2 * L.boxPad), h, L.bg));
       }
-      ev.push(`Dialogue: ${ly},${assTime(l.start)},${assTime(l.end)},Narr,,0,0,0,,{\\an5\\pos(${C},${midY})}${hlText(l.ko ?? l.text, 9, ac)}`);
+      ev.push(`Dialogue: ${ly},${assTime(l.start)},${assTime(l.end)},Narr,,0,0,0,,{\\an5\\pos(${C},${midY})}${hlText(l.ko ?? l.text, 9, ac, !!P.fxPop)}`);
     } else {
       const showEn = L.bilingual && l.en && !P.srcSubs;
       let at = '';
@@ -703,7 +778,7 @@ function buildBannerAss(P, part = 'all') {
         ev.push(boxEv(L, l.start, l.end, C, L.subCy - h / 2, Math.max(L.boxMinW, tw + 2 * L.boxPad), h, L.bg));
         at = `{\\an8\\pos(${C},${Math.round(L.subCy - th / 2)})}`;  // 글자는 상자 안 세로 가운데
       }
-      ev.push(`Dialogue: ${ly},${assTime(l.start)},${assTime(l.end)},Sub,,0,0,0,,${at}${hlText(l.ko ?? l.text, 13, ac)}${en}`);
+      ev.push(`Dialogue: ${ly},${assTime(l.start)},${assTime(l.end)},Sub,,0,0,0,,${at}${hlText(l.ko ?? l.text, 13, ac, !!P.fxPop)}${en}`);
     }
   }
   const sty = (n, fs, col, bold, bord, sh, al, mv) => `Style: ${n},${FONT_NAME},${fs},&H00${col},&H000000FF,&H00000000,&H80000000,${bold},0,0,0,100,100,0,0,1,${bord},${sh},${al},60,60,${mv},1`;
@@ -734,13 +809,13 @@ function buildPunchAss(P, part = 'all') {
   if (fxOn && P.hook?.text && hd > 0) ev.push(`Dialogue: 2,${assTime(0)},${assTime(hd)},Hook,,0,0,0,,{\\an5\\pos(${C},${y(L.hookY)})}${assEsc(wrapKo(P.hook.text, 7).slice(0, 2).join('\n'))}`);
   for (const l of lnOn ? P.lines : []) {
     const a = Math.max(l.start, hd); if (a >= l.end - 0.01) continue;  // 훅이 나오는 동안은 자막을 쉬어요
-    if (l.punch) ev.push(`Dialogue: 1,${assTime(a)},${assTime(l.end)},Punch,,0,0,0,,{\\an5\\pos(${C},${y(L.punchY)})\\frz${L.punchRot}\\fscx130\\fscy130\\t(0,120,\\fscx100\\fscy100)}${hlText(l.ko ?? l.text, 6, ac)}`);
+    if (l.punch) ev.push(`Dialogue: 1,${assTime(a)},${assTime(l.end)},Punch,,0,0,0,,{\\an5\\pos(${C},${y(L.punchY)})\\frz${L.punchRot}\\fscx130\\fscy130\\t(0,120,\\fscx100\\fscy100)}${hlText(l.ko ?? l.text, 6, ac, !!P.fxPop)}`);
     else {
       if (L.subBox) {
         const ls = plainLines(l.ko ?? l.text, 11), h = Math.max(L.boxMinH, ls.length * L.capFs * L.boxLineH + 2 * L.boxPad);
         ev.push(boxEv(L, a, l.end, C, y(L.capY) - h / 2, Math.max(L.boxMinW, Math.max(...ls.map(t => lineW(t, L.capFs))) + 2 * L.boxPad), h, L.bg || '#000000'));
       }
-      ev.push(`Dialogue: ${L.subBox ? 1 : 0},${assTime(a)},${assTime(l.end)},Cap,,0,0,0,,{\\an5\\pos(${C},${y(L.capY)})}${hlText(l.ko ?? l.text, 11, ac)}`);
+      ev.push(`Dialogue: ${L.subBox ? 1 : 0},${assTime(a)},${assTime(l.end)},Cap,,0,0,0,,{\\an5\\pos(${C},${y(L.capY)})}${hlText(l.ko ?? l.text, 11, ac, !!P.fxPop)}`);
     }
   }
   if (fxOn && L.watermark) ev.push(`Dialogue: 3,${assTime(0)},${end},WM,,0,0,0,,{\\an7\\pos(${L.wmX},${L.wmY})\\frz4\\alpha&H40&}${assEsc(L.watermark)}`);
@@ -793,7 +868,7 @@ function buildMatAss(P, part = 'all') {
   if (lnOn) {
     const lines = P.lines || [];
     lines.forEach((l, k) => {
-      ev.push(`Dialogue: 1,${assTime(l.start)},${assTime(l.end)},Cap,,0,0,0,,{\\an8\\pos(${C},${L.capY})${heavy}}${hlText(l.ko ?? l.text, L.capWrap, ac)}`);
+      ev.push(`Dialogue: 1,${assTime(l.start)},${assTime(l.end)},Cap,,0,0,0,,{\\an8\\pos(${C},${L.capY})${heavy}}${hlText(l.ko ?? l.text, L.capWrap, ac, !!P.fxPop)}`);
       if (l.tag) {   // 선수 태그: 다음 태그가 나오거나 tagDur 초가 지날 때까지
         const nx = lines.slice(k + 1).find(x => x.tag), e = Math.min(P.total, Math.max(l.end, Math.min(l.start + L.tagDur, nx ? nx.start : P.total)));
         const w1 = matW(l.tag.main, L.tagFs) + 48;
@@ -950,8 +1025,9 @@ async function subs(E, ctx) {
 
 // ---------- 7. 이펙트: 룩에 맞는 배너·훅·흑백 인트로·제목 카드·워터마크 ----------
 async function fx(E, ctx) {
-  const P = readJson(E.p('편집/편집계획.json'));
+  let P = readJson(E.p('편집/편집계획.json'));
   if (!P) throw new StepError('편집 계획이 먼저예요.');
+  delete P.fxPack; delete P.fxEvents; delete P.fxPop;   // 이펙트 팩 자국은 이 단계가 새로 남겨요 (이펙트 없음 = 예전과 똑같은 계획)
   const base = exists(E.p('편집/자막본.mp4')) ? '편집/자막본.mp4' : exists(E.p('편집/가편집.mp4')) ? '편집/가편집.mp4' : null;
   if (!base) throw new StepError('가편집이 먼저예요.');
   delete E.s.legacyBurn;   // 이 단계가 새 완성본을 만들면 예전 방식(대본 자막 포함)은 끝나요
@@ -973,13 +1049,25 @@ async function fx(E, ctx) {
     ctx.log(`  배너: ${b.small || '(없음)'} / ${b.big}${P.bw.length ? ` · 흑백 인트로 0~${end}초` : ''}`);
   }
   writeJson(E.p('편집/편집계획.json'), P);
+  // 이펙트 팩(최종 결과물 레퍼런스): 강조 순간을 모아 영상 칸에 줌·흔들림·플래시를 입혀요. 효과음은 목소리·음악 단계가 같은 목록으로 넣어요.
+  const pack = fxPackOf(E), area = look?.kind === 'mat' ? [W, look.footH] : look?.kind === 'punch' || !look ? [W, H] : [W, H - look.bannerH];
+  let fxv = '';
+  if (pack.id !== 'none') {
+    relayout(E, ctx);   // 대본이 이미 확인돼 있으면 줄 시간표를 먼저 짜서 강조 순간을 알아요
+    P = readJson(E.p('편집/편집계획.json')) || P;
+    P.fxPack = pack.id; P.fxPop = !!pack.pop; P.fxEvents = buildFxEvents(E, P, pack);
+    writeJson(E.p('편집/편집계획.json'), P);
+    fxv = fxVideoFilter(pack, P, P.fxEvents, area[0], area[1]);
+    const cnt = k => P.fxEvents.filter(e => e.kind === k).length;
+    ctx.log(`이펙트 팩: ${pack.name} · 컷 ${cnt('cut')}곳 · 슬로우 ${cnt('slow')}곳 · 강조 ${cnt('hit')}곳${pack.pop ? ' · 강조 단어 팝' : ''}`);
+  }
   const assFile = E.p('편집/효과.ass');
   fs.writeFileSync(assFile, buildAss(P, 'fx'));
   let vf = `ass='${escFilterPath(assFile)}':fontsdir='${FONT_DIR}'`, vArgs = ['-vf', vf, '-map', '0:v'];
   let aArgs = ['-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo'], aMap = ['-map', '1:a', '-shortest'];
   if (look?.kind === 'mat') {
     // 경기 화면은 가운데 칸(footY부터 footH 높이), 나머지는 검은 바탕 → 제목·출처·워터마크·SLOW
-    vf = `scale=${W}:${look.footH}:force_original_aspect_ratio=increase,crop=${W}:${look.footH},setsar=1,pad=${W}:${H}:0:${look.footY}:color=black,` + vf;
+    vf = `scale=${W}:${look.footH}:force_original_aspect_ratio=increase,crop=${W}:${look.footH},setsar=1,${fxv ? fxv + ',' : ''}pad=${W}:${H}:0:${look.footY}:color=black,` + vf;
     vArgs = ['-vf', vf, '-map', '0:v'];
     if ((await probe(E.p(base), ctx)).hasAudio) { aArgs = []; aMap = ['-map', '0:a']; }
     ctx.log('매트 스토리 틀(제목·출처·워터마크·SLOW)을 입혀요…');
@@ -988,19 +1076,22 @@ async function fx(E, ctx) {
     const hd = P.hook?.dur || 0, w2 = 2 * Math.round(W * look.hookScale / 2), h2 = 2 * Math.round(H * look.hookScale / 2);
     const full = `[0:v]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1`;
     const fc = hd > 0
-      ? `${full},split=2[f][s];[s]scale=${w2}:${h2},pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2:color=black[sm];[f][sm]overlay=0:0:enable='lt(t,${hd})',${vf}[v]`
-      : `${full},${vf}[v]`;
+      ? `${full},${fxv ? fxv + ',' : ''}split=2[f][s];[s]scale=${w2}:${h2},pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2:color=black[sm];[f][sm]overlay=0:0:enable='lt(t,${hd})',${vf}[v]`
+      : `${full},${fxv ? fxv + ',' : ''}${vf}[v]`;
     vArgs = ['-filter_complex', fc, '-map', '[v]'];
     ctx.log(`훅 제목(처음 ${hd}초) + 워터마크를 입혀요…`);
   } else if (look) {
     // 영상은 아래 칸(배너 빼고)에 꽉 차게 → 흑백(인트로) → 위에 배너색 띠 → 글자
     const bw = (P.bw || []).filter(([a, b]) => b > a);
-    vf = `scale=${W}:${H - look.bannerH}:force_original_aspect_ratio=increase,crop=${W}:${H - look.bannerH},setsar=1` +
+    vf = `scale=${W}:${H - look.bannerH}:force_original_aspect_ratio=increase,crop=${W}:${H - look.bannerH},setsar=1` + (fxv ? ',' + fxv : '') +
       (bw.length ? `,hue=s=0:enable='${bw.map(([a, b]) => `between(t,${a},${b})`).join('+')}'` : '') +
       `,pad=${W}:${H}:0:${look.bannerH}:color=0x${String(look.bg).replace('#', '')},` + vf;
     vArgs = ['-vf', vf, '-map', '0:v'];
     ctx.log(`배너를 입혀요${bw.length ? ' (인트로는 흑백)' : ''}…`);
-  } else ctx.log('제목 카드(처음 1.5초)를 입혀요…');
+  } else {
+    if (fxv) { vf = fxv + ',' + vf; vArgs = ['-vf', vf, '-map', '0:v']; }
+    ctx.log('제목 카드(처음 1.5초)를 입혀요…');
+  }
   try {
     await ff(['-i', E.p(base), ...aArgs, ...vArgs,
       ...aMap, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '19', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', E.p('편집/완성본.mp4')], ctx);
@@ -1060,6 +1151,17 @@ export async function mix(E, ctx) {
     chains.push(`[${idx}:a]aresample=44100,aformat=channel_layouts=stereo,atrim=0:3,adelay=${Math.round(at * 1000)}:all=1,volume=0.9[st]`); idx++;
     mixIn.push('[st]'); ctx.log(`  시그니처 소리: ${E.s.mix.sting} (${at.toFixed(1)}초)`);
   }
+  // 이펙트 팩 효과음: 이펙트 단계가 남긴 강조 순간(P.fxEvents)마다. 파일이 없으면 ffmpeg 로 만든 기본 소리
+  const fxp = FX_PACKS.find(p => p.id === P.fxPack), said = new Set();
+  for (const e of (fxp && P.fxEvents ? P.fxEvents : []).slice(0, 60)) {
+    const name = fxp.sfx?.[e.kind]; if (!name) continue;
+    const file = findSfx(E, name);
+    if (file) inputs.push('-i', file); else inputs.push('-f', 'lavfi', '-t', String(SFX_SYNTH[name].d), '-i', SFX_SYNTH[name].src);
+    chains.push(`[${idx}:a]aresample=44100,aformat=channel_layouts=stereo,atrim=0:${file ? 2 : SFX_SYNTH[name].d},asetpts=PTS-STARTPTS,adelay=${Math.round(e.t * 1000)}:all=1,volume=0.8[x${idx}]`);
+    mixIn.push(`[x${idx}]`); idx++;
+    if (!said.has(name)) { said.add(name); ctx.log(`  효과음 "${name}": ${file ? path.basename(file) : '소리/효과음 폴더에 파일이 없어서 기본 소리로 만들어요'}`); }
+    ctx.log(`  효과음 ${name} · ${e.t.toFixed(1)}초 (${{ cut: '컷', slow: '슬로우', hit: '강조' }[e.kind]})`);
+  }
   let args;
   if (mixIn.length) {
     chains.push(`${mixIn.join('')}amix=inputs=${mixIn.length}:normalize=0:duration=longest,apad=whole_dur=${T},alimiter=limit=0.95[aout]`);
@@ -1077,7 +1179,12 @@ export async function mix(E, ctx) {
 }
 export function assetDirs(E, kind) {
   const R = E.soundRoot;
-  return kind === 'bgm' ? [path.join(R, '소리/BGM'), path.join(E.homeRoot, '음악')] : [path.join(R, '소리/시그니처')];
+  return kind === 'bgm' ? [path.join(R, '소리/BGM'), path.join(E.homeRoot, '음악')] : kind === 'sfx' ? [path.join(R, '소리/효과음')] : [path.join(R, '소리/시그니처')];
+}
+// 효과음 파일 찾기: 소리/효과음/팡.mp3 처럼 이름(확장자 앞)이 같은 파일
+function findSfx(E, name) {
+  for (const d of assetDirs(E, 'sfx')) { try { const f = fs.readdirSync(d).find(x => AUDIO_EXT.test(x) && !x.startsWith('.') && x.replace(AUDIO_EXT, '') === name); if (f) return path.join(d, f); } catch {} }
+  return null;
 }
 export function listAssets(E, kind) {
   const set = new Set();
@@ -1101,7 +1208,7 @@ async function upload(E, ctx) {
   const credits = info.map((s, si) => `- ${s.channel ? s.channel + ' · ' : ''}${s.title} (${s.local ? '내 파일' : s.url}) · 사용 구간 ${rangesFor(E, si, s).join(', ')}`);
   const music = [E.s.mix?.bgm && `배경음악: ${E.s.mix.bgm}`, E.s.mix?.sting && `효과음: ${E.s.mix.sting}`].filter(Boolean);
   const desc = [E.s.note || (P.lines || []).slice(0, 2).map(l => l.text).join(' ') || E.s.title, '', '[소스]', ...(credits.length ? credits : ['- (없음)']),
-    ...(music.length ? ['', '[음악·효과음]', ...music.map(m => '- ' + m)] : []), '', profileOf(E).disclaimer].join('\n');
+    ...(music.length ? ['', '[음악·효과음]', ...music.map(m => '- ' + m)] : []), ...(fxPackOf(E).id !== 'none' ? ['', `[이펙트] ${fxPackOf(E).name}`] : []), '', profileOf(E).disclaimer].join('\n');
   const words = [...new Set(E.s.title.replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(w => w.length >= 2))].slice(0, 6);
   const tags = [...words, ...profileOf(E).tags, ...(short ? ['Shorts'] : [])];
   const dest = E.p('업로드/영상.mp4');

@@ -3,6 +3,7 @@
 const RUNNER = 'http://127.0.0.1:4777';
 const RUNNER_API_NEEDED = 4;  // 4 = 7칸 순서(1차 편집·피드백·2차 편집)  // 실행기 /health 의 api 가 이 숫자보다 작으면 예전 버전 안내
 const RUNNER_OLD_MSG = '<div class="ya-off pl-error" role="alert"><b>이 맥의 실행기가 예전 버전이에요.</b> 저장소를 <code>git pull</code> 한 뒤 <code>runner/설치·업데이트.command</code> 를 더블클릭하세요.</div>';
+let runnerApi = null;  // 실행기 /health 의 api (모르면 null). 5 = 최종 결과물 레퍼런스(/fxpack)
 let runnerData = null, runnerOnline = null, runnerOld = false, runnerBusy = false, runnerTimer = null, runnerOpenLog = null, runnerSelectedStep = null;
 // 주제 = 에피소드: 작업판에서 고른 주제(idea)에 연결된 에피소드만 보여 준다
 function runnerIdea() { return typeof ytPipeIdea === 'function' ? ytPipeIdea() : null; }
@@ -46,7 +47,7 @@ async function runnerFetch(p, body) {
 }
 async function runnerRefresh() {
   // 켜져는 있는데 예전 버전인지 확인 (api 숫자가 없거나 RUNNER_API_NEEDED 보다 작으면 예전 버전)
-  try { const h = await runnerFetch('/health'); runnerOld = !(Number.isInteger(h.api) && h.api >= RUNNER_API_NEEDED); }
+  try { const h = await runnerFetch('/health'); runnerApi = Number.isInteger(h.api) ? h.api : 0; runnerOld = !(Number.isInteger(h.api) && h.api >= RUNNER_API_NEEDED); }
   catch (_) { runnerOld = false; }
   try { runnerData = await runnerFetch('/status'); runnerOnline = true; runnerSyncIdeas(); }
   catch (_) { runnerOnline = false; }
@@ -314,6 +315,14 @@ document.addEventListener('click', async e => {
           runnerSelectedStep = runnerOpenLog = null; toast('룩을 정했어요: ' + r.ep);
         }
         if (typeof ytPipe === 'object') { ytPipe.look = ''; ytPipe.lookIdea = ''; }
+      } else if (a === 'fxpack') {
+        // ③ 최종 결과물 레퍼런스(이펙트 팩): 고른 팩과 더 강조할 시간을 저장. 바뀌면 이펙트부터 다시 만들어요.
+        const pack = act.dataset.yaFxpack || '', times0 = (document.querySelector('[data-ya-new="fxtimes"]')?.value ?? ((typeof ytPipe === 'object' && ytPipe.fxTimes != null) ? ytPipe.fxTimes : cur?.fxTimes) ?? '').trim(), times = pack === 'none' ? '' : times0;
+        if (!cur || !pack) throw new Error('편집 스타일을 먼저 정해 주세요');
+        if ((cur.round || 0) >= 1 && (pack !== cur.fxPackUsed || times !== (cur.fxTimes || '')) && !confirm('레퍼런스를 바꾸면 이펙트부터 다시 만들어요. 계속할까요?')) return;
+        const r = await runnerFetch('/fxpack', { ep: cur.ep, pack, times });
+        if (typeof ytPipe === 'object') { ytPipe.fxPack = ''; ytPipe.fxIdea = ''; ytPipe.fxTimes = null; }
+        toast(r.reset ? '레퍼런스를 바꿨어요. 이펙트부터 다시 만들어요.' : '레퍼런스를 정했어요.');
       } else if (a === 'cut') {
         // ④ 컷 편집: 구간 저장 → 자르기·편집 계획·가편집
         const val = (document.querySelector('[data-ya-new="ranges"]')?.value || '').trim();
@@ -341,17 +350,17 @@ document.addEventListener('click', async e => {
           } else if (a === 'fbai') {
             toast('Claude가 고치는 중…');
             const d = await runnerFetch('/feedback', { ep: cur.ep, feedback: st.fb });
-            st.loaded = false; toast(`반영했어요: 대본 ${d.lines}줄${d.rangesChanged ? ' · 구간 바뀜' : ''}. ⑥ 2차 편집을 누르세요.`);
+            st.loaded = false; toast(`반영했어요: 대본 ${d.lines}줄${d.rangesChanged ? ' · 구간 바뀜' : ''}. 2차 편집을 누르세요.`);
           } else if (a === 'fbans') {
             if (!st.ans.trim()) throw new Error('Claude 답을 ② 칸에 붙여 넣어 주세요.');
             const d = await runnerFetch('/draft', { ep: cur.ep, answer: st.ans, feedback: st.fb });
-            st.ans = ''; st.loaded = false; toast(`반영했어요: 대본 ${d.lines}줄${d.rangesChanged ? ' · 구간 바뀜' : ''}. ⑥ 2차 편집을 누르세요.`);
+            st.ans = ''; st.loaded = false; toast(`반영했어요: 대본 ${d.lines}줄${d.rangesChanged ? ' · 구간 바뀜' : ''}. 2차 편집을 누르세요.`);
           } else {
             const body = { ep: cur.ep, feedback: st.fb };
             if (st.ranges.trim() !== st.ranges0.trim()) body.ranges = st.ranges;
             if (st.text !== st.text0) body.text = st.text;
             const d = await runnerFetch('/draft', body);
-            st.loaded = false; toast(`수정안을 저장했어요${d.lines ? ` (대본 ${d.lines}줄)` : ''}. ⑥ 2차 편집을 누르세요.`);
+            st.loaded = false; toast(`수정안을 저장했어요${d.lines ? ` (대본 ${d.lines}줄)` : ''}. 2차 편집을 누르세요.`);
           }
         } finally { st.busy = false; }
       } else if (a === 'addsrc') {

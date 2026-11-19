@@ -6,11 +6,11 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { HOME, StepError, StopError, sanitize, exists, parseRanges, isLocalSource, localPath, run, FFMPEG, lastLines } from './util.mjs';
 import { listStyles, saveStyle, enqueue, cancelJob, listJobs, resolveReadable, thumbOf, shutdownImages, ImgError } from './images.mjs';
-import { STEP_DEFS, STEP_FN, outputsFor, listAssets, checkScript, cleanPasted, parseScript, parseBanner, parseHook, PLACEHOLDER, SCRIPT_MAX_LINES, CHANNEL_PROFILES, LOOK_CHOICES, lookKeyOf, migrateState, layoutLines, draftText, splitAnswer, feedbackPrompt, callClaude, parseCredit } from './steps.mjs';
+import { STEP_DEFS, STEP_FN, outputsFor, listAssets, checkScript, cleanPasted, parseScript, parseBanner, parseHook, PLACEHOLDER, SCRIPT_MAX_LINES, CHANNEL_PROFILES, LOOK_CHOICES, lookKeyOf, FX_PACKS, fxPackOf, parseFxTimes, migrateState, layoutLines, draftText, splitAnswer, feedbackPrompt, callClaude, parseCredit } from './steps.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // 작업판이 쓰는 기능 수준. 3 = 새 9칸 순서 (/look, /ranges, deferRanges, 단계 clip·subs·fx)
-const API_LEVEL = 4;   // 4 = 7칸 순서 (/edit 1차·2차 편집, /draft, /feedback, 슬로우 구간 x0.5, 매트 스토리 룩)
+const API_LEVEL = 5;   // 4 = 7칸 순서 (/edit 1차·2차 편집, /draft, /feedback, 슬로우 구간 x0.5, 매트 스토리 룩) · 5 = 최종 결과물 레퍼런스(이펙트 팩: /fxpack, status.fxPacks)
 let VERSION = 'dev';
 try { VERSION = fs.readFileSync(path.join(HERE, 'version.txt'), 'utf8').trim() || 'dev'; } catch {}
 const PORT = +(process.env.FIELDNOTE_RUNNER_PORT || 4777);
@@ -23,7 +23,7 @@ const ORIGINS = new Set(['https://digitalstudio-eight.vercel.app', 'http://local
 if (!process.env.ANTHROPIC_API_KEY) {
   try { const k = fs.readFileSync(path.join(HERE, 'anthropic-key.txt'), 'utf8').split(/\r?\n/)[0].trim(); if (k) process.env.ANTHROPIC_API_KEY = k; } catch {}
 }
-for (const d of [DATA, path.join(HOME_ROOT, '소리/BGM'), path.join(HOME_ROOT, '소리/시그니처')]) fs.mkdirSync(d, { recursive: true });
+for (const d of [DATA, path.join(HOME_ROOT, '소리/BGM'), path.join(HOME_ROOT, '소리/시그니처'), path.join(HOME_ROOT, '소리/효과음')]) fs.mkdirSync(d, { recursive: true });
 
 // ---------- 에피소드 저장소 ----------
 const episodes = new Map();   // ep -> E
@@ -55,6 +55,7 @@ function view(E) {
   return {
     ep: E.s.ep, title: E.s.title, note: E.s.note || '', ideaId: E.s.ideaId || '', format: E.s.format, channel: E.s.channel || '',
     look: E.s.look || '', lookUsed: lookKeyOf(E),
+    fxPack: E.s.fxPack || '', fxPackUsed: fxPackOf(E).id, fxTimes: E.s.fxTimes || '',
     sources: E.s.sources.map(x => ({ url: x.url, ranges: x.ranges })),
     steps: STEP_DEFS.map(d => {
       const st = E.s.steps[d.id], o = { id: d.id, name: d.name, status: st.status, outputs: outputsFor(d.id, E).map(p => { const ex = exists(E.p(p)), r = { path: p, exists: ex }; if (ex) { try { r.mtime = Math.round(fs.statSync(E.p(p)).mtimeMs); } catch {} } return r; }) };
@@ -186,7 +187,7 @@ const routes = {
   'POST /img/cancel': imgWrap(({ body }) => ({ json: { ok: true, job: cancelJob(body.id) } })),
   'GET /': () => ({ text: '실행기가 켜져 있어요.' }),
   'GET /health': () => ({ json: { ok: true, api: API_LEVEL, version: VERSION, ffmpeg: exists(FFMPEG), data: DATA, ai: !!process.env.ANTHROPIC_API_KEY } }),
-  'GET /status': () => ({ json: { looks: LOOK_CHOICES, episodes: [...episodes.values()].sort((a, b) => b.s.created - a.s.created).map(view) } }),
+  'GET /status': () => ({ json: { looks: LOOK_CHOICES, fxPacks: FX_PACKS, episodes: [...episodes.values()].sort((a, b) => b.s.created - a.s.created).map(view) } }),
   'GET /episodes': () => routes['GET /status'](),
   'POST /episodes': ({ body }) => {
     const title = String(body.title || '').trim(); if (!title) throw new HttpError(400, '제목이 필요해요.');
@@ -218,6 +219,16 @@ const routes = {
     if (look !== was) for (const id of ['clip', 'plan', 'rough', 'subs', 'fx', 'mix', 'upload']) { const st = E.s.steps[id]; if (st.status !== 'todo') { st.status = 'todo'; delete st.error; } }
     if (look !== was) delete E.s.legacyBurn;
     save(E); return { json: { ok: true, look, lookUsed: lookKeyOf(E), reset: look !== was } };
+  },
+  // ③ 최종 결과물 레퍼런스(이펙트 팩) 고르기. 바뀌면 이펙트(영상 효과)와 목소리·음악(효과음)을 다시 만들어야 해요. 컷·자막·대본은 그대로.
+  'POST /fxpack': ({ body }) => {
+    const E = getEp(body.ep); mustIdle(E);
+    const pack = String(body.pack || ''); if (!FX_PACKS.some(p => p.id === pack)) throw new HttpError(400, '모르는 이펙트 팩이에요: ' + pack);
+    let times; try { times = parseFxTimes(body.times).text; } catch (e) { throw new HttpError(400, e.message); }
+    const was = fxPackOf(E).id, wasTimes = E.s.fxTimes || '', changed = pack !== was || times !== wasTimes;
+    E.s.fxPack = pack; E.s.fxTimes = times;
+    if (changed) for (const id of ['fx', 'mix', 'upload']) { const st = E.s.steps[id]; if (st.status !== 'todo') { st.status = 'todo'; delete st.error; } }
+    save(E); return { json: { ok: true, pack, fxPackUsed: fxPackOf(E).id, fxTimes: times, reset: changed } };
   },
   // ④ 컷 편집: 쓸 구간 정하기 (소스 하나의 구간 목록을 통째로 바꿔요). 구간이 바뀌면 자르기부터 다시 돌려야 해요.
   'POST /ranges': ({ body }) => {

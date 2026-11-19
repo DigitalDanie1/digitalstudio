@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { FFMPEG, probe, run } from './util.mjs';
 import { parseRanges, rangeSecs, rangeSpeed } from './util.mjs';
-import { matItems, splitAnswer, CHANNEL_PROFILES, profileOf, promptFor, parseVtt, transcriptFor, parseScript, parseHook, hookFromTitle, parseLine, parseBanner, bannerFromTitle, bwSpans, buildAss, resolveLook, lookOf, LOOK_CHOICES, lookKeyOf, migrateState, srcCues, translateCues, buildSrcAss, STEP_DEFS } from './steps.mjs';
+import { matItems, splitAnswer, CHANNEL_PROFILES, profileOf, promptFor, parseVtt, transcriptFor, parseScript, parseHook, hookFromTitle, parseLine, parseBanner, bannerFromTitle, bwSpans, buildAss, resolveLook, lookOf, LOOK_CHOICES, lookKeyOf, migrateState, srcCues, translateCues, buildSrcAss, STEP_DEFS, FX_PACKS, fxPackOf, buildFxEvents, fxVideoFilter, parseFxTimes, SFX_SYNTH } from './steps.mjs';
 // 옛 버전과 비교하는 검사: backup-20261118-banner 폴더가 있는 맥에서만 실행 (없으면 건너뜀)
 let oldBuildAss = null;
 try { ({ buildAss: oldBuildAss } = await import('./backup-20261118-banner/steps.mjs')); } catch {}
@@ -420,6 +420,115 @@ try {
     assert.ok(!/,BanB,/.test(buildAss(B, 'lines').split('[Events]')[1]));
     assert.ok(!/Suffering/.test(buildAss({ ...B, srcSubs: true }, 'lines')), '원본 자막이 영어 원문을 이미 보여 주면 영어 줄은 빼요');
   });
+  // ---- 최종 결과물 레퍼런스(이펙트 팩) ----
+  const fxP = id => FX_PACKS.find(p => p.id === id);
+  const fxPlan = { total: 6, width: 1080, height: 1920, title: 'T', clips: [{ start: 0, duration: 2 }, { start: 2, duration: 2, speed: 0.5 }, { start: 4, duration: 2 }],
+    lines: [{ i: 0, start: 1, end: 3, text: '이 정책', ko: '이 *정책*', punch: false }, { i: 1, start: 3, end: 4, text: '그 순간', ko: '!그 순간!', punch: true, stamp: { main: '4 : 0' } }, { i: 2, start: 4.5, end: 6, text: '끝', ko: '끝' }] };
+  await check('이펙트 팩: 팩 4개 · 채널별 기본(기독교=잔잔, 정치=펀치, 나머지=경기) · 직접 고른 것이 먼저', () => {
+    assert.deepEqual(FX_PACKS.map(p => p.id), ['none', 'calm', 'punch', 'match']);
+    for (const p of FX_PACKS) { assert.ok(p.name && p.desc && typeof p.ref === 'string', p.id); assert.ok(p.desc.split(' · ').length >= 2, p.id + ' desc 는 효과를 " · " 로 나열'); }
+    assert.equal(fxP('calm').ref, 'https://www.youtube.com/shorts/op51yRlhjjI'); assert.equal(fxP('punch').ref, 'https://www.youtube.com/shorts/1zpjOi8_LH0'); assert.equal(fxP('match').ref, '');
+    assert.equal(fxPackOf(fakeE('yt-christian')).id, 'calm'); assert.equal(fxPackOf(fakeE('yt-politics')).id, 'punch');
+    for (const c of ['yt-wrestling', 'yt-mat', '', 'nope', undefined]) assert.equal(fxPackOf(fakeE(c)).id, 'match', String(c));
+    assert.equal(fxPackOf(fakeE('yt-politics', { fxPack: 'none' })).id, 'none'); assert.equal(fxPackOf(fakeE('yt-politics', { fxPack: 'zzz' })).id, 'punch');
+  });
+  await check('이펙트 팩: 직접 적은 시간 읽기(모양·개수 검사) + 강조 순간 목록(0~총길이로 자르고 0.25초 안은 합침)', () => {
+    assert.deepEqual(parseFxTimes('0:03, 0:07.5').secs, [3, 7.5]); assert.equal(parseFxTimes('').text, ''); assert.deepEqual(parseFxTimes('5 9').secs, [5, 9]);
+    assert.throws(() => parseFxTimes('abc'), /시간 모양/); assert.throws(() => parseFxTimes(Array(31).fill('1').join(',')), /30개/);
+    const ev = buildFxEvents({ s: { fxTimes: '0:05.3, 0:05.2, 0:99' } }, fxPlan, fxP('punch'));
+    assert.deepEqual(ev.filter(e => e.kind === 'cut').map(e => e.t), [2, 4]); assert.deepEqual(ev.filter(e => e.kind === 'slow').map(e => e.t), [2]);
+    assert.deepEqual(ev.filter(e => e.kind === 'hit').map(e => e.t), [1, 3, 5.2, 6]);   // 5.3 은 5.2 와 0.25초 안이라 합쳐짐, 99 는 6 으로 잘림
+    assert.ok(ev.every((e, i) => i === 0 || ev[i - 1].t <= e.t));
+    assert.deepEqual(buildFxEvents({ s: {} }, fxPlan, fxP('calm')).filter(e => e.kind === 'hit').map(e => e.t), [1], '잔잔: 첫 강조점 하나');
+    assert.deepEqual(buildFxEvents({ s: {} }, { ...fxPlan, lines: [] }, fxP('calm')).filter(e => e.kind === 'hit').map(e => e.t), [0.5], '강조가 없으면 0.5초');
+    assert.deepEqual(buildFxEvents({ s: {} }, fxPlan, fxP('match')).filter(e => e.kind === 'hit').map(e => e.t), [3], '경기: 점수 도장·펀치 줄만');
+  });
+  await check('이펙트 팩: 이펙트 없음 = 필터 없음 · 펀치 = 줌·흔들림·플래시 · 잔잔 = 천천히 줌 + 어둡게 · 경기 = 슬로우 플래시 + 줌 유지', () => {
+    const f = id => fxVideoFilter(fxP(id), fxPlan, buildFxEvents({ s: {} }, fxPlan, fxP(id)), 1080, 1920);
+    assert.equal(f('none'), ''); assert.equal(fxVideoFilter(null, fxPlan, [], 1080, 1920), '');
+    assert.match(f('punch'), /scale=w='trunc\(1080\*\(1\+.*sin\(PI\*\(t-2\)\/0\.35\).*:eval=frame/); assert.match(f('punch'), /crop=w=1080:h=1920:x='.*sin\(t\*61\)/); assert.match(f('punch'), /drawbox=.*color=white@0\.8:t=fill:enable='between\(t,1,1\.08\)\+between\(t,3,3\.08\)/);
+    assert.doesNotMatch(f('punch'), /eq=/);
+    assert.match(f('calm'), /0\.06\*\(t-0\)\/2/); assert.match(f('calm'), /eq=brightness='-0\.45\*max\(0,1-abs\(t-2\)\/0\.06\)/); assert.doesNotMatch(f('calm'), /drawbox|sin\(t\*61\)/);
+    assert.match(f('match'), /0\.1\*min\(1,\(t-2\)\/0\.15\)/); assert.match(f('match'), /drawbox=.*enable='between\(t,2,2\.08\)'/); assert.match(f('match'), /sin\(t\*61\)/);
+    assert.equal(fxVideoFilter(fxP('calm'), fxPlan, [], 1080, 1920).includes('eq='), false, '컷이 없으면 어둡게는 없어요');
+  });
+  await check('이펙트 팩: 강조 단어 팝은 fxPop 일 때만 ASS 에 (이펙트 없음 = 예전과 같은 ASS)', () => {
+    const look = n => resolveLook(CHANNEL_PROFILES[n].look), mk = (n, extra = {}) => ({ ...fxPlan, look: look(n), banner: { small: '', big: '' }, hook: { text: '훅', dur: 1 }, bw: [], ...extra });
+    for (const n of ['yt-politics', 'yt-christian', 'yt-mat']) {
+      const plain = buildAss(mk(n), 'lines'), off = buildAss(mk(n, { fxPop: false }), 'lines'), on = buildAss(mk(n, { fxPop: true }), 'lines');
+      assert.equal(plain, off, n); assert.doesNotMatch(plain, /fscx125/, n); assert.match(on, /\\c&H[0-9A-F]{6}&\\fscx125\\fscy125\\t\(0,160,\\fscx100\\fscy100\)}정책/, n);
+    }
+    const basic = { ...fxPlan }; assert.equal(buildAss(basic, 'lines'), buildAss({ ...basic, fxPop: true }, 'lines'));
+  });
+  await check('이펙트 팩: 효과음 기본 소리 4개는 ffmpeg 로 만들어져요 (팡·휙·쾅·띵)', async () => {
+    for (const [n, x] of Object.entries(SFX_SYNTH)) {
+      const out = path.join(tmp, `sfx-${n}.wav`); await run(FFMPEG, ['-hide_banner', '-nostdin', '-y', '-loglevel', 'error', '-f', 'lavfi', '-t', String(x.d), '-i', x.src, '-af', 'volume=0.8', out]);
+      const pr = await probe(out); assert.ok(Math.abs(pr.duration - x.d) < 0.1, n + ' ' + pr.duration);
+    }
+  });
+  await check('이펙트 팩 ffmpeg 확인: 팩 4개 × 룩 틀 5개 모두 오류 없이 돌고 길이·크기가 그대로', async () => {
+    const src6 = path.join(tmp, 'fx-src.mp4');
+    await run(FFMPEG, ['-hide_banner', '-nostdin', '-y', '-loglevel', 'error', '-f', 'lavfi', '-i', 'testsrc=size=1080x1920:rate=30:duration=6', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', src6]);
+    for (const p of FX_PACKS) for (const [look, W, H] of [['기본', 1080, 1920], ['배너', 1080, 1480], ['매트', 1080, 970], ['펀치', 1080, 1920], ['가로', 1920, 1080]]) {
+      const out = path.join(tmp, `fx-${p.id}-${look}.mp4`), f = fxVideoFilter(p, fxPlan, buildFxEvents({ s: { fxTimes: '0:05' } }, fxPlan, p), W, H);
+      await run(FFMPEG, ['-hide_banner', '-nostdin', '-y', '-loglevel', 'error', '-i', src6, '-vf', `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1${f ? ',' + f : ''}`, '-an', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', out]);
+      const pr = await probe(out); assert.ok(Math.abs(pr.duration - 6) < 0.2 && pr.width === W && pr.height === H, `${p.id} ${look} ${pr.duration} ${pr.width}x${pr.height}`);
+    }
+  });
+  await check('/fxpack: 모르는 팩·이상한 시간 거절 · 같으면 그대로 · 바뀌면 이펙트·목소리·업로드만 되돌림 · status 에 fxPacks', async () => {
+    assert.equal((await J('/fxpack', { ep: L1, pack: 'nope' })).r.status, 400); assert.equal((await J('/fxpack', { ep: L1, pack: 'punch', times: 'abc' })).r.status, 400);
+    assert.equal((await J('/fxpack', { ep: 'nope', pack: 'punch' })).r.status, 404);
+    const st0 = (await J('/status')).d; assert.deepEqual(st0.fxPacks.map(p => p.id), FX_PACKS.map(p => p.id));
+    let e = st0.episodes.find(x => x.ep === L1); assert.equal(e.fxPack, ''); assert.equal(e.fxPackUsed, 'punch');   // 정치 채널 기본
+    assert.equal((await J('/fxpack', { ep: L1, pack: 'punch' })).d.reset, false);   // 지금 쓰는 팩과 같음 (직접 고른 것으로 저장만)
+    await J('/run', { ep: L1, steps: ['clip', 'plan', 'rough', 'subs', 'fx', 'mix', 'upload'] }); e = await waitIdle(180000);
+    for (const id of ['clip', 'plan', 'rough', 'subs', 'fx', 'mix', 'upload']) assert.equal(step(e, id).status, 'done', id + ' ' + step(e, id).error);
+    const r = await J('/fxpack', { ep: L1, pack: 'calm', times: '0:02, 0:03' }); assert.equal(r.r.status, 200); assert.equal(r.d.reset, true); assert.equal(r.d.fxTimes, '0:02, 0:03');
+    e = (await J('/status')).d.episodes.find(x => x.ep === L1); assert.equal(e.fxPack, 'calm'); assert.equal(e.fxPackUsed, 'calm'); assert.equal(e.fxTimes, '0:02, 0:03');
+    for (const id of ['fx', 'mix', 'upload']) assert.equal(step(e, id).status, 'todo', id);
+    for (const id of ['research', 'download', 'clip', 'plan', 'rough', 'subs']) assert.equal(step(e, id).status, 'done', id);
+    assert.equal((await J('/fxpack', { ep: L1, pack: 'calm', times: '0:02,0:03' })).d.reset, false);   // 모양만 다른 같은 시간
+  });
+  await check('이펙트 팩 실제 실행: 펀치 팩 이펙트 → 완성본 크기·길이 그대로 + fxEvents/fxPop 기록 + 효과음 기본 소리 → 최종본 + 업로드에 [이펙트]', async () => {
+    const dir = path.join(tmp, 'data', L1), planF = path.join(dir, '편집/편집계획.json'), read = () => JSON.parse(fs.readFileSync(planF, 'utf8'));
+    assert.equal((await J('/fxpack', { ep: L1, pack: 'punch', times: '0:02, 0:03' })).d.reset, true);
+    await J('/run', { ep: L1, steps: ['fx', 'mix', 'upload'] }); const e = await waitIdle(180000);
+    for (const id of ['fx', 'mix', 'upload']) assert.equal(step(e, id).status, 'done', id + ' ' + step(e, id).error);
+    const P = read(); assert.equal(P.fxPack, 'punch'); assert.equal(P.fxPop, true); assert.deepEqual(P.fxEvents.filter(x => x.kind === 'hit').map(x => x.t), [2, 3]);
+    const pr = await probe(path.join(dir, '편집/완성본.mp4')), pf = await probe(path.join(dir, '편집/최종본.mp4'));
+    assert.equal(pr.width, 1080); assert.equal(pr.height, 1920); assert.ok(Math.abs(pr.duration - P.total) < 0.3, pr.duration); assert.ok(Math.abs(pf.duration - P.total) < 0.3, pf.duration); assert.ok(pf.hasAudio);
+    const fxlog = fs.readFileSync(path.join(dir, '로그/fx.log'), 'utf8'), mlog = fs.readFileSync(path.join(dir, '로그/mix.log'), 'utf8');
+    assert.match(fxlog, /이펙트 팩: 펀치 · 컷 0곳 · 슬로우 0곳 · 강조 2곳 · 강조 단어 팝/);
+    assert.match(mlog, /효과음 "팡": 소리\/효과음 폴더에 파일이 없어서 기본 소리로 만들어요/); assert.match(mlog, /효과음 팡 · 2\.0초 \(강조\)/); assert.match(mlog, /효과음 팡 · 3\.0초 \(강조\)/);
+    assert.match(fs.readFileSync(path.join(dir, '업로드/업로드.txt'), 'utf8'), /\[이펙트\] 펀치/);
+    // 효과음 폴더에 팡 파일이 있으면 그걸 써요
+    const sd = path.join(tmp, 'home', '소리/효과음'); fs.mkdirSync(sd, { recursive: true });
+    await run(FFMPEG, ['-hide_banner', '-nostdin', '-y', '-loglevel', 'error', '-f', 'lavfi', '-t', '0.5', '-i', 'sine=f=300', path.join(sd, '팡.wav')]);
+    await J('/run', { ep: L1, step: 'mix' }); const e2 = await waitIdle(120000); assert.equal(step(e2, 'mix').status, 'done', step(e2, 'mix').error);
+    assert.match(fs.readFileSync(path.join(dir, '로그/mix.log'), 'utf8'), /효과음 "팡": 팡\.wav/);
+  });
+  await check('이펙트 팩 실제 실행: 이펙트 없음 = 계획에 팩 자국 없음 · 효과음 없음 · 예전과 같은 로그', async () => {
+    const dir = path.join(tmp, 'data', L1), planF = path.join(dir, '편집/편집계획.json');
+    assert.equal((await J('/fxpack', { ep: L1, pack: 'none' })).d.reset, true);
+    await J('/run', { ep: L1, steps: ['fx', 'mix'] }); const e = await waitIdle(180000);
+    for (const id of ['fx', 'mix']) assert.equal(step(e, id).status, 'done', id + ' ' + step(e, id).error);
+    const P = JSON.parse(fs.readFileSync(planF, 'utf8')); assert.ok(!('fxPack' in P) && !('fxEvents' in P) && !('fxPop' in P), Object.keys(P).join());
+    assert.doesNotMatch(fs.readFileSync(path.join(dir, '로그/fx.log'), 'utf8'), /이펙트 팩/); assert.doesNotMatch(fs.readFileSync(path.join(dir, '로그/mix.log'), 'utf8'), /효과음/);
+    const pr = await probe(path.join(dir, '편집/완성본.mp4')); assert.equal(pr.height, 1920);
+    await J('/run', { ep: L1, step: 'upload' }); await waitIdle(60000); assert.doesNotMatch(fs.readFileSync(path.join(dir, '업로드/업로드.txt'), 'utf8'), /\[이펙트\]/);
+    await J('/fxpack', { ep: L1, pack: 'punch' });   // 뒤 테스트를 위해 되돌림
+  });
+  await check('이펙트 팩 실제 실행: 룩 틀마다(펀치 훅 분할·배너·매트) 이펙트 → 최종본까지 오류 없이, 크기 1080x1920', async () => {
+    const dir = path.join(tmp, 'data', L1);
+    for (const [look, pack] of [['yt-politics', 'punch'], ['yt-christian', 'calm'], ['yt-mat', 'match']]) {
+      assert.equal((await J('/look', { ep: L1, look })).r.status, 200); assert.equal((await J('/fxpack', { ep: L1, pack, times: '0:02' })).r.status, 200);
+      await J('/run', { ep: L1, steps: ['clip', 'plan', 'rough', 'subs', 'fx', 'mix'] }); const e = await waitIdle(240000);
+      for (const id of ['clip', 'plan', 'rough', 'subs', 'fx', 'mix']) assert.equal(step(e, id).status, 'done', `${look}/${pack} ${id} ${step(e, id).error}`);
+      const pr = await probe(path.join(dir, '편집/최종본.mp4')); assert.equal(pr.width, 1080); assert.equal(pr.height, 1920); assert.ok(pr.hasAudio, look);
+      assert.equal(JSON.parse(fs.readFileSync(path.join(dir, '편집/편집계획.json'), 'utf8')).fxPack, pack);
+    }
+    await J('/look', { ep: L1, look: 'yt-wrestling' });
+  });
   await check('자막 자동화: 영어 → 한국어 번역(키 있을 때) · 실패하면 영어 그대로 · 룩별 모양', async () => {
     const cues = [{ start: 0, end: 1, en: 'a' }, { start: 1, end: 2, en: 'b' }, { start: 2, end: 3, en: 'c' }];
     const ok = await translateCues(cues, async () => '여기 JSON: ["에이","비","씨"]'); assert.deepEqual(ok.map(c => c.ko), ['에이', '비', '씨']);
@@ -535,10 +644,10 @@ try {
     assert.equal(f(a).channel, 'yt-christian'); assert.equal(f(b).channel, ''); assert.equal(f(c).channel.length, 40);
     assert.equal(st(a).voice.length, 2000); assert.equal(st(b).voice, '');
   });
-  await check('/health: 버전(version)과 기능 수준(api = 4)', async () => {
+  await check('/health: 버전(version)과 기능 수준(api = 5)', async () => {
     const { r, d } = await J('/health');
     assert.equal(r.status, 200); assert.equal(d.ok, true);
-    assert.equal(d.api, 4);
+    assert.equal(d.api, 5);
     assert.equal(typeof d.version, 'string'); assert.ok(d.version.length > 0);
   });
   await check('재시작 복구: running → failed(한국어)', async () => {

@@ -13,7 +13,7 @@
   // ----- 저장되는 상태 (이 브라우저) -----
   let S = { sel: {}, opened: {}, instaMode: 'toon', igSel: {}, igLoaded: 'insta-sing' };
   try { S = { ...S, ...JSON.parse(localStorage.getItem(KEY) || '{}') }; } catch (_) {}
-  S.sel = S.sel || {}; S.opened = S.opened || {}; S.igSel = S.igSel || {};
+  S.sel = S.sel || {}; S.opened = S.opened || {}; S.igSel = S.igSel || {}; S.fxRefs = S.fxRefs || {};
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (_) {} };
   // 예전 "오늘 글 하나 쓰기"에서 하던 작업 이어받기
   try {
@@ -445,7 +445,7 @@
   }
 
   // ===== YouTube (맥 실행기 단계를 같은 틀에 그린다) =====
-  // 유튜브 작업 순서 (모든 채널·형식 같음, 7칸): 원본 링크 → 편집 스타일 선택 → 링크 영상 다운 → 1차 편집 → 피드백 → 2차 편집 → 최종 편집안 다운로드
+  // 유튜브 작업 순서 (모든 채널·형식 같음, 8칸): 원본 링크 → 편집 스타일 선택 → 최종 결과물 레퍼런스 → 링크 영상 다운 → 1차 편집 → 피드백 → 2차 편집 → 최종 편집안 다운로드
   // 편집 룩 목록: 실행기 /status 의 looks 와 같아요. 실행기가 꺼져 있어도 고를 수 있게 여기에도 둬요.
   const YT_LOOKS = [
     { id: 'yt-wrestling', name: '기본 룩', desc: '흰 자막 + 첫 1.5초 제목 카드 (레슬링 채널 기본)' },
@@ -464,6 +464,28 @@
   const ytLooks = () => (runnerData && runnerData.looks && runnerData.looks.length ? runnerData.looks : YT_LOOKS);
   const ytLookDefault = ch => (ch === 'yt-wrestling' || !ch ? 'yt-mat' : YT_LOOKS.some(l => l.id === ch) ? ch : 'yt-mat');
   const ytLookPick = (it, ep) => (it.idea && ytPipe.lookIdea === it.idea.id && ytPipe.look) || (ep && ep.look) || ytLookDefault(ytCh(it.idea));
+
+  // 최종 결과물 레퍼런스(이펙트 팩): 실행기 /status 의 fxPacks 와 같아요 (desc 는 " · " 로 효과를 나열). 실행기가 꺼져 있어도 고를 수 있게 여기에도 둬요.
+  const YT_FX_PACKS = [
+    { id: 'none', name: '이펙트 없음', desc: '지금처럼 그대로 · 줌·흔들림·효과음 없음', ref: '' },
+    { id: 'calm', name: '잔잔', desc: '클립마다 천천히 줌인 · 컷 사이 짧게 어둡다 밝아짐 · 첫 강조점에 부드러운 "띵"', ref: 'https://www.youtube.com/shorts/op51yRlhjjI' },
+    { id: 'punch', name: '펀치', desc: '컷마다 빠른 줌 펀치 · 강조 순간 흔들림 + 흰 플래시 · "팡" 효과음 · 강조 단어 팝', ref: 'https://www.youtube.com/shorts/1zpjOi8_LH0' },
+    { id: 'match', name: '경기 하이라이트', desc: '슬로우 시작에 흰 플래시 + 줌인 유지 · 컷마다 "휙" · 점수 도장·강조에 흔들림 + "쾅"', ref: '' },
+  ];
+  // 이펙트 미리보기: 9:16 미니 화면이 2.4초마다 되풀이 (CSS 애니메이션만). 룩 미리보기(.lm)와 같은 크기·틀.
+  const YT_FX_MOCKS = {
+    none: '<i class="lm-v"></i><i class="lm-a lm-sub" style="top:68%;left:0;right:0">이펙트 없음</i>',
+    calm: '<i class="lm-v fxm-v fxm-kb"></i><i class="fxm-dip"></i><i class="lm-a lm-sub" style="top:68%;left:0;right:0">잔잔하게</i><i class="lm-a fxm-t fxm-ding" style="top:30%;left:0;right:0">띵</i>',
+    punch: '<i class="lm-v fxm-v fxm-pz"></i><i class="fxm-flash fxm-fl-p"></i><i class="lm-a fxm-t fxm-pop" style="top:30%;left:0;right:0">팡!</i><i class="lm-a lm-sub" style="top:68%;left:0;right:0">오늘의 <u class="fxm-word">핵심</u></i>',
+    match: '<i class="lm-v fxm-v fxm-mz"></i><i class="fxm-flash fxm-fl-m"></i><i class="lm-a fxm-slow" style="top:7%;right:5%">SLOW</i><i class="lm-a fxm-t fxm-swish" style="top:36%;left:0;right:0">휙</i><i class="lm-a lm-sub" style="top:68%;left:0;right:0">역전 순간</i>',
+  };
+  const ytFxMock = id => (YT_FX_MOCKS[id] ? `<span class="lm fxm fxm-${id}" aria-hidden="true">${YT_FX_MOCKS[id]}</span>` : '');
+  const ytFxPacks = () => (runnerData && runnerData.fxPacks && runnerData.fxPacks.length ? runnerData.fxPacks : YT_FX_PACKS);
+  const ytFxDefault = ch => (ch === 'yt-christian' ? 'calm' : ch === 'yt-politics' ? 'punch' : 'match');
+  const ytFxPick = (it, ep) => (it.idea && ytPipe.fxIdea === it.idea.id && ytPipe.fxPack) || (ep && (ep.fxPack || ep.fxPackUsed)) || ytFxDefault(ytCh(it.idea));
+  const ytFxTimes = (it, ep) => (it.idea && ytPipe.fxIdea === it.idea.id && ytPipe.fxTimes != null ? ytPipe.fxTimes : (ep && ep.fxTimes) || '');
+  const ytFxRef = p => (S.fxRefs && S.fxRefs[p.id]) || p.ref || '';   // 내가 넣은 링크가 먼저
+  const ytFxOld = () => typeof runnerApi === 'number' && runnerApi < 5;
   const YT_GROUPS = [
     { id: 'g-dl', name: '링크 영상 다운', ids: ['research', 'download'], desc: '링크의 영상을 맥에 통째로 받아요. 영어 자막이 있으면 같이 받아요.', go: '영상 받기' },
     { id: 'g-cut', name: '컷 편집', ids: ['clip', 'plan', 'rough'], desc: '쓸 구간을 넣으세요. 한 구간은 15초까지예요. 구간을 잘라 이어 붙여 가편집을 만들어요.', go: '컷 편집 실행' },
@@ -473,7 +495,7 @@
     { id: 'g-upload', name: '업로드 패키지', ids: ['upload'], desc: '제목·설명란·태그·썸네일 문구를 한 파일로 만들어요.', go: '업로드 패키지 만들기' },
   ];
   const YT_STEP_NAME = { research: '소스 확인', download: '영상 받기', clip: '구간 자르기', plan: '편집 계획', rough: '가편집', subs: '자막 자동화', fx: '이펙트', script: '대본', mix: '목소리·음악', upload: '업로드 패키지' };
-  const YT_PLACEHOLDER = ['원본 링크', '편집 스타일 선택', '링크 영상 다운', '1차 편집', '피드백', '2차 편집', '최종 편집안 다운로드'];
+  const YT_PLACEHOLDER = ['원본 링크', '편집 스타일 선택', '최종 결과물 레퍼런스', '링크 영상 다운', '1차 편집', '피드백', '2차 편집', '최종 편집안 다운로드'];
   // 실행기 단계들을 칸(그룹)으로 묶은 상태
   function ytGroupState(ep, g) {
     const sts = g.ids.map(id => (ep.steps || []).find(x => x.id === id)).filter(Boolean);
@@ -604,6 +626,36 @@
       },
       run: () => {},
     };
+    // 최종 결과물 레퍼런스: 룩 = 색·틀·자막 모양 / 이 칸 = 영상 속 강조(줌·흔들림·플래시·효과음·단어 팝). 고른 팩은 실행기가 이펙트·목소리·음악 단계에서 진짜로 입혀요.
+    const fxref = {
+      id: 'fxref', name: '최종 결과물 레퍼런스', title: '최종 결과물 레퍼런스',
+      desc: it => (it.ep ? '영상 속 강조 효과를 고르세요. 편집 스타일은 색과 틀, 이 칸은 움직임과 소리예요.' : '앞 단계를 끝내면 열려요.'),
+      btn: it => (it.ep && it.ep.fxPack ? '이 레퍼런스로 바꾸기' : '이 레퍼런스로 정하기'),
+      attrs: it => `data-ya-act="fxpack" data-ya-fxpack="${esc(ytFxPick(it, it.ep))}"`,
+      disabled: it => !it.ep || off || runnerOnline === null || ytFxOld() || !!it.ep.running || (it.ep.fxPack === ytFxPick(it, it.ep) && ytFxTimes(it, it.ep).trim() === (it.ep.fxTimes || '')),
+      isDone: it => { const ep = it.ep; if (!ep) return false; if (ytFxOld() || ep.fxPack || (ep.round || 0) >= 1) return true; const ok = id => (ep.steps || []).some(x => x.id === id && x.status === 'done'); return ok('research') && ok('download'); },
+      result: it => { const ep = it.ep; if (!ep || ytFxOld()) return '';
+        const used = ytFxPacks().find(p => p.id === (ep.fxPack || ep.fxPackUsed)); if (!used) return '';
+        return `<b>${esc(used.name)}</b> 이펙트${ep.fxPack ? '로 정했어요' : '로 만들어요 (이 채널 기본)'}${ep.fxTimes ? ` · 더 강조할 시간 ${esc(ep.fxTimes)}` : ''} · <span class="small">아래에서 다른 팩을 고르면 바꿀 수 있어요.</span>`; },
+      body: it => {
+        if (!it.idea || !it.ep) return '';
+        if (ytFxOld()) return '<p class="pl-error" role="alert"><b>실행기를 업데이트해야 이 칸을 쓸 수 있어요.</b> 저장소를 <code>git pull</code> 한 뒤 <code>runner/설치·업데이트.command</code> 를 더블클릭하세요. 이 칸은 건너뛰어도 돼요.</p>';
+        const pick = ytFxPick(it, it.ep), def = ytFxDefault(ytCh(it.idea)), packs = ytFxPacks(), cur = packs.find(p => p.id === pick) || packs[0];
+        const chips = `<div class="pl-looks pl-fxs" role="radiogroup" aria-label="이펙트 팩">${packs.map(p => {
+          const on = pick === p.id, ref = ytFxRef(p);
+          return `<div class="pl-fxc ${on ? 'on' : ''}"><button type="button" role="radio" aria-checked="${on}" class="pl-fxb" data-ya-fxpick="${esc(p.id)}">${ytFxMock(p.id)}<span class="pl-lk-txt"><b>${esc(p.name)}${p.id === def ? ' · 이 채널 기본' : ''}</b><ul class="pl-fxl">${String(p.desc || '').split(' · ').filter(Boolean).map(x => `<li>${esc(x)}</li>`).join('')}</ul></span></button>${p.id === 'none' ? '' : ref ? `<a class="pl-fxlink" href="${esc(ref)}" target="_blank" rel="noopener noreferrer">레퍼런스 영상 ↗</a>` : '<span class="small pl-fxlink">예시 영상은 아래에서 직접 넣어요</span>'}</div>`;
+        }).join('')}</div>`;
+        let extra = '';
+        if (cur.id !== 'none') {
+          const ref = ytFxRef(cur), vid = ytVidOf(ref);
+          extra += `<div class="pl-fxsel"><b class="small">${esc(cur.name)} 레퍼런스 영상</b>${vid ? `<div class="pl-fxvidw"><iframe id="plFxVid" class="pl-fxvid" src="https://www.youtube-nocookie.com/embed/${esc(vid)}" title="${esc(cur.name)} 레퍼런스 영상" loading="lazy" allow="encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>` : ref ? `<p class="small"><a class="pl-link" href="${esc(ref)}" target="_blank" rel="noopener noreferrer">${esc(ref)} ↗</a></p>` : '<p class="small">아직 예시 영상이 없어요. 아래에 내 레퍼런스 링크를 넣으면 여기서 볼 수 있어요.</p>'}
+            <label class="pl-fxown">내 레퍼런스 링크 (선택)<input class="pl-input" data-fx-ref="${esc(cur.id)}" placeholder="https://www.youtube.com/shorts/…" value="${esc((S.fxRefs && S.fxRefs[cur.id]) || '')}" autocomplete="off"></label><p class="small">비워 두면 기본 예시를 써요. 링크는 이 브라우저에만 저장돼요.</p></div>`;
+          extra += `<div class="pl-ya-form"><label>더 강조할 시간 (선택, 쉼표로)<input class="pl-input" data-ya-new="fxtimes" placeholder="0:03, 0:07" value="${esc(ytFxTimes(it, it.ep))}" autocomplete="off"></label><p class="small">대본의 강조·펀치 줄은 자동으로 잡아요. 여기에 적은 시간에는 효과를 더 넣어요.</p></div>`;
+        }
+        return (off ? offMsg : runnerOld ? RUNNER_OLD_MSG : '') + chips + extra;
+      },
+      run: () => {},
+    };
     const mid = YT_GROUPS.filter(g => g.id === 'g-dl').map(g => {
       const base = { id: g.id, name: g.name, title: g.name };
       if (!ep) return { ...base, desc: '앞 단계를 끝내면 열려요.', btn: g.go, disabled: () => true, isDone: () => false, result: () => '', run: () => {} };
@@ -668,7 +720,7 @@
         recordUrl('youtube', it.key, it.idea, it.idea.title);
       },
     };
-    return [topic, look, ...mid, ...edits];
+    return [topic, look, fxref, ...mid, ...edits];
   }
   // ===== ④ 1차 편집 · ⑤ 피드백 · ⑥ 2차 편집 · ⑦ 최종 편집안 다운로드 =====
   function ytEditCards(it, ep, off) {
@@ -684,7 +736,7 @@
     const editResult = r => () => {
       const parts = [];
       if (failed && failed.error && (ep.editRound || 1) === r) parts.push(`<p class="pl-error"><b>${esc(failed.name)}</b> · ${esc(runnerFriendly(failed.error))}</p>`);
-      if (round >= r) { const v = ytEditVideo(ep); parts.push(`<p><b>${r}차 편집본이 나왔어요.</b> 위 플레이어에서 보세요.${v ? ' ' + ytFileLink(ep.ep, { path: v.path }) : ''}</p>`); if (!ep.hasScript) parts.push('<p class="small">아직 자막 대본이 없어서 자막 없이 만들었어요. ⑤ 피드백에서 대본을 넣어요.</p>'); }
+      if (round >= r) { const v = ytEditVideo(ep); parts.push(`<p><b>${r}차 편집본이 나왔어요.</b> 위 플레이어에서 보세요.${v ? ' ' + ytFileLink(ep.ep, { path: v.path }) : ''}</p>`); if (!ep.hasScript) parts.push('<p class="small">아직 자막 대본이 없어서 자막 없이 만들었어요. 피드백에서 대본을 넣어요.</p>'); }
       parts.push(logs()); return parts.join('');
     };
     const rangesNow = ((ep.sources && ep.sources[0] && ep.sources[0].ranges) || []).join(', ');
@@ -708,13 +760,13 @@
       attrs: () => 'data-ya-act="draftsave"',
       disabled: () => off || round < 1 || !!ep.running,
       isDone: () => fbNew || (round >= 2 && !fbNew),
-      result: () => fbNew ? '<b>수정안을 저장했어요.</b> ⑥ 2차 편집을 누르세요.' : '',
+      result: () => fbNew ? '<b>수정안을 저장했어요.</b> 2차 편집을 누르세요.' : '',
       body: () => round >= 1 ? ytFeedbackPanel(ep) : '',
       run: () => {},
     };
     const e3 = {
       id: 'e3', name: '2차 편집', title: '2차 편집',
-      desc: round < 1 ? '1차 편집이 끝나면 열려요.' : fbNew || round < 2 ? '저장한 수정안으로 다시 편집해요. 자막·제목·선수 태그·점수 도장·원본 소리·배경음악이 들어가요.' : '다시 고치려면 ⑤ 피드백에서 수정안을 저장하고 누르세요.',
+      desc: round < 1 ? '1차 편집이 끝나면 열려요.' : fbNew || round < 2 ? '저장한 수정안으로 다시 편집해요. 자막·제목·선수 태그·점수 도장·원본 소리·배경음악이 들어가요.' : '다시 고치려면 피드백에서 수정안을 저장하고 누르세요.',
       btn: () => editing && (ep.editRound || 0) >= 2 ? '실행 멈춤' : round >= 2 ? `${round + 1}차 편집 만들기` : '2차 편집 만들기',
       attrs: () => editing && (ep.editRound || 0) >= 2 ? 'data-ya-act="stop"' : `data-ya-act="edit" data-ya-round="${Math.max(round + 1, 2)}"`,
       cls: editing && (ep.editRound || 0) >= 2 ? 'danger' : '',
@@ -758,14 +810,14 @@
     const ep = ytEp(i);
     if (ep) {
       const ok = id => (ep.steps || []).some(x => x.id === id && x.status === 'done'), r = ep.round || 0, fb = (ep.feedbackAt || 0) > (ep.editAt || 0);
-      const flags = [true, !!ep.look, ok('research') && ok('download'), r >= 1, fb || r >= 2, r >= 2 && !fb, ok('upload')], n = flags.filter(Boolean).length, k = flags.findIndex(x => !x);
+      const flags = [true, !!ep.look, !!(ep.fxPack || (ep.round || 0) >= 1 || (ok('research') && ok('download'))), ok('research') && ok('download'), r >= 1, fb || r >= 2, r >= 2 && !fb, ok('upload')], n = flags.filter(Boolean).length, k = flags.findIndex(x => !x);
       const nx = k < 0 ? null : { g: { name: YT_PLACEHOLDER[k] } };
       const b = [];
       if (ep.running) b.push('<i class="b run">실행 중</i>');
 
       if ((ep.steps || []).some(x => x.status === 'failed')) b.push('<i class="b fail">실패</i>');
       if (ytEditVideo(ep)) b.push('<i class="b vid">▶ 편집본</i>');
-      return `${n}/7 단계 · ${esc(nx ? nx.g.name : '끝')}${b.length ? `<span class="pl-wbs">${b.join('')}</span>` : ''}`;
+      return `${n}/${flags.length} 단계 · ${esc(nx ? nx.g.name : '끝')}${b.length ? `<span class="pl-wbs">${b.join('')}</span>` : ''}`;
     }
     return runnerOnline === false && !runnerData ? '실행기 꺼짐 · 상태 모름' : '편집 스타일 선택 전';
   }
@@ -1092,6 +1144,7 @@
     if (t.dataset.plWiphide) { const i = db.ideas.find(x => x.id === t.dataset.plWiphide); if (i && confirm('작업 중 목록에서 뺄까요?\n(영상과 작업 내용은 지워지지 않아요)')) { delete i.ytStarted; i.ytHidden = Date.now(); persist(); const sel = S.sel.youtube; if (sel && sel.ideaId === i.id) { S.sel.youtube = { empty: true }; ytPipe.ideaId = ''; T.ytSkipAdopt = false; T.ytPick = ''; save(); } render(); } return; }
     if (t.dataset.plYtpick) { selectYt(t.dataset.plYtpick); T.view.youtube = null; repaint('youtube', true); return; }
     if (t.dataset.plYlchip) { ylSetUrl(t.dataset.plYlchip, true); return; }
+    if (t.dataset.yaFxpick) { const { it } = ctx(); ytPipe.fxPack = t.dataset.yaFxpick; ytPipe.fxIdea = it.idea ? it.idea.id : ''; repaint('youtube', true); return; }
     if (t.dataset.yaLookpick) { const { it } = ctx(); ytPipe.look = t.dataset.yaLookpick; ytPipe.lookIdea = it.idea ? it.idea.id : ''; repaint('youtube', true); return; }
     if (t.hasAttribute('data-pl-ytchange')) { ytLinkReset(); adapter('youtube').fresh(); T.view.youtube = 0; repaint('youtube', true); return; }
     if (t.dataset.plYsrc) { const u = t.dataset.plYsrc, i = document.querySelector('#plRoot [data-ya-new="url"]'); ytPipe.url = u; if (i) i.value = u; return; }
@@ -1123,6 +1176,8 @@
     setTimeout(() => repaint('youtube', true), 700);
   }, true);
   document.addEventListener('change', e => {
+    const fr = e.target.closest('input[data-fx-ref]');
+    if (fr) { const id = fr.dataset.fxRef, v = fr.value.trim(); if (v && !/^https?:\/\//i.test(v)) { toast('https:// 로 시작하는 링크를 넣어 주세요.'); return; } if (v) S.fxRefs[id] = v; else delete S.fxRefs[id]; save(); repaint('youtube', true); return; }
     const sel = e.target.closest('select[data-pl-item]');
     if (sel) { const root = sel.closest('#plRoot'), c = root.dataset.c; if (!sel.value) return; adapter(c).select(sel.value); T.view[c] = null; T.err[c] = ''; T.manual[c] = false; T.askCopied[c] = false; if (c === 'youtube' || c === 'insta') render(); else repaint(c, true); return; }
     const ck = e.target.closest('input[data-pl-check]');
@@ -1140,6 +1195,7 @@
     else if (t.dataset.plUrlinput) T.url[t.dataset.plUrlinput] = t.value;
     else if (t.hasAttribute('data-pl-caption')) { const p = c === 'insta' && window.InstaToon.current(); if (p) { p.caption = t.value; persist(); } }
     else if (t.dataset.yl) { if (t.dataset.yl === 'url') ylSetUrl(t.value); else if (t.dataset.yl === 'title') { YL.title = t.value; YL.edited = true; } else YL.view = t.value; }
+    else if (t.dataset.yaNew === 'fxtimes') { const { it } = evalSteps('youtube'); ytPipe.fxTimes = t.value; ytPipe.fxIdea = it.idea ? it.idea.id : ''; if (!ytPipe.fxPack) ytPipe.fxPack = ytFxPick(it, it.ep); document.querySelector('#plRoot [data-ya-act="fxpack"]')?.removeAttribute('disabled'); }
     else if (t.dataset.yaNew) { if (t.dataset.yaNew === 'url') ytPipe.url = t.value; else ytPipe.ranges = t.value; }
   });
   document.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing && e.target.id === 'plLinkUrl') { e.preventDefault(); const c = e.target.closest('#plRoot').dataset.c; linkRead(c, false); } });
@@ -1250,6 +1306,48 @@
 .lm .lm-p{font-size:9px;font-weight:900;color:#FFD400;text-shadow:0 1px 2px #000}
 .lm .lm-t1{font-weight:900;text-shadow:0 1px 2px #000}
 .lm .lm-stamp{font-size:15px;font-weight:900;color:#FF2B2B;border:2px solid #FF2B2B;border-radius:4px;padding:0 3px;transform:translate(-50%,-50%) rotate(-10deg);background:rgba(0,0,0,.25)}
+.pl-fxs{align-items:start}
+.pl-fxc{border:2px solid var(--line);background:var(--panel2);border-radius:12px;display:flex;flex-direction:column;min-width:0}
+.pl-fxc.on{border-color:var(--pc);background:color-mix(in srgb,var(--pc) 12%,var(--panel2))}
+.pl-fxb{display:flex;gap:12px;align-items:flex-start;text-align:left;background:none;border:0;color:var(--text);font-size:16px;line-height:1.4;padding:10px 14px 4px;cursor:pointer;border-radius:12px;min-height:52px}
+.pl-fxb:focus-visible{outline:3px solid var(--pc);outline-offset:2px}
+.pl-fxl{margin:2px 0 0;padding-left:16px;font-size:13px;color:var(--muted);line-height:1.5}
+.pl-fxlink{margin:0 14px 10px 110px;font-size:14px;color:var(--pc);align-self:flex-start;min-height:32px;display:inline-flex;align-items:center}
+span.pl-fxlink{color:var(--muted)}
+.pl-fxsel{margin:6px 0 10px;display:grid;gap:8px}
+.pl-fxvidw{width:100%;max-width:260px;aspect-ratio:9/16;border-radius:12px;overflow:hidden;background:#000;border:1px solid var(--line)}
+.pl-fxvid{width:100%;height:100%;border:0;display:block}
+.pl-fxown{display:grid;gap:6px;font-size:14px;color:#c3c8cf;max-width:520px}
+.fxm .fxm-v{transform-origin:50% 50%}
+.fxm .fxm-flash{position:absolute;inset:0;background:#fff;opacity:0}
+.fxm .fxm-dip{position:absolute;inset:0;background:#000;opacity:0}
+.fxm .fxm-t{font-size:14px;font-weight:900;color:#fff;text-shadow:0 1px 3px #000,0 0 6px rgba(0,0,0,.6)}
+.fxm .fxm-pop{color:#FFD400;font-size:17px;transform:rotate(-6deg)}
+.fxm .fxm-word{color:#FFD400;display:inline-block}
+.fxm .fxm-slow{padding:1px 3px;border-radius:3px;background:#FFE100;color:#000;font-size:5px;font-weight:900}
+.fxm-calm .fxm-kb{animation:fxm-kb 2.4s linear infinite}
+.fxm-calm .fxm-dip{animation:fxm-dip 2.4s linear infinite}
+.fxm-calm .fxm-ding{animation:fxm-ding 2.4s linear infinite}
+.fxm-punch .fxm-pz{animation:fxm-pz 2.4s linear infinite}
+.fxm-punch .fxm-fl-p{animation:fxm-flp 2.4s linear infinite}
+.fxm-punch .fxm-pop{animation:fxm-pop 2.4s linear infinite}
+.fxm-punch .fxm-word{animation:fxm-word 2.4s linear infinite}
+.fxm-match .fxm-mz{animation:fxm-mz 2.4s linear infinite}
+.fxm-match .fxm-fl-m{animation:fxm-flm 2.4s linear infinite}
+.fxm-match .fxm-slow{animation:fxm-slow 2.4s linear infinite}
+.fxm-match .fxm-swish{animation:fxm-swish 2.4s linear infinite}
+@keyframes fxm-kb{0%{transform:scale(1)}90%,100%{transform:scale(1.07)}}
+@keyframes fxm-dip{0%{opacity:.55}7%{opacity:0}93%{opacity:0}100%{opacity:.55}}
+@keyframes fxm-ding{0%,12%{opacity:0;transform:scale(.6)}18%{opacity:1;transform:scale(1.15)}30%{opacity:1;transform:scale(1)}55%,100%{opacity:0}}
+@keyframes fxm-pz{0%{transform:scale(1)}7%{transform:scale(1.13)}14%,48%{transform:scale(1)}50%{transform:scale(1.04) translate(-3px,2px)}53%{transform:scale(1.04) translate(3px,-2px)}56%{transform:scale(1.04) translate(-2px,-1px)}59%{transform:scale(1.04) translate(2px,1px)}62%,100%{transform:scale(1)}}
+@keyframes fxm-flp{0%,49%{opacity:0}50%{opacity:.85}53%,100%{opacity:0}}
+@keyframes fxm-pop{0%,49%{opacity:0;transform:rotate(-6deg) scale(.4)}52%{opacity:1;transform:rotate(-6deg) scale(1.4)}58%,80%{opacity:1;transform:rotate(-6deg) scale(1)}90%,100%{opacity:0;transform:rotate(-6deg) scale(1)}}
+@keyframes fxm-word{0%,49%{transform:scale(1)}53%{transform:scale(1.5)}60%,100%{transform:scale(1)}}
+@keyframes fxm-mz{0%{transform:scale(1)}5%,60%{transform:scale(1.1)}64%{transform:scale(1.14) translate(-3px,2px)}67%{transform:scale(1.14) translate(3px,-2px)}70%{transform:scale(1.14) translate(-2px,-1px)}73%{transform:scale(1.14) translate(2px,1px)}76%,92%{transform:scale(1.1)}100%{transform:scale(1)}}
+@keyframes fxm-flm{0%{opacity:.85}5%,100%{opacity:0}}
+@keyframes fxm-slow{0%{opacity:0}4%,92%{opacity:1}100%{opacity:0}}
+@keyframes fxm-swish{0%{opacity:0;transform:translateX(-14px)}6%,28%{opacity:1;transform:translateX(0)}40%,100%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.fxm *{animation:none!important}}
 .pl-topic.on{border-color:var(--pc);background:color-mix(in srgb,var(--pc) 12%,var(--panel2))}
 .pl-topic em{font-style:normal;font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:1px 6px;flex:none}
 .pl-help{margin:10px 0;font-size:14px}.pl-help summary{cursor:pointer;color:var(--pc);min-height:36px;display:flex;align-items:center}.pl-help ol{margin:6px 0 0;padding-left:20px;line-height:1.7}.pl-help code{background:var(--panel2);padding:1px 5px;border-radius:4px}
