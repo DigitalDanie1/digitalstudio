@@ -35,6 +35,10 @@
       "destination": "/outputs/fieldnote-ytformula.js"
     },
     {
+      "source": "/fieldnote-ytrefs.js",
+      "destination": "/outputs/fieldnote-ytrefs.js"
+    },
+    {
       "source": "/instatoon.js",
       "destination": "/outputs/instatoon.js"
     },
