@@ -973,7 +973,24 @@
       return `<div class="pl-wc ${i.id === curId ? 'on' : ''}"><button type="button" class="pl-wc-main" data-pl-wip="${esc(i.id)}" ${i.id === curId ? 'aria-current="true"' : ''}>${th ? `<img src="${esc(th)}" alt="" loading="lazy">` : '<span class="pl-wc-ph" aria-hidden="true">🎬</span>'}<span class="pl-wc-t">${esc(i.title)}</span><span class="pl-wc-s">${ytWipStatus(i)}</span></button><button type="button" class="pl-wc-x" data-pl-wiphide="${esc(i.id)}" aria-label="완전히 지우기" title="완전히 지우기">×</button></div>`; };
     const pubs = db.ideas.filter(i => ideaPlatform(i) === 'YouTube' && ytCh(i) === ytTab() && i.publicationCheck);
     const pubHtml = pubs.length ? `<details class="pl-wpub"><summary>올린 영상 ${pubs.length}개</summary><ul>${pubs.map(i => { const u = typeof i.publicationCheck === 'string' ? i.publicationCheck : (i.publicationCheck && i.publicationCheck.url) || ''; return `<li>${/^https?:/.test(u) ? `<a class="pl-link" href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(i.title)} ↗</a>` : esc(i.title)}</li>`; }).join('')}</ul></details>` : '';
-    return `<div class="pl-wip" aria-label="작업 중인 영상"><div class="pl-wip-h"><b>작업 중 ${list.length}개</b>${list.length ? '' : '<span class="small">작업 중인 영상이 없어요. 링크를 넣어 시작하세요.</span>'}</div><div class="pl-wip-row"><button type="button" class="pl-wc pl-wc-new" data-pl-ytchange>＋ 새 링크로 시작</button>${list.map(card).join('')}</div>${pubHtml}</div>`;
+    return `<div class="pl-wip" aria-label="작업 중인 영상"><div class="pl-wip-h"><b>작업 중 ${list.length}개</b><button type="button" class="pl-wip-reset" data-pl-ytreset title="유튜브 작업 기록을 모두 지워요 (영상 파일은 휴지통으로)">유튜브 초기화</button>${list.length ? '' : '<span class="small">작업 중인 영상이 없어요. 링크를 넣어 시작하세요.</span>'}</div><div class="pl-wip-row"><button type="button" class="pl-wc pl-wc-new" data-pl-ytchange>＋ 새 링크로 시작</button>${list.map(card).join('')}</div>${pubHtml}</div>`;
+  }
+  // 이 브라우저의 기록 지우기 (× 와 '유튜브 초기화'가 같이 써요): 주제 + 그 주제의 YouTube 글·초안 + 선택·열림·단계 기록
+  function ytCleanLocal(ids) {
+    const idset = new Set(ids), keys = new Set(ids.map(id => 'y:' + id));
+    const gone = new Set(db.posts.filter(p => idset.has(p.ideaId) && p.channel === 'youtube').map(p => p.id));
+    gone.forEach(pid => { try { clearTimeout(draftTimer); draftDel(pid); } catch (_) {} delete S.opened[pid]; });
+    db.posts = db.posts.filter(p => !gone.has(p.id));
+    db.ideas = db.ideas.filter(x => !idset.has(x.id));
+    const sel = S.sel.youtube;
+    if (sel && (idset.has(sel.ideaId) || gone.has(sel.postId))) S.sel.youtube = { empty: true };
+    keys.forEach(k => { delete S.opened[k]; });
+    for (const m of Object.values(T)) if (m && typeof m === 'object' && !Array.isArray(m)) keys.forEach(k => { if (k in m) delete m[k]; });
+    if (idset.has(ytPipe.ideaId)) ytPipe.ideaId = '';
+    if (idset.has(ytPipe.lookIdea)) { ytPipe.look = ''; ytPipe.lookIdea = ''; }
+    if (idset.has(ytPipe.fxIdea)) { ytPipe.fxPack = ''; ytPipe.fxIdea = ''; ytPipe.fxTimes = null; ytPipe.fxLabels = null; }
+    if (idset.has(T.ytPick)) T.ytPick = '';
+    T.ytSkipAdopt = false;
   }
   // 작업 중 카드의 ×: 실행기의 영상 폴더(휴지통으로) + 이 브라우저의 소재·선택·초안 기록을 모두 지운다
   let ytPurging = false;
@@ -995,19 +1012,33 @@
       } else {
         msg = '실행기가 꺼져 있어서 맥의 영상 파일은 그대로예요. 실행기를 켜면 바탕화면 유투브/에피소드 에서 직접 지우세요.';
       }
-      const key = 'y:' + id, gone = new Set(db.posts.filter(p => p.ideaId === id && p.channel === 'youtube').map(p => p.id));
-      gone.forEach(pid => { try { clearTimeout(draftTimer); draftDel(pid); } catch (_) {} delete S.opened[pid]; });
-      db.posts = db.posts.filter(p => !gone.has(p.id));
-      db.ideas = db.ideas.filter(x => x.id !== id);
-      const sel = S.sel.youtube;
-      if (sel && (sel.ideaId === id || gone.has(sel.postId))) S.sel.youtube = { empty: true };
-      delete S.opened[key];
-      for (const m of Object.values(T)) if (m && typeof m === 'object' && !Array.isArray(m) && key in m) delete m[key];
-      if (ytPipe.ideaId === id) ytPipe.ideaId = '';
-      if (ytPipe.lookIdea === id) { ytPipe.look = ''; ytPipe.lookIdea = ''; }
-      if (ytPipe.fxIdea === id) { ytPipe.fxPack = ''; ytPipe.fxIdea = ''; ytPipe.fxTimes = null; ytPipe.fxLabels = null; }
-      if (T.ytPick === id) T.ytPick = '';
-      T.ytSkipAdopt = false;
+      ytCleanLocal([id]);
+      save(); persist(); render(); toast(msg);
+    } finally { ytPurging = false; }
+  }
+  // '유튜브 초기화': 유튜브 작업 기록 전부(세 채널) — 실행기의 영상·하이라이트 폴더는 휴지통 한 폴더로, 이 브라우저의 기록은 지움. 블로그·인스타 등은 그대로
+  async function ytResetAll() {
+    if (ytPurging) return;
+    const nWip = db.ideas.filter(i => ideaPlatform(i) === 'YouTube' && ytIsWip(i)).length;
+    if (!confirm(`유튜브 작업 기록을 모두 지울까요?\n작업 중 영상 ${nWip}개와 하이라이트 찾기 기록이 지워져요. 맥의 영상 파일은 휴지통으로 가요.\n블로그·인스타 등 다른 기록은 그대로예요.`)) return;
+    ytPurging = true;
+    try {
+      const ids = db.ideas.filter(i => ideaPlatform(i) === 'YouTube' && (i.ytStarted || i.ytHidden || i.publicationCheck || ytEp(i)
+        || db.posts.some(p => p.ideaId === i.id && p.channel === 'youtube'))).map(i => i.id);
+      let msg, api = 0, res = null;
+      try { const h = await runnerFetch('/health'); api = Number.isInteger(h.api) ? h.api : 0; } catch (_) { api = -1; }
+      if (api >= 9) {
+        try { res = await runnerFetch('/reset', { scope: 'youtube' }); }
+        catch (e) { toast('초기화하지 못했어요: ' + e.message); return; }   // 409·오류면 여기 기록은 하나도 안 바꿔요
+        runnerData = Object.assign({}, runnerData || {}, { episodes: [] });
+        msg = res && res.trashed ? `초기화했어요. 영상 파일은 휴지통 '${res.trashed.split('/').pop()}' 폴더에 있어요.` : '초기화했어요. 옮길 영상 파일은 없었어요.';
+      } else {
+        msg = api === -1 ? '이 화면의 기록만 지웠어요. 실행기가 꺼져 있어서 맥의 영상 파일은 그대로예요. 실행기를 켠 뒤 다시 초기화를 눌러 주세요. 안 그러면 실행기의 영상이 카드로 되살아나요.'
+          : '이 화면의 기록만 지웠어요. 실행기가 옛 버전이라 맥의 영상 파일은 그대로예요. 실행기를 새로 켠 뒤 다시 초기화를 눌러 주세요.';
+      }
+      ytCleanLocal(ids);
+      S.sel.youtube = { empty: true }; ytPipe.ideaId = ''; T.view.youtube = null; T.err.youtube = '';
+      try { if (typeof window.ytHighlightReset === 'function') window.ytHighlightReset(); } catch (_) {}
       save(); persist(); render(); toast(msg);
     } finally { ytPurging = false; }
   }
@@ -1324,6 +1355,7 @@
     if (t.dataset.plPick) { T.pick[c] = t.dataset.plPick; T.custom[c] = ''; repaint(c, true); return; }
     if (t.hasAttribute('data-pl-more')) { T.page[c] = (T.page[c] || 0) + 1; repaint(c, true); return; }
     if (t.dataset.plWip) { selectYt(t.dataset.plWip); T.view.youtube = null; T.err.youtube = ''; render(); return; }
+    if (t.hasAttribute('data-pl-ytreset')) { ytResetAll(); return; }
     if (t.dataset.plWiphide) { ytWipPurge(t.dataset.plWiphide); return; }
     if (t.dataset.plYtpick) { selectYt(t.dataset.plYtpick); T.view.youtube = null; repaint('youtube', true); return; }
     if (t.dataset.plYlchip) { ylSetUrl(t.dataset.plYlchip, true); return; }
@@ -1402,7 +1434,7 @@
 .pl-items label span{font-size:13px;color:var(--muted);flex:none}
 .pl-items select{min-width:0;width:100%;min-height:42px;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:9px;padding:0 10px;font-size:15px}
 .pl-newbtn{min-height:42px;padding:0 14px;border-radius:9px;border:1px dashed var(--pc);background:transparent;color:var(--pc);font-weight:700;font-size:15px;cursor:pointer;white-space:nowrap}
-.pl-wip{flex:1 1 100%;min-width:0}.pl-wip-h{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:8px}.pl-wip-h b{font-size:16px}
+.pl-wip{flex:1 1 100%;min-width:0}.pl-wip-h{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:8px}.pl-wip-h b{font-size:16px}.pl-wip-reset{margin-left:auto;font:inherit;font-size:12px;padding:3px 10px;border-radius:999px;border:1px solid #c0392b;background:transparent;color:#c0392b;cursor:pointer}.pl-wip-reset:hover{background:#c0392b;color:#fff}.pl-wip-reset:focus-visible{outline:2px solid #c0392b;outline-offset:2px}
 .pl-wip-row{display:flex;gap:10px;overflow-x:auto;padding-bottom:6px;scroll-snap-type:x proximity}
 .pl-wc{position:relative;flex:none;width:200px;scroll-snap-align:start;border:2px solid var(--line);border-radius:12px;background:var(--panel2);overflow:hidden}
 .pl-wc.on{border-color:var(--pc);box-shadow:0 0 0 1px var(--pc)}

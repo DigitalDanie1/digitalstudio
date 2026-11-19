@@ -176,6 +176,7 @@ function paintProgress() {
 }
 function paintJobsOnly() { const box = document.querySelector('[data-hl-jobs]'); if (box && !S.busy) { const t = document.createElement('div'); t.innerHTML = jobsCard(); const n = t.querySelector('[data-hl-jobs]'); if (n) box.innerHTML = n.innerHTML; } }
 
+window.ytHighlightReset = () => { S.jobs = []; S.eps = []; S.cur = null; S.curId = ''; S.checked = {}; S.edit = {}; S.made = null; S.err = ''; };
 window.ytHighlightPage = function () {
   setTimeout(() => { if (document.getElementById('hlRoot')) { loadAll().then(() => { if (S.cur) prepare(); paint(); schedule(); }); } }, 0);
   return head('하이라이트 찾기', '긴 경기 영상에서 볼 만한 장면을 자동으로 골라, 쇼츠 에피소드로 만들어요.', false)

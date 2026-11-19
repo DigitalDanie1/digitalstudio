@@ -343,6 +343,14 @@ export function createHighlights({ dataDir, log: logErr = console.error }) {
       J.s.count = clampN(count, 1, COUNT_MAX, J.s.count); J.s.len = clampN(len, LEN_MIN, LEN_MAX, J.s.len);
       launch(J, ctx => pipeline(J, ctx));
     },
+    anyRunning,
+    // 유튜브 초기화: 하이라이트 작업 폴더를 전부 move(dir, name)으로 치우고 목록을 비워요. 돌고 있는 게 있으면 아무것도 안 건드려요.
+    resetAll(move) {
+      if (anyRunning()) throw new StepError('지금 하이라이트 작업이 돌고 있어요. 끝나거나 멈춘 뒤에 눌러 주세요.');
+      let n = 0;
+      for (const [name, J] of [...jobs]) { move(J.dir, name); jobs.delete(name); n++; }
+      return n;
+    },
     stop(J) { J.ctrl.aborted = true; try { J.ctrl.child?.kill('SIGTERM'); setTimeout(() => { try { J.ctrl.child?.kill('SIGKILL'); } catch {} }, 3000); } catch {} },
     shutdown() { for (const J of jobs.values()) { J.ctrl.aborted = true; try { J.ctrl.child?.kill('SIGTERM'); } catch {} } },
   };

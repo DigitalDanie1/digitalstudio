@@ -12,7 +12,7 @@ import { STEP_DEFS, STEP_FN, outputsFor, listAssets, checkScript, cleanPasted, p
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // 작업판이 쓰는 기능 수준. 3 = 새 9칸 순서 (/look, /ranges, deferRanges, 단계 clip·subs·fx)
-const API_LEVEL = 8;   // 8 = 미리보기 견본(/preview, 고른 룩·이펙트를 실제 영상 4초로) · 7 = 에피소드 완전히 지우기(/episode/delete, 휴지통으로) · 6 = 하이라이트 찾기(/hl/*) ·  4 = 7칸 순서 (/edit 1차·2차 편집, /draft, /feedback, 슬로우 구간 x0.5, 매트 스토리 룩) · 5 = 최종 결과물 레퍼런스(이펙트 팩: /fxpack, status.fxPacks)
+const API_LEVEL = 9;   // 9 = 유튜브 초기화(/reset, 에피소드·하이라이트 전부 휴지통 한 폴더로) · 8 = 미리보기 견본(/preview, 고른 룩·이펙트를 실제 영상 4초로) · 7 = 에피소드 완전히 지우기(/episode/delete, 휴지통으로) · 6 = 하이라이트 찾기(/hl/*) ·  4 = 7칸 순서 (/edit 1차·2차 편집, /draft, /feedback, 슬로우 구간 x0.5, 매트 스토리 룩) · 5 = 최종 결과물 레퍼런스(이펙트 팩: /fxpack, status.fxPacks)
 let VERSION = 'dev';
 try { VERSION = fs.readFileSync(path.join(HERE, 'version.txt'), 'utf8').trim() || 'dev'; } catch {}
 const PORT = +(process.env.FIELDNOTE_RUNNER_PORT || 4777);
@@ -269,6 +269,21 @@ const hlDynamic = async (method, url, body) => {
 };
 
 const imgWrap = fn => a => { try { return fn(a); } catch (e) { if (e instanceof ImgError) throw new HttpError(e.code || 400, e.message); throw e; } };
+// ---------- 휴지통 ----------
+const trashRoot = () => process.env.FIELDNOTE_TRASH_DIR || path.join(os.homedir(), '.Trash');
+const tsNow = () => { const d = new Date(), p2 = n => String(n).padStart(2, '0'); return `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`; };
+// src 폴더를 parent/name 으로 옮겨요 (이름이 있으면 -2, -3). 다른 디스크면 복사한 뒤 지워요. 옮긴 곳을 돌려줘요.
+function moveToTrash(src, parent, name) {
+  fs.mkdirSync(parent, { recursive: true });
+  let dest = path.join(parent, name), n = 1;
+  while (exists(dest)) dest = path.join(parent, `${name}-${++n}`);
+  try { fs.renameSync(src, dest); }
+  catch (e) {
+    try { fs.cpSync(src, dest, { recursive: true }); fs.rmSync(src, { recursive: true, force: true }); }
+    catch (e2) { try { fs.rmSync(dest, { recursive: true, force: true }); } catch {} throw new HttpError(500, '휴지통으로 옮기지 못했어요: ' + e2.message); }
+  }
+  return dest;
+}
 // ---------- 견본 작업 (한 번에 하나) ----------
 let pvJob = null;   // { key, ctrl, promise }
 async function previewRun(E, spec) {
@@ -455,20 +470,28 @@ const routes = {
       for (let i = 0; i < 50 && E.running; i++) await new Promise(r => setTimeout(r, 100));
       if (E.running) throw new HttpError(409, '아직 멈추는 중이에요. 잠시 뒤에 다시 눌러 주세요.');
     }
-    const trashRoot = process.env.FIELDNOTE_TRASH_DIR || path.join(os.homedir(), '.Trash');
-    fs.mkdirSync(trashRoot, { recursive: true });
-    const d = new Date(), p2 = n => String(n).padStart(2, '0');
-    const ts = `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`;
-    let dest = path.join(trashRoot, `${path.basename(dir)} ${ts}`), n = 1;
-    while (exists(dest)) dest = path.join(trashRoot, `${path.basename(dir)} ${ts}-${++n}`);
-    try { fs.renameSync(dir, dest); }
-    catch (e) {   // 다른 디스크면 이름 바꾸기가 안 돼서 복사한 뒤 지워요
-      try { fs.cpSync(dir, dest, { recursive: true }); fs.rmSync(dir, { recursive: true, force: true }); }
-      catch (e2) { try { fs.rmSync(dest, { recursive: true, force: true }); } catch {} throw new HttpError(500, '휴지통으로 옮기지 못했어요: ' + e2.message); }
-    }
+    const dest = moveToTrash(dir, trashRoot(), `${path.basename(dir)} ${tsNow()}`);
     episodes.delete(E.s.ep);
     try { HL.dropEpisodeRef(E.s.ep); } catch {}
     return { json: { ok: true, trashed: dest } };
+  },
+  // 유튜브 초기화: 에피소드·하이라이트 작업을 전부 휴지통 '유투브 초기화 <시각>' 한 폴더로. 소리 폴더·스타일·키는 그대로. 뭐가 돌고 있으면 409
+  'POST /reset': async ({ body }) => {
+    if (!body || body.scope !== 'youtube') throw new HttpError(400, '지울 범위(scope)가 이상해요.');
+    const busy = [...episodes.values()].find(E => E.running);
+    if (busy) throw new HttpError(409, `영상 단계가 돌고 있어요(${busy.s.title || busy.s.ep}). 끝나거나 멈춘 뒤에 눌러 주세요.`);
+    if (pvJob) throw new HttpError(409, '결과물 미리보기(견본)를 만드는 중이에요. 끝난 뒤에 눌러 주세요.');
+    if (HL.anyRunning()) throw new HttpError(409, '하이라이트 찾기가 돌고 있어요. 끝나거나 멈춘 뒤에 눌러 주세요.');
+    const dest = path.join(trashRoot(), `유투브 초기화 ${tsNow()}`);
+    let epN = 0, hlN = 0;
+    for (const [name, E] of [...episodes]) {
+      const dir = path.resolve(E.dir);
+      if (path.dirname(dir) !== path.resolve(DATA) || E.s.ep !== path.basename(dir)) continue;
+      moveToTrash(dir, path.join(dest, '에피소드'), name); episodes.delete(name); epN++;
+    }
+    try { hlN = HL.resetAll((dir, name) => moveToTrash(dir, path.join(dest, '하이라이트'), name)); }
+    catch (e) { if (e instanceof StepError) throw new HttpError(409, e.message); throw e; }
+    return { json: { ok: true, trashed: exists(dest) ? dest : '', episodes: epN, highlights: hlN } };
   },
   // 견본: 고른 룩·이펙트 팩이 이 에피소드의 진짜 영상에서 어떻게 보이는지 4초짜리(540x960)로. 에피소드 단계·상태는 건드리지 않아요. 한 번에 하나만, 새 요청이 오면 옛 요청은 멈춰요.
   'POST /preview': async ({ body }) => {

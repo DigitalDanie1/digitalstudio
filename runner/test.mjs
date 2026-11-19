@@ -698,10 +698,10 @@ try {
     assert.equal(f(a).channel, 'yt-christian'); assert.equal(f(b).channel, ''); assert.equal(f(c).channel.length, 40);
     assert.equal(st(a).voice.length, 2000); assert.equal(st(b).voice, '');
   });
-  await check('/health: 버전(version)과 기능 수준(api = 8)', async () => {
+  await check('/health: 버전(version)과 기능 수준(api = 9)', async () => {
     const { r, d } = await J('/health');
     assert.equal(r.status, 200); assert.equal(d.ok, true);
-    assert.equal(d.api, 8);
+    assert.equal(d.api, 9);
     assert.equal(typeof d.version, 'string'); assert.ok(d.version.length > 0);
   });
   await check('재시작 복구: running → failed(한국어)', async () => {
@@ -877,7 +877,7 @@ try {
   });
   await check('에피소드 완전히 지우기: 휴지통 폴더로 옮기고 /status 에서 사라져요 (+ 없는 에피소드·경로 검사)', async () => {
     await stop(); await start();
-    assert.equal((await J('/health')).d.api, 8);
+    assert.equal((await J('/health')).d.api, 9);
     const mk = await J('/episodes', { title: '지울 주제', url: 'https://example.com/x', ranges: '0:00-0:05' }); assert.equal(mk.r.status, 200, JSON.stringify(mk.d));
     const name = mk.d.ep, dir = path.join(tmp, 'data', name), trash = path.join(tmp, 'trash');
     fs.writeFileSync(path.join(dir, '원본', 'keep.txt'), 'hi'); assert.ok(fs.existsSync(dir));
@@ -892,6 +892,34 @@ try {
     assert.equal((await J('/episode/delete', { ep: name })).r.status, 404, '두 번째는 없는 에피소드');
     // 다시 켜도 안 살아나요
     await stop(); await start(); assert.ok(!(await J('/status')).d.episodes.some(x => x.ep === name));
+  });
+  await check('유튜브 초기화(/reset): 돌고 있으면 409로 아무것도 안 옮기고, 아니면 에피소드·하이라이트를 휴지통 한 폴더로 (+ 재시작해도 비어 있음)', async () => {
+    await waitIdle();
+    const trash = path.join(tmp, 'trash'), dataDir = path.join(tmp, 'data'), before = (await J('/status')).d.episodes.map(x => x.ep).sort();
+    const hlBefore = (await J('/hl/list')).d.jobs.map(j => j.id).sort();
+    assert.ok(before.length >= 1 && hlBefore.length >= 1, '지울 게 있어야 해요');
+    assert.equal((await J('/reset', {})).r.status, 400); assert.equal((await J('/reset', { scope: 'blog' })).r.status, 400);
+    const trashBefore = fs.existsSync(trash) ? fs.readdirSync(trash).sort() : [];
+    const run = await J('/run', { ep: before[0], steps: ['rough', 'fx'] }); assert.equal(run.r.status, 200, JSON.stringify(run.d));
+    const busy = await J('/reset', { scope: 'youtube' }); assert.equal(busy.r.status, 409, JSON.stringify(busy.d)); assert.match(busy.d.error, /영상 단계/);
+    assert.deepEqual((await J('/status')).d.episodes.map(x => x.ep).sort(), before, '막혔을 땐 아무것도 안 옮겨요');
+    for (const n of before) assert.ok(fs.existsSync(path.join(dataDir, n)));
+    assert.deepEqual(fs.existsSync(trash) ? fs.readdirSync(trash).sort() : [], trashBefore, '휴지통도 그대로');
+    await waitIdle();
+    const { r, d } = await J('/reset', { scope: 'youtube' }); assert.equal(r.status, 200, JSON.stringify(d));
+    assert.equal(d.ok, true); assert.equal(d.episodes, before.length); assert.equal(d.highlights, hlBefore.length);
+    assert.match(path.basename(d.trashed), /^유투브 초기화 \d{8}-\d{6}$/); assert.equal(path.dirname(d.trashed), trash);
+    assert.deepEqual(fs.readdirSync(path.join(d.trashed, '에피소드')).sort(), before);
+    assert.deepEqual(fs.readdirSync(path.join(d.trashed, '하이라이트')).sort(), hlBefore);
+    assert.ok(fs.existsSync(path.join(d.trashed, '에피소드', before[0], 'state.json')));
+    assert.deepEqual(fs.readdirSync(dataDir).filter(n => !n.startsWith('.')), [], '에피소드 폴더는 비어야 해요');
+    assert.deepEqual(fs.readdirSync(path.join(tmp, '하이라이트')), []);
+    assert.equal((await J('/status')).d.episodes.length, 0); assert.equal((await J('/hl/list')).d.jobs.length, 0);
+    assert.ok(fs.existsSync(path.join(tmp, 'home')), '소리 폴더 등 나머지는 그대로');
+    assert.equal((await J('/reset', { scope: 'youtube' })).d.episodes, 0, '또 눌러도 괜찮아요');
+    await stop(); await start();
+    assert.equal((await J('/status')).d.episodes.length, 0); assert.equal((await J('/hl/list')).d.jobs.length, 0);
+    assert.equal((await J('/health')).d.api, 9);
   });
   console.log(`\n전부 통과 (${ok}개)  · 산출물: ${tmp}`);
 } catch (e) { console.error('\n테스트 실패:', e.message); process.exitCode = 1; }
