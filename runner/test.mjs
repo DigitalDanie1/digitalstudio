@@ -208,7 +208,7 @@ try {
     const { r, d } = await J('/episodes', { title: '테스트: 그레코로만 던지기?', note: '허리 던지기 한 장면\n상대 균형을 먼저 무너뜨린다', url: src, ranges: '0:01-0:07, 0:03-0:08', ideaId: 'idea-1' });
     assert.equal(r.status, 200); E = d.ep; assert.ok(E);
     const e = await ep(); assert.equal(e.ideaId, 'idea-1'); assert.deepEqual(e.sources[0].ranges, ['0:01-0:07', '0:03-0:08']);
-    assert.deepEqual(e.steps.map(s => s.id), ['research', 'download', 'clip', 'plan', 'rough', 'subs', 'fx', 'script', 'mix', 'upload']);
+    assert.deepEqual(e.steps.map(s => s.id), ['research', 'download', 'clip', 'plan', 'rough', 'subs', 'fx', 'script', 'mix', 'upload', 'aicut', 'aistyle', 'aisubs']);
     assert.equal(e.look, ''); assert.equal(e.lookUsed, 'yt-wrestling');
     assert.ok(step(e, 'script').gate); assert.equal(e.gate, false);
   });
@@ -603,7 +603,7 @@ try {
   await check('예전 에피소드(8단계) → 새 단계로 옮기기', async () => {
     const legacy = (channel, st) => ({ ep: 'x', channel, format: 'shorts', sources: [{ url: 'u', ranges: ['0:00-0:15'] }], steps: Object.fromEntries(['research', 'download', 'script', 'plan', 'rough', 'finish', 'mix', 'upload'].map(id => [id, { status: st[id] || 'todo' }])) });
     const a = migrateState(legacy('yt-politics', { research: 'done', download: 'done', script: 'done', plan: 'done', rough: 'done', finish: 'done' }));
-    assert.deepEqual(STEP_DEFS.map(d => a.steps[d.id]?.status), ['done', 'done', 'done', 'done', 'done', 'done', 'done', 'done', 'todo', 'todo']);
+    assert.deepEqual(STEP_DEFS.slice(0, 10).map(d => a.steps[d.id]?.status), ['done', 'done', 'done', 'done', 'done', 'done', 'done', 'done', 'todo', 'todo']);
     assert.equal(a.look, 'yt-politics'); assert.equal(a.legacyBurn, true); assert.ok(!a.steps.finish);
     const b = migrateState(legacy('yt-christian', { research: 'done', download: 'todo' })); assert.equal(b.steps.clip.status, 'todo'); assert.equal(b.steps.subs.status, 'todo'); assert.equal(b.steps.fx.status, 'todo'); assert.ok(!b.legacyBurn);
     const c = legacy('', { research: 'done', download: 'done', finish: 'failed' }); c.steps.finish.error = '실패 사유';

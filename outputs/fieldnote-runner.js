@@ -321,6 +321,21 @@ document.addEventListener('click', async e => {
           runnerSelectedStep = runnerOpenLog = null; toast('룩을 정했어요: ' + r.ep);
         }
         if (typeof ytPipe === 'object') { ytPipe.look = ''; ytPipe.lookIdea = ''; }
+      } else if (a === 'aicut') {
+        // 레슬링 AI 편집 ②: 에피소드가 없으면 만들고(구간은 AI 가 골라요) 소스 확인·영상 받기·AI 하이라이트 1차 컷을 이어서 돌려요
+        if (act.dataset.yaConfirm && !confirm(act.dataset.yaConfirm)) return;
+        const idea = runnerIdea(); if (!idea) throw new Error('주제를 먼저 고르세요');
+        let ep = cur && cur.ep;
+        if (!ep) {
+          const url = (typeof ytPipe === 'object' && ytPipe.url) || ytFirstUrl(idea);
+          const r = await runnerFetch('/episodes', { title: idea.title, note: idea.note || '', url, deferRanges: true, ideaId: idea.id, channel: 'yt-wrestling', format: 'shorts' });
+          ep = r.ep;
+          if (!idea.ytStarted || idea.ytHidden) { idea.ytStarted = idea.ytStarted || Date.now(); delete idea.ytHidden; persist(); }
+        }
+        const done = id => !!cur && (cur.steps || []).some(x => x.id === id && x.status === 'done');
+        const steps = [...['research', 'download'].filter(id => !done(id)), 'aicut'];
+        await runnerFetch('/run', { ep, steps }); runnerOpenLog = steps[0]; runnerSelectedStep = null;
+        toast('1차 컷을 시작했어요. Claude 가 영상을 보는 데 몇 분 걸려요.');
       } else if (a === 'fxpack') {
         // ③ 최종 결과물 레퍼런스(이펙트 팩): 고른 팩과 더 강조할 시간을 저장. 바뀌면 이펙트부터 다시 만들어요.
         const pack = act.dataset.yaFxpack || '', times0 = (document.querySelector('[data-ya-new="fxtimes"]')?.value ?? ((typeof ytPipe === 'object' && ytPipe.fxTimes != null) ? ytPipe.fxTimes : cur?.fxTimes) ?? '').trim(), times = pack === 'none' ? '' : times0;

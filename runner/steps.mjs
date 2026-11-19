@@ -8,6 +8,7 @@ import {
   FFMPEG, YTDLP, FONT_DIR, FONT_NAME, StepError, StopError, run, ff, probe, lastLines, exists,
   parseRanges, rangeSecs, rangeSpeed, fmtTime, parseTime, isLocalSource, localPath, MAX_RANGE,
 } from './util.mjs';
+import { AI_FN, AI_OUT } from './ai.mjs';
 
 export const STEP_DEFS = [
   { id: 'research', name: '소스 확인' },
@@ -20,6 +21,9 @@ export const STEP_DEFS = [
   { id: 'script', name: '대본', gate: true },
   { id: 'mix', name: '목소리·음악' },
   { id: 'upload', name: '업로드 패키지' },
+  { id: 'aicut', name: 'AI 하이라이트 1차 컷' },
+  { id: 'aistyle', name: 'AI 스타일 입히기' },
+  { id: 'aisubs', name: 'AI 자막' },
 ];
 // 스튜디오 카드(9칸) 와 실행기 단계의 짝: 링크·룩 = 실행기 단계 없음 / 영상 다운 = research+download / 컷 편집 = 구간+clip+plan+rough /
 // 자막 = subs / 이펙트 = fx / 음악·녹음 = script(대본, 게이트) → 녹음 → mix / 업로드 패키지 = upload / 올리기 = 없음
@@ -329,6 +333,7 @@ export function outputsFor(id, E) {
     case 'subs': return ['편집/자막본.mp4', ...(exists(E.p('편집/원본자막.ass')) ? ['편집/원본자막.ass'] : [])];
     case 'fx': return ['편집/완성본.mp4'];
     case 'mix': return ['편집/최종본.mp4'];
+    case 'aicut': case 'aistyle': case 'aisubs': return AI_OUT[id];
     case 'upload': return ['업로드/업로드.txt', '업로드/업로드.json', '업로드/영상.mp4', '업로드/썸네일.jpg'];
     default: return [];
   }
@@ -1453,7 +1458,7 @@ export function migrateState(s) {
   }
   return s;
 }
-export const STEP_FN = { research, download, clip, plan, rough, subs, fx, script, mix, upload };
+export const STEP_FN = { research, download, clip, plan, rough, subs, fx, script, mix, upload, ...AI_FN };
 
 // ---------- 견본: 고른 룩·이펙트가 실제 영상에서 어떻게 보이는지 4초만 미리 만들어 봐요 ----------
 // 진짜 편집과 같은 길을 가요: 구간 자르기(cutClip) → 이어 붙이기 → 이펙트(fxDecorate·fxPackApply·fxGraph, 줄 자막 ASS 포함) → 효과음. 에피소드 상태·단계·파일은 건드리지 않고 '미리보기/' 폴더에만 써요.

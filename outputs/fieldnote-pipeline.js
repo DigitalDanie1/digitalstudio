@@ -858,7 +858,73 @@
         recordUrl('youtube', it.key, it.idea, it.idea.title);
       },
     };
+    if ((it.idea ? ytCh(it.idea) : ytTab()) === 'yt-wrestling') return [topic, ...ytAiCards(it, ep, off)];
     return [topic, look, fxref, ...mid, ...edits];
+  }
+  // ===== 레슬링 작업판 (AI 편집, 맥의 Claude Code): 링크 → 하이라이트 1차 컷 → 스타일 선택 → 스타일 입히기 → 자막 → 다운로드 =====
+  // 인트로·아웃트로는 모든 단계에서 후크: 1차 컷(첫 컷 intro·마지막 컷 outro) / 스타일(위 제목) / 자막(0초 후크·마지막 줄 후크)
+  const AI_LOOKS = ['yt-mat'];
+  function ytAiCards(it, ep, off) {
+    const names = ['하이라이트 1차 컷', '스타일 선택', '스타일 입히기', '자막', '다운로드'];
+    const st = id => (ep && (ep.steps || []).find(x => x.id === id)) || { status: 'todo', outputs: [] }, ok = id => st(id).status === 'done';
+    const out = (id, p) => (st(id).outputs || []).find(o => o.path === p && o.exists);
+    const old = !!ep && !(ep.steps || []).some(x => x.id === 'aicut');
+    const oldMsg = '<p class="pl-error" role="alert"><b>맥의 실행기를 업데이트해야 AI 편집을 쓸 수 있어요.</b> 저장소를 <code>git pull</code> 한 뒤 <code>runner/설치·업데이트.command</code> 를 더블클릭하세요.</p>';
+    const runIn = ids => !!(ep && ep.running && ids.includes(ep.running));
+    const busyElse = ids => !!(ep && ep.running && !ids.includes(ep.running));
+    const errOf = ids => { const f = ids.map(st).find(x => x.status === 'failed'); return f && f.error ? `<p class="pl-error"><b>${esc(f.name)}</b> · ${esc(runnerFriendly(f.error))}</p>` : ''; };
+    const logs = ids => `<div class="pl-logs">${ids.map(id => `<button type="button" class="pl-link" data-pl-log="${id}" aria-expanded="${T.logOpen === id}">${esc(st(id).name || id)} 로그${T.logOpen === id ? ' 닫기' : ''}</button>`).join('')}</div>${ids.includes(T.logOpen) ? '<pre class="pl-log" id="plLog">불러오는 중…</pre>' : ''}`;
+    const vid = (id, p, label) => { const o = out(id, p); return o ? ytVideoBox('plAi' + id, ep, o, label) : ''; };
+    const runLine = ids => () => runIn(ids) ? `<b>실행 중…</b> ${esc(st(ep.running).name || ep.running)}. Claude 가 영상을 보는 단계는 몇 분 걸려요. 끝나면 자동으로 바뀌어요.` : '';
+    const stopOr = (ids, attrs) => () => runIn(ids) ? 'data-ya-act="stop"' : attrs;
+    const card = (i, o) => ({ id: 'ai' + i, name: names[i], title: names[i], run: () => {}, ...o });
+    const CUT = ['research', 'download', 'aicut'], cutDone = ok('aicut'), lookOk = !!ep && AI_LOOKS.includes(ep.look);
+    const c1 = card(0, {
+      desc: !it.idea ? '앞 단계를 끝내면 열려요.' : 'Claude 가 영상을 처음부터 끝까지 보고 제일 센 장면을 골라 1차 컷을 만들어요. 인트로(첫 1.5~3초)는 제일 충격적인 순간부터, 아웃트로는 인트로로 다시 이어지게 잘라요. 기술은 원속도 → 단계별 슬로우 → 원속도로 세 번 보여 줘요.',
+      btn: () => runIn(CUT) ? '실행 멈춤' : cutDone ? 'AI 가 다시 자르기' : '1차 컷 만들기',
+      attrs: stopOr(CUT, `data-ya-act="aicut"${cutDone ? ' data-ya-confirm="1차 컷을 다시 만들어요. 스타일·자막도 다시 해야 해요. 계속할까요?"' : ''}`),
+      cls: runIn(CUT) ? 'danger' : '',
+      disabled: () => !it.idea || off || runnerOnline === null || old || busyElse(CUT),
+      isDone: () => cutDone,
+      statusLine: runLine(CUT),
+      result: () => ep ? errOf(CUT) + (cutDone ? `<p><b>1차 컷이 나왔어요.</b> 인트로·아웃트로가 후크인지 보고, 아니면 "AI 가 다시 자르기"를 누르세요.</p>` + vid('aicut', '편집/AI1차컷.mp4', '1차 컷') : '') + logs(CUT) : '',
+      body: () => (off ? '<p class="pl-error" role="alert"><b>실행기가 꺼져 있어요.</b></p>' : old ? oldMsg : ''),
+    });
+    const pick = ep && ep.look && AI_LOOKS.includes(ep.look) ? ep.look : 'yt-mat';
+    const c2 = card(1, {
+      desc: !cutDone ? '1차 컷이 끝나면 열려요.' : '이 쇼츠에 입힐 편집 스타일을 고르세요. AI 편집은 지금 매트 스토리 룩만 돼요.',
+      btn: lookOk ? '이 스타일로 정했어요' : '이 스타일로 정하기',
+      attrs: () => `data-ya-act="look" data-ya-look="${esc(pick)}"`,
+      disabled: () => off || !cutDone || lookOk || !!ep.running,
+      isDone: () => cutDone && lookOk,
+      result: () => lookOk ? `<b>${esc((ytLooks().find(l => l.id === ep.look) || { name: ep.look }).name)}</b>로 정했어요.` : '',
+      body: () => cutDone ? `<div class="pl-looks" role="radiogroup" aria-label="편집 스타일">${AI_LOOKS.map(id => { const l = ytLooks().find(x => x.id === id) || { name: id, desc: '' }; return `<button type="button" role="radio" aria-checked="${pick === id}" class="pl-topic on">${ytLookMock(id)}<span class="pl-lk-txt"><b>${esc(l.name)}</b><span class="small">${esc(l.desc)}</span></span></button>`; }).join('')}</div>` : '',
+    });
+    const ST = ['aistyle'], styDone = ok('aistyle');
+    const c3 = card(2, {
+      desc: !lookOk ? '스타일을 고르면 열려요.' : 'Claude 가 경기·선수·기록을 조사하고(A·B 등급 사실만), 위 2줄 제목(인트로 후크)·선수 라벨·점수 팝업을 정해서 고른 스타일로 입혀요.',
+      btn: () => runIn(ST) ? '실행 멈춤' : styDone ? '다시 입히기' : '스타일 입히기',
+      attrs: stopOr(ST, 'data-ya-steps="aistyle"'), cls: runIn(ST) ? 'danger' : '',
+      disabled: () => off || !lookOk || !cutDone || busyElse(ST),
+      isDone: () => styDone, statusLine: runLine(ST),
+      result: () => ep ? errOf(ST) + (styDone ? vid('aistyle', '편집/AI스타일본.mp4', '스타일본 (자막 전)') + (out('aistyle', '조사/research.md') ? `<p class="small">${ytFileLink(ep.ep, { path: '조사/research.md' })} · 제목·라벨에 쓴 사실의 근거</p>` : '') : '') + logs(ST) : '',
+    });
+    const SU = ['aisubs'], subDone = ok('aisubs');
+    const c4 = card(3, {
+      desc: !styDone ? '스타일을 입히면 열려요.' : 'Claude 가 한국어 자막을 써요. 0초부터 결과를 먼저 던지는 인트로 후크, 슬로우 구간마다 ①②③ 단계 이름, 다시 보게 만드는 아웃트로 후크까지.',
+      btn: () => runIn(SU) ? '실행 멈춤' : subDone ? '자막 다시 쓰기' : '자막 넣기',
+      attrs: stopOr(SU, 'data-ya-steps="aisubs"'), cls: runIn(SU) ? 'danger' : '',
+      disabled: () => off || !styDone || busyElse(SU),
+      isDone: () => subDone, statusLine: runLine(SU),
+      result: () => ep ? errOf(SU) + (subDone ? vid('aisubs', '편집/AI완성.mp4', '완성본') : '') + logs(SU) : '',
+    });
+    const fin = out('aisubs', '편집/AI완성.mp4');
+    const c5 = card(4, {
+      desc: !fin ? '자막까지 끝나면 열려요.' : '완성본을 내려받아 YouTube Studio 에서 올리세요.',
+      hideBtn: () => true, isDone: () => !!fin,
+      result: () => fin ? `<div class="pl-files"><a class="btn ghost ya-file" href="${RUNNER}/file?ep=${encodeURIComponent(ep.ep)}&path=${encodeURIComponent(fin.path)}&dl=1">완성본 내려받기 ⬇</a> ${out('aistyle', '편집/AI완성.json') ? ytFileLink(ep.ep, { path: '편집/AI완성.json' }) : ''}</div>` : '',
+    });
+    return [c1, c2, c3, c4, c5];
   }
   // ===== ④ 1차 편집 · ⑤ 자막 넣기 · ⑥ 2차 편집 · ⑦ 최종 편집안 다운로드 =====
   function ytEditCards(it, ep, off) {
@@ -957,6 +1023,13 @@
     const ep = ytEp(i);
     if (ep) {
       const ok = id => (ep.steps || []).some(x => x.id === id && x.status === 'done'), r = ep.round || 0, fb = (ep.feedbackAt || 0) > (ep.editAt || 0);
+      if (ytCh(i) === 'yt-wrestling') {   // AI 작업판 6칸
+        const af = [true, ok('aicut'), ok('aicut') && AI_LOOKS.includes(ep.look), ok('aistyle'), ok('aisubs'), ok('aisubs')], an = af.filter(Boolean).length, ak = af.findIndex(x => !x);
+        const AN = ['원본 링크', '하이라이트 1차 컷', '스타일 선택', '스타일 입히기', '자막', '다운로드'], ab = [];
+        if (ep.running) ab.push('<i class="b run">실행 중</i>');
+        if ((ep.steps || []).some(x => ['research', 'download', 'aicut', 'aistyle', 'aisubs'].includes(x.id) && x.status === 'failed')) ab.push('<i class="b fail">실패</i>');
+        return `${an}/6 단계 · ${esc(ak < 0 ? '끝' : AN[ak])}${ab.length ? `<span class="pl-wbs">${ab.join('')}</span>` : ''}`;
+      }
       const flags = [true, !!ep.look, !!(ep.fxPack || (ep.round || 0) >= 1 || (ok('research') && ok('download'))), ok('research') && ok('download'), r >= 1, fb || r >= 2, r >= 2 && !fb, ok('upload')], n = flags.filter(Boolean).length, k = flags.findIndex(x => !x);
       const nx = k < 0 ? null : { g: { name: YT_PLACEHOLDER[k] } };
       const b = [];
@@ -966,7 +1039,7 @@
       if (ytEditVideo(ep)) b.push('<i class="b vid">▶ 편집본</i>');
       return `${n}/${flags.length} 단계 · ${esc(nx ? nx.g.name : '끝')}${b.length ? `<span class="pl-wbs">${b.join('')}</span>` : ''}`;
     }
-    return runnerOnline === false && !runnerData ? '실행기 꺼짐 · 상태 모름' : '편집 스타일 선택 전';
+    return runnerOnline === false && !runnerData ? '실행기 꺼짐 · 상태 모름' : ytCh(i) === 'yt-wrestling' ? '1차 컷 전' : '편집 스타일 선택 전';
   }
   function ytWipHtml(curId) {
     const list = ytWipList();
@@ -1231,7 +1304,7 @@
       <div class="pl-top">${items}${insta}</div>${c === 'youtube' ? ytPlayerHtml(it) : ''}${bar}
       <article class="pl-card" aria-live="polite"><div class="pl-steplabel">${v + 1} / ${N} 단계 ${lastLabel}</div>
         <h2>${esc(val(s.title, it))}</h2><p class="pl-desc">${esc(val(s.desc, it))}</p>
-        ${c === 'youtube' ? ytOutHtml(it) : ''}${val(s.body || '', it) || ''}${err}
+        ${c === 'youtube' && !(it.idea ? ytCh(it.idea) === 'yt-wrestling' : ytTab() === 'yt-wrestling') ? ytOutHtml(it) : ''}${val(s.body || '', it) || ''}${err}
         ${btn}${statusLine ? `<p class="small pl-status">${esc(statusLine)}</p>` : ''}
         <div class="pl-result" aria-label="이 단계의 결과"><div class="pl-result-h">결과</div>${res || '<span class="small">아직 없어요. 위 버튼을 누르면 여기에 나와요.</span>'}</div>
         ${finish}
