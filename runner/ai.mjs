@@ -42,6 +42,8 @@ async function askClaude(E, ctx, prompt, check) {
     let out;
     try { ({ out } = await run(CLAUDE, ['-p', p, '--output-format', 'json', '--allowedTools', 'Read,Write,WebSearch,WebFetch', '--add-dir', E.dir, '--add-dir', SKILL_DIR], ctx)); }
     catch (e) {
+      const lim = /hit your limit[^"]*/i.exec(String(e.out || '') + String(e.err || ''));
+      if (lim) throw new StepError('Claude 구독 사용 한도에 걸렸어요 (' + lim[0] + '). 풀린 뒤 다시 실행하세요.');
       if (e instanceof StopError || e instanceof StepError) throw e.message.includes('ENOENT') ? new StepError('Claude Code(claude)를 못 찾았어요. 맥에 Claude Code 를 설치하고 로그인해 주세요.') : e;
       throw new StepError('Claude Code 실행 실패: ' + (lastLines(e.err) || lastLines(e.out) || e.message));
     }
@@ -117,7 +119,7 @@ ${trTxt}
 JSON 하나만 답해라:
 {"moments":[{"t":원본초,"what":"그 순간 화면에 보이는 것"}],
  "cuts":[{"a":원본초,"b":원본초,"speed":1,"role":"intro|score|slow|after|outro","step":"슬로우 단계 이름(slow 일 때만)"}],
- "who":"화면에서 확인되는 선수/팀/대회 정보, 모르면 빈칸",
+ "who":"선수/팀/대회. 누가 어느 쪽인지는 싱글릿 글씨·색·점수판 이름 같은 화면 근거로만 정하고 근거를 괄호로 적어라. 확실하지 않으면 빈칸",
  "crop_bottom": 화면 아래쪽 중계 띠(뉴스 티커·광고 띠 등)가 차지하는 높이 비율 0~0.25 (없으면 0. 경기 장면이 잘리지 않게)}`,
     j => {
       const c = j.cuts;
@@ -195,6 +197,7 @@ async function aistyle(E, ctx) {
   fs.mkdirSync(E.p('조사'), { recursive: true });
   const j = await askClaude(E, ctx, `${skills(ctx, ['source-check-research', 'shorts-blueprint'])}${common(E, st, info, plan)}
 
+주의: 1차 컷의 who 와 moments 의 선수 구분(누가 누구를 넘겼는지, 누가 이겼는지)은 틀릴 수 있다. 조사 결과와 프레임(싱글릿 글씨·색)으로 다시 확인하고, 다르면 조사와 화면을 따른다.
 먼저 할 일: 이 경기·선수·대회·기록을 source-check-research 방식(한·영 검색, A/B/C 등급, 교차 확인, 확인 못 한 것 표시)으로 조사해서 Write 도구로 ${E.p('조사/research.md')} 에 저장한다.
 
 이번 할 일: 스타일 요소만 정한다 (자막은 다음 단계).
@@ -216,6 +219,7 @@ async function aisubs(E, ctx) {
   const j = await askClaude(E, ctx, `${skills(ctx, ['shorts-blueprint'])}${common(E, st, info, plan)}
 이미 정한 위 제목·라벨·팝업 (바꾸지 말고 그대로 돌려줘라): ${JSON.stringify({ frame: base.frame, fx: base.fx, credits: base.credits })}
 
+선수 구분과 승패는 조사 파일과 프레임 기준이다 (1차 컷의 who·moments 가 틀렸을 수 있다).
 이번 할 일: 자막. 인트로와 아웃트로가 제일 중요하다. 둘 다 후크다.
 - 인트로(intro 컷 구간): 0초에 바로 시작. 결과/숫자/반전을 먼저 던진다 (예: "올림픽 5연패\\n시작 15초 만에 들어 던지기"). 인사, 설명, "오늘은" 금지.
 - 아웃트로(outro 컷 구간): 영상 끝까지. 다시 보게 만드는 한 줄 (예: "자, 15초 만에 [[한 번 더]].") 또는 댓글을 부르는 질문. 마지막 자막이 인트로로 이어지게.
