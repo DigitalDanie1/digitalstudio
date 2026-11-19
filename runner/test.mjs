@@ -16,7 +16,7 @@ const sameAsOld = P => { if (oldBuildAss) assert.equal(buildAss(P), oldBuildAss(
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'runner-test-'));
 const PORT = +(process.env.FIELDNOTE_TEST_PORT || process.env.TEST_PORT || 4790), B = `http://127.0.0.1:${PORT}`;
-const env = { ...process.env, FIELDNOTE_RUNNER_PORT: PORT, FIELDNOTE_RUNNER_DATA: path.join(tmp, 'data'), FIELDNOTE_RUNNER_HOME: path.join(tmp, 'home'), ANTHROPIC_API_KEY: '' };
+const env = { ...process.env, FIELDNOTE_RUNNER_PORT: PORT, FIELDNOTE_RUNNER_DATA: path.join(tmp, 'data'), FIELDNOTE_RUNNER_HOME: path.join(tmp, 'home'), FIELDNOTE_TRASH_DIR: path.join(tmp, 'trash'), ANTHROPIC_API_KEY: '' };
 delete env.ANTHROPIC_API_KEY;
 
 // ---- Codex 그림 테스트용 가짜 환경 ----
@@ -698,10 +698,10 @@ try {
     assert.equal(f(a).channel, 'yt-christian'); assert.equal(f(b).channel, ''); assert.equal(f(c).channel.length, 40);
     assert.equal(st(a).voice.length, 2000); assert.equal(st(b).voice, '');
   });
-  await check('/health: 버전(version)과 기능 수준(api = 6)', async () => {
+  await check('/health: 버전(version)과 기능 수준(api = 8)', async () => {
     const { r, d } = await J('/health');
     assert.equal(r.status, 200); assert.equal(d.ok, true);
-    assert.equal(d.api, 6);
+    assert.equal(d.api, 8);
     assert.equal(typeof d.version, 'string'); assert.ok(d.version.length > 0);
   });
   await check('재시작 복구: running → failed(한국어)', async () => {
@@ -842,6 +842,56 @@ try {
     for (let i = 0; i < 150; i++) { const x = (await J('/status')).d.episodes.find(y => y.ep === e.ep); if (!x.running) break; await new Promise(r => setTimeout(r, 200)); }
     const e2 = (await J('/status')).d.episodes.find(x => x.ep === e.ep); assert.equal(step(e2, 'clip').status, 'done', step(e2, 'clip').error);
     assert.ok(step(e2, 'clip').outputs.length === 1 && step(e2, 'clip').outputs[0].exists);
+  });
+  await check('/preview 견본: 룩×팩 조합마다 540x960 약 4초 mp4 · 같은 입력은 캐시 · 없는 에피소드/룩/팩 거절 · 에피소드 단계는 그대로', async () => {
+    await stop(); await start();
+    const all0 = (await J('/status')).d.episodes, e0 = all0.find(x => step(x, 'download').status === 'done'); assert.ok(e0, '받기가 끝난 에피소드가 있어야 해요');
+    const stateOf = async () => { const x = (await J('/status')).d.episodes.find(y => y.ep === e0.ep); return JSON.stringify({ running: x.running, look: x.look, fxPack: x.fxPack, round: x.round, steps: x.steps.map(s => [s.id, s.status, s.error || '', s.outputs.map(o => [o.path, o.exists, o.mtime])]) }); };
+    const before = await stateOf();
+    const combos = [['yt-mat', 'match'], ['yt-raw', 'raw'], ['yt-steps', 'steps'], ['yt-words', 'words'], ['yt-tags', 'tags'], ['yt-christian', 'calm'], ['yt-politics', 'punch'], ['yt-wrestling', 'none']];
+    const made = {};
+    for (const [look, pack] of combos) {
+      const { r, d } = await J('/preview', { ep: e0.ep, look, pack, times: '0:01 벽처럼 서기', labels: ['낮추기', '밀기'] }); assert.equal(r.status, 200, look + '/' + pack + ' ' + JSON.stringify(d));
+      assert.equal(d.ok, true); assert.ok(new RegExp(`^미리보기/${look}-${pack}-[0-9a-f]{10}\\.mp4$`).test(d.path), d.path);
+      const f = path.join(tmp, 'data', e0.ep, d.path), pr = await probe(f);
+      assert.equal(pr.width, 540, look); assert.equal(pr.height, 960, look); assert.ok(pr.hasAudio, look + ' 소리');
+      assert.ok(pr.duration > (pack === 'raw' ? 4.0 : 3.5) && pr.duration < (pack === 'raw' ? 4.6 : 4.6), look + ' 길이 ' + pr.duration);
+      const g = await fetch(B + '/file?ep=' + encodeURIComponent(e0.ep) + '&path=' + encodeURIComponent(d.path)); assert.equal(g.status, 200); assert.equal(g.headers.get('content-type'), 'video/mp4'); await g.arrayBuffer();
+      made[look] = { path: d.path, mtime: fs.statSync(f).mtimeMs };
+    }
+    const again = await J('/preview', { ep: e0.ep, look: 'yt-mat', pack: 'match', times: '0:01 벽처럼 서기', labels: ['낮추기', '밀기'] });
+    assert.equal(again.r.status, 200); assert.equal(again.d.cached, true); assert.equal(again.d.path, made['yt-mat'].path); assert.equal(fs.statSync(path.join(tmp, 'data', e0.ep, again.d.path)).mtimeMs, made['yt-mat'].mtime, '캐시를 다시 만들면 안 돼요');
+    assert.notEqual((await J('/preview', { ep: e0.ep, look: 'yt-mat', pack: 'punch' })).d.path, made['yt-mat'].path, '팩이 다르면 다른 파일');
+    assert.equal((await J('/preview', { ep: 'nope', look: 'yt-mat', pack: 'match' })).r.status, 404);
+    assert.equal((await J('/preview', { ep: e0.ep, look: 'yt-zzz', pack: 'match' })).r.status, 400);
+    assert.equal((await J('/preview', { ep: e0.ep, look: 'yt-mat', pack: 'zzz' })).r.status, 400);
+    assert.equal((await J('/preview', { ep: e0.ep, look: 'yt-mat', pack: 'tags', times: 'abc' })).r.status, 400);
+    const nov = await J('/episodes', { title: '받기 전', url: 'https://example.com/x', ranges: '0:00-0:05' });
+    const none = await J('/preview', { ep: nov.d.ep, look: 'yt-mat', pack: 'match' }); assert.equal(none.r.status, 400); assert.match(none.d.error, /먼저/);
+    // 새 요청이 오면 옛 요청은 멈추거나(409) 이미 끝나 있어요 · 마지막 요청은 꼭 만들어져요
+    const p1 = J('/preview', { ep: e0.ep, look: 'yt-tags', pack: 'tags', times: '0:02 휙' }); await new Promise(r => setTimeout(r, 120));
+    const p2 = J('/preview', { ep: e0.ep, look: 'yt-tags', pack: 'punch', times: '0:02 휙' });
+    const [r1, r2] = await Promise.all([p1, p2]); assert.ok([200, 409].includes(r1.r.status), 'p1 ' + r1.r.status + JSON.stringify(r1.d)); assert.equal(r2.r.status, 200, JSON.stringify(r2.d));
+    assert.ok(!fs.readdirSync(path.join(tmp, 'data', e0.ep, '미리보기')).some(f => f.startsWith('.tmp-')), '임시 폴더가 남으면 안 돼요');
+    assert.equal(await stateOf(), before, '견본은 에피소드 단계·결과 파일을 바꾸면 안 돼요');
+  });
+  await check('에피소드 완전히 지우기: 휴지통 폴더로 옮기고 /status 에서 사라져요 (+ 없는 에피소드·경로 검사)', async () => {
+    await stop(); await start();
+    assert.equal((await J('/health')).d.api, 8);
+    const mk = await J('/episodes', { title: '지울 주제', url: 'https://example.com/x', ranges: '0:00-0:05' }); assert.equal(mk.r.status, 200, JSON.stringify(mk.d));
+    const name = mk.d.ep, dir = path.join(tmp, 'data', name), trash = path.join(tmp, 'trash');
+    fs.writeFileSync(path.join(dir, '원본', 'keep.txt'), 'hi'); assert.ok(fs.existsSync(dir));
+    assert.equal((await J('/episode/delete', { ep: 'nope' })).r.status, 404);
+    assert.equal((await J('/episode/delete', {})).r.status, 404);
+    assert.equal((await J('/episode/delete', { ep: '../home' })).r.status, 404);
+    assert.ok(fs.existsSync(dir), '잘못된 요청에 폴더가 남아야 해요');
+    const { r, d } = await J('/episode/delete', { ep: name }); assert.equal(r.status, 200, JSON.stringify(d));
+    assert.equal(d.ok, true); assert.ok(d.trashed.startsWith(trash + path.sep), d.trashed);
+    assert.ok(!fs.existsSync(dir), '데이터 폴더에서 빠져야 해요'); assert.equal(fs.readFileSync(path.join(d.trashed, '원본', 'keep.txt'), 'utf8'), 'hi');
+    assert.ok(!(await J('/status')).d.episodes.some(x => x.ep === name));
+    assert.equal((await J('/episode/delete', { ep: name })).r.status, 404, '두 번째는 없는 에피소드');
+    // 다시 켜도 안 살아나요
+    await stop(); await start(); assert.ok(!(await J('/status')).d.episodes.some(x => x.ep === name));
   });
   console.log(`\n전부 통과 (${ok}개)  · 산출물: ${tmp}`);
 } catch (e) { console.error('\n테스트 실패:', e.message); process.exitCode = 1; }

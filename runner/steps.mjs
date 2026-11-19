@@ -3,6 +3,7 @@
 //  ctx = { log, aborted, setChild }
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import {
   FFMPEG, YTDLP, FONT_DIR, FONT_NAME, StepError, StopError, run, ff, probe, lastLines, exists,
   parseRanges, rangeSecs, rangeSpeed, fmtTime, parseTime, isLocalSource, localPath, MAX_RANGE,
@@ -489,6 +490,19 @@ export const clipMap = (E, info) => {
 };
 // atempo 는 0.5~2 만 돼서 더 느리면 여러 번 이어요
 const atempoChain = sp => { const out = []; let r = sp; while (r < 0.5 - 1e-9) { out.push('atempo=0.5'); r /= 0.5; } if (Math.abs(r - 1) > 1e-6) out.push(`atempo=${+r.toFixed(4)}`); return out.join(','); };
+// 소스 영상의 한 구간을 룩 틀에 맞춰 잘라 클립 하나로 (구간 자르기 단계와 견본이 같이 써요). 실패하면 ffmpeg 오류(e.err)를 그대로 던져요.
+export async function cutClip(E, ctx, { input, offset, d, sp = 1, out, preset = 'veryfast', crf = '20' }) {
+  const outD = d / sp;
+  let fc = clipFilter(E, sp), aIn = [], aMap = ['-an'];
+  if (keepsAudio(E)) {   // 원본 소리 살리기: 소리가 없는 영상이면 무음으로 채워서 클립마다 소리 칸이 꼭 있게 해요 (이어 붙이기 때문)
+    const has = (await probe(input, ctx)).hasAudio, at = atempoChain(sp);
+    if (has) fc += `;[0:a]aresample=44100,aformat=channel_layouts=stereo${at ? ',' + at : ''},atrim=0:${outD.toFixed(3)},asetpts=PTS-STARTPTS[a]`;
+    else { aIn = ['-f', 'lavfi', '-t', outD.toFixed(3), '-i', 'anullsrc=r=44100:cl=stereo']; fc += `;[1:a]anull[a]`; }
+    aMap = ['-map', '[a]', '-c:a', 'aac', '-b:a', '160k'];
+  }
+  await ff(['-ss', String(offset), '-t', String(d), '-i', input, ...aIn, '-filter_complex', fc, '-map', '[v]', ...aMap,
+    '-c:v', 'libx264', '-preset', preset, '-crf', crf, '-pix_fmt', 'yuv420p', '-movflags', '+faststart', out], ctx);
+}
 async function clip(E, ctx) {
   const info = readJson(E.p('소스.json'));
   if (!info) throw new StepError('소스 확인이 먼저예요. "소스 확인" 단계를 실행하세요.');
@@ -521,17 +535,8 @@ async function clip(E, ctx) {
     }
     const sp = m.speed || 1, outD = d / sp;
     ctx.log(`  자르는 중 → ${path.basename(clipFile)} (${d}초${sp < 1 ? ` → 슬로우 ${sp}배 ${outD.toFixed(1)}초` : ''}, ${E.s.format === 'long' ? '가로' : '세로'})`);
-    try {
-      let fc = clipFilter(E, sp), aIn = [], aMap = ['-an'];
-      if (keepsAudio(E)) {   // 원본 소리 살리기: 소리가 없는 영상이면 무음으로 채워서 클립마다 소리 칸이 꼭 있게 해요 (이어 붙이기 때문)
-        const has = (await probe(input, ctx)).hasAudio, at = atempoChain(sp);
-        if (has) fc += `;[0:a]aresample=44100,aformat=channel_layouts=stereo${at ? ',' + at : ''},atrim=0:${outD.toFixed(3)},asetpts=PTS-STARTPTS[a]`;
-        else { aIn = ['-f', 'lavfi', '-t', outD.toFixed(3), '-i', 'anullsrc=r=44100:cl=stereo']; fc += `;[1:a]anull[a]`; }
-        aMap = ['-map', '[a]', '-c:a', 'aac', '-b:a', '160k'];
-      }
-      await ff(['-ss', String(offset), '-t', String(d), '-i', input, ...aIn, '-filter_complex', fc, '-map', '[v]', ...aMap,
-        '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', clipFile], ctx);
-    } catch (e) { if (e instanceof StopError) throw e; throw new StepError(`ffmpeg가 영상을 자르지 못했어요: ${lastLines(e.err)}`); }
+    try { await cutClip(E, ctx, { input, offset, d, sp, out: clipFile }); }
+    catch (e) { if (e instanceof StopError) throw e; throw new StepError(`ffmpeg가 영상을 자르지 못했어요: ${lastLines(e.err)}`); }
     if (!exists(clipFile)) throw new StepError('구간을 자르지 못했어요(영상이 짧은가요?).');
   }
   ctx.log(`클립 ${total}개 완성.`);
@@ -764,22 +769,28 @@ const spread = (items, t0, t1) => {   // 글자 수에 비례해 줄마다 시�
   let t = t0;
   return items.map((it, i) => { const d = minD + spare * weights[i] / sumW, start = t; t += d; return { start, end: i === items.length - 1 ? t1 : t }; });
 };
-export function layoutLines(E, ctx) {
-  const lines = checkScript(E), look = lookOf(E), P = readJson(E.p('편집/편집계획.json'));
-  if (!P) throw new StepError('컷 편집이 먼저예요. "편집 계획"을 만들어 주세요.');
-  const items = look?.kind === 'mat' ? matItems(lines) : look ? lines.map(l => parseLine(l, look.kind)) : lines.map(text => ({ text })), T = P.total;
-  if (!items.length) throw new StepError('대본에 자막 줄이 없어요. [태그]·[점수] 줄 말고 자막 줄도 넣어 주세요.');
+// 대본 항목(items) → 시간표가 붙은 줄 목록 (대본 시간표 짜기와 견본이 같이 써요)
+export function placeLines(items, look, P) {
+  const T = P.total;
   const intro = look?.kind === 'banner' && P.bw?.[0] ? P.bw[0][1] : 0;   // 이펙트의 흑백 인트로 안에 나레이션 줄을 먼저 보여 줘요
   let lead = 0; if (intro) while (lead < items.length && items[lead].narr) lead++;
   const timed = lead && lead < items.length ? [...spread(items.slice(0, lead), 0, intro), ...spread(items.slice(lead), intro, T)] : spread(items, 0, T);
-  P.lines = items.map((it, i) => {
+  return items.map((it, i) => {
     const { start, end } = timed[i], clipI = P.clips.findIndex(u => start >= u.start - 1e-6 && start < u.start + u.duration - 1e-6);
     const o = { i, text: it.text, start: +start.toFixed(2), end: +end.toFixed(2), clip: Math.max(0, clipI) };
     if (look) Object.assign(o, { ko: it.ko, en: it.en, narr: it.narr, ...(look.kind === 'punch' ? { punch: !!it.punch } : {}), ...(it.tag ? { tag: it.tag } : {}), ...(it.stamp ? { stamp: it.stamp } : {}) });
     return o;
   });
+}
+export const itemsOf = (lines, look) => (look?.kind === 'mat' ? matItems(lines) : look ? lines.map(l => parseLine(l, look.kind)) : lines.map(text => ({ text })));
+export function layoutLines(E, ctx) {
+  const lines = checkScript(E), look = lookOf(E), P = readJson(E.p('편집/편집계획.json'));
+  if (!P) throw new StepError('컷 편집이 먼저예요. "편집 계획"을 만들어 주세요.');
+  const items = itemsOf(lines, look);
+  if (!items.length) throw new StepError('대본에 자막 줄이 없어요. [태그]·[점수] 줄 말고 자막 줄도 넣어 주세요.');
+  P.lines = placeLines(items, look, P);
   writeJson(E.p('편집/편집계획.json'), P);
-  ctx?.log?.(`대본 ${P.lines.length}줄을 영상(${T.toFixed(1)}초)에 배분했어요.`);
+  ctx?.log?.(`대본 ${P.lines.length}줄을 영상(${P.total.toFixed(1)}초)에 배분했어요.`);
   return P.lines;
 }
 // 대본이 이미 확인돼 있으면(예전 에피소드·다시 실행) 시간표를 자동으로 다시 짜요
@@ -1181,6 +1192,77 @@ async function subs(E, ctx) {
 }
 
 // ---------- 7. 이펙트: 룩에 맞는 배너·훅·흑백 인트로·제목 카드·워터마크 ----------
+// 룩·팩이 영상 위에 얹을 문구(배너·훅·제목 상자·단계 라벨)를 계획 P 에 적어요 (이펙트 단계와 견본이 같이 써요). txt = 대본.md 글, info = 소스.json
+function fxDecorate(E, P, txt, info, log) {
+  const look = P.look && P.height > P.width ? P.look : null;
+  if (look?.kind === 'mat') {
+    const b = parseBanner(txt) || bannerFromTitle(E.s.title);
+    const credit = parseCredit(txt) || [...new Set(info.filter(x => !x.local && x.channel).map(x => x.channel))].join(' · ');
+    P.banner = { small: b.small, big: b.big }; P.credit = credit; P.bw = [];
+    log(`  제목: ${b.small || '(없음)'} / ${b.big}${credit ? ' · 출처: ' + credit : ''}`);
+  } else if (look?.kind === 'punch') {
+    const h = parseHook(txt) || hookFromTitle(E.s.title);
+    P.hook = { text: h.text, dur: +Math.min(look.hookDur, P.total * 0.3).toFixed(2) }; P.bw = [];
+    log(`  훅 제목: ${h.text} (처음 ${P.hook.dur}초)`);
+  } else if (look) {
+    const b = parseBanner(txt) || bannerFromTitle(E.s.title), end = +Math.min(look.introDur ?? 4, P.total * 0.3).toFixed(2);
+    P.banner = { small: b.small, big: b.big }; P.bw = look.introBW && end > 0 ? [[0, end]] : [];
+    log(`  배너: ${b.small || '(없음)'} / ${b.big}${P.bw.length ? ` · 흑백 인트로 0~${end}초` : ''}`);
+  }
+  const pk0 = fxPackOf(E);
+  delete P.fxTitle; delete P.fxSteps;
+  if (pk0.hookFixed || pk0.steps) {   // 한 방 리얼·단계 강의: 팩이 제목 문구를 직접 보여 줘요 (룩의 훅 칸은 비켜요)
+    const h = parseHook(txt) || hookFromTitle(E.s.title);
+    P.fxTitle = { text: h.text, dur: pk0.steps ? +Math.min(pk0.titleDur, P.total * 0.3).toFixed(2) : P.total };
+    if (P.hook) P.hook.dur = 0;
+    log(`  제목 문구: ${h.text}${pk0.steps ? ` (처음 ${P.fxTitle.dur}초)` : ' (영상 내내)'}`);
+  }
+  if (pk0.steps) { P.fxSteps = stepLabels(E.s.fxLabels, P.clips.length).map((label, i) => ({ start: P.clips[i].start, end: +(P.clips[i].start + P.clips[i].duration).toFixed(2), label })); log(`  단계 라벨: ${P.fxSteps.map(x => x.label).join(' / ')}`); }
+}
+// 이펙트 팩의 강조 순간·영상 필터를 계획 P 에 남기고 필터 글(fxv)을 돌려줘요 (P.lines 는 미리 있어야 해요). 이펙트 없음 = ''
+function fxPackApply(E, P, pack, area, log) {
+  if (pack.id === 'none') return '';
+  P.fxPack = pack.id; P.fxPop = !!pack.pop; P.fxEvents = buildFxEvents(E, P, pack);
+  const fxv = fxVideoFilter(pack, P, P.fxEvents, area[0], area[1]);
+  const cnt = k => P.fxEvents.filter(e => e.kind === k).length;
+  log(`이펙트 팩: ${pack.name} · 컷 ${cnt('cut')}곳 · 슬로우 ${cnt('slow')}곳 · 강조 ${cnt('hit')}곳${pack.tags ? ` · 라벨 ${cnt('label')}곳` : ''}${pack.pop ? ' · 강조 단어 팝' : ''}`);
+  return fxv;
+}
+// 룩 틀에 맞는 이펙트 단계 ffmpeg 그림 조립 (이펙트 단계와 견본이 같이 써요). tail = 마지막에 더 이어 붙일 필터(견본: 대본 줄 자막·축소). hasAudio = 입력 영상에 소리가 있는지(매트 룩만 봐요)
+function fxGraph(look, P, fxv, assFile, hasAudio, log, tail = '') {
+  const W = P.width, H = P.height;
+  let vf = `ass='${escFilterPath(assFile)}':fontsdir='${FONT_DIR}'`, vArgs = ['-vf', vf + tail, '-map', '0:v'];
+  let aArgs = ['-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo'], aMap = ['-map', '1:a', '-shortest'];
+  if (look?.kind === 'mat') {
+    // 경기 화면은 가운데 칸(footY부터 footH 높이), 나머지는 검은 바탕 → 제목·출처·워터마크·SLOW
+    vf = `scale=${W}:${look.footH}:force_original_aspect_ratio=increase,crop=${W}:${look.footH},setsar=1,${fxv ? fxv + ',' : ''}pad=${W}:${H}:0:${look.footY}:color=black,` + vf;
+    vArgs = ['-vf', vf + tail, '-map', '0:v'];
+    if (hasAudio) { aArgs = []; aMap = ['-map', '0:a']; }
+    log('매트 스토리 틀(제목·출처·워터마크·SLOW)을 입혀요…');
+  } else if (look?.kind === 'punch') {
+    // 처음 hook.dur초는 화면을 줄여 검은 바탕에 놓고(훅 제목), 그다음은 꽉 찬 화면
+    const hd = P.hook?.dur || 0, w2 = 2 * Math.round(W * look.hookScale / 2), h2 = 2 * Math.round(H * look.hookScale / 2);
+    const full = `[0:v]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1`;
+    const fc = hd > 0
+      ? `${full},${fxv ? fxv + ',' : ''}split=2[f][s];[s]scale=${w2}:${h2},pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2:color=black[sm];[f][sm]overlay=0:0:enable='lt(t,${hd})',${vf}${tail}[v]`
+      : `${full},${fxv ? fxv + ',' : ''}${vf}${tail}[v]`;
+    vArgs = ['-filter_complex', fc, '-map', '[v]'];
+    log(`훅 제목(처음 ${hd}초) + 워터마크를 입혀요…`);
+  } else if (look) {
+    // 영상은 아래 칸(배너 빼고)에 꽉 차게 → 흑백(인트로) → 위에 배너색 띠 → 글자
+    const bw = (P.bw || []).filter(([a, b]) => b > a);
+    vf = `scale=${W}:${H - look.bannerH}:force_original_aspect_ratio=increase,crop=${W}:${H - look.bannerH},setsar=1` + (fxv ? ',' + fxv : '') +
+      (bw.length ? `,hue=s=0:enable='${bw.map(([a, b]) => `between(t,${a},${b})`).join('+')}'` : '') +
+      `,pad=${W}:${H}:0:${look.bannerH}:color=0x${String(look.bg).replace('#', '')},` + vf;
+    vArgs = ['-vf', vf + tail, '-map', '0:v'];
+    log(`배너를 입혀요${bw.length ? ' (인트로는 흑백)' : ''}…`);
+  } else {
+    if (fxv) { vf = fxv + ',' + vf; vArgs = ['-vf', vf + tail, '-map', '0:v']; }
+    else vArgs = ['-vf', vf + tail, '-map', '0:v'];
+    log('제목 카드(처음 1.5초)를 입혀요…');
+  }
+  return { vArgs, aArgs, aMap };
+}
 async function fx(E, ctx) {
   let P = readJson(E.p('편집/편집계획.json'));
   if (!P) throw new StepError('편집 계획이 먼저예요.');
@@ -1191,29 +1273,7 @@ async function fx(E, ctx) {
   const look = P.look && P.height > P.width ? P.look : null, W = P.width, H = P.height;
   // 문구는 영상 제목에서 (대본에 "> 배너:"/"> 훅:" 줄이 있으면 그걸 먼저 써요)
   const txt = exists(E.p('편집/대본.md')) ? fs.readFileSync(E.p('편집/대본.md'), 'utf8') : '';
-  if (look?.kind === 'mat') {
-    const b = parseBanner(txt) || bannerFromTitle(E.s.title), info = readJson(E.p('소스.json'), []);
-    const credit = parseCredit(txt) || [...new Set(info.filter(x => !x.local && x.channel).map(x => x.channel))].join(' · ');
-    P.banner = { small: b.small, big: b.big }; P.credit = credit; P.bw = [];
-    ctx.log(`  제목: ${b.small || '(없음)'} / ${b.big}${credit ? ' · 출처: ' + credit : ''}`);
-  } else if (look?.kind === 'punch') {
-    const h = parseHook(txt) || hookFromTitle(E.s.title);
-    P.hook = { text: h.text, dur: +Math.min(look.hookDur, P.total * 0.3).toFixed(2) }; P.bw = [];
-    ctx.log(`  훅 제목: ${h.text} (처음 ${P.hook.dur}초)`);
-  } else if (look) {
-    const b = parseBanner(txt) || bannerFromTitle(E.s.title), end = +Math.min(look.introDur ?? 4, P.total * 0.3).toFixed(2);
-    P.banner = { small: b.small, big: b.big }; P.bw = look.introBW && end > 0 ? [[0, end]] : [];
-    ctx.log(`  배너: ${b.small || '(없음)'} / ${b.big}${P.bw.length ? ` · 흑백 인트로 0~${end}초` : ''}`);
-  }
-  const pk0 = fxPackOf(E);
-  delete P.fxTitle; delete P.fxSteps;
-  if (pk0.hookFixed || pk0.steps) {   // 한 방 리얼·단계 강의: 팩이 제목 문구를 직접 보여 줘요 (룩의 훅 칸은 비켜요)
-    const h = parseHook(txt) || hookFromTitle(E.s.title);
-    P.fxTitle = { text: h.text, dur: pk0.steps ? +Math.min(pk0.titleDur, P.total * 0.3).toFixed(2) : P.total };
-    if (P.hook) P.hook.dur = 0;
-    ctx.log(`  제목 문구: ${h.text}${pk0.steps ? ` (처음 ${P.fxTitle.dur}초)` : ' (영상 내내)'}`);
-  }
-  if (pk0.steps) { P.fxSteps = stepLabels(E.s.fxLabels, P.clips.length).map((label, i) => ({ start: P.clips[i].start, end: +(P.clips[i].start + P.clips[i].duration).toFixed(2), label })); ctx.log(`  단계 라벨: ${P.fxSteps.map(x => x.label).join(' / ')}`); }
+  fxDecorate(E, P, txt, look?.kind === 'mat' ? readJson(E.p('소스.json'), []) : [], ctx.log);
   writeJson(E.p('편집/편집계획.json'), P);
   // 이펙트 팩(최종 결과물 레퍼런스): 강조 순간을 모아 영상 칸에 줌·흔들림·플래시를 입혀요. 효과음은 목소리·음악 단계가 같은 목록으로 넣어요.
   const pack = fxPackOf(E), area = look?.kind === 'mat' ? [W, look.footH] : look?.kind === 'punch' || !look ? [W, H] : [W, H - look.bannerH];
@@ -1221,43 +1281,13 @@ async function fx(E, ctx) {
   if (pack.id !== 'none') {
     relayout(E, ctx);   // 대본이 이미 확인돼 있으면 줄 시간표를 먼저 짜서 강조 순간을 알아요
     P = readJson(E.p('편집/편집계획.json')) || P;
-    P.fxPack = pack.id; P.fxPop = !!pack.pop; P.fxEvents = buildFxEvents(E, P, pack);
+    fxv = fxPackApply(E, P, pack, area, ctx.log);
     writeJson(E.p('편집/편집계획.json'), P);
-    fxv = fxVideoFilter(pack, P, P.fxEvents, area[0], area[1]);
-    const cnt = k => P.fxEvents.filter(e => e.kind === k).length;
-    ctx.log(`이펙트 팩: ${pack.name} · 컷 ${cnt('cut')}곳 · 슬로우 ${cnt('slow')}곳 · 강조 ${cnt('hit')}곳${pack.tags ? ` · 라벨 ${cnt('label')}곳` : ''}${pack.pop ? ' · 강조 단어 팝' : ''}`);
   }
   const assFile = E.p('편집/효과.ass');
   fs.writeFileSync(assFile, buildAss(P, 'fx'));
-  let vf = `ass='${escFilterPath(assFile)}':fontsdir='${FONT_DIR}'`, vArgs = ['-vf', vf, '-map', '0:v'];
-  let aArgs = ['-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo'], aMap = ['-map', '1:a', '-shortest'];
-  if (look?.kind === 'mat') {
-    // 경기 화면은 가운데 칸(footY부터 footH 높이), 나머지는 검은 바탕 → 제목·출처·워터마크·SLOW
-    vf = `scale=${W}:${look.footH}:force_original_aspect_ratio=increase,crop=${W}:${look.footH},setsar=1,${fxv ? fxv + ',' : ''}pad=${W}:${H}:0:${look.footY}:color=black,` + vf;
-    vArgs = ['-vf', vf, '-map', '0:v'];
-    if ((await probe(E.p(base), ctx)).hasAudio) { aArgs = []; aMap = ['-map', '0:a']; }
-    ctx.log('매트 스토리 틀(제목·출처·워터마크·SLOW)을 입혀요…');
-  } else if (look?.kind === 'punch') {
-    // 처음 hook.dur초는 화면을 줄여 검은 바탕에 놓고(훅 제목), 그다음은 꽉 찬 화면
-    const hd = P.hook?.dur || 0, w2 = 2 * Math.round(W * look.hookScale / 2), h2 = 2 * Math.round(H * look.hookScale / 2);
-    const full = `[0:v]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1`;
-    const fc = hd > 0
-      ? `${full},${fxv ? fxv + ',' : ''}split=2[f][s];[s]scale=${w2}:${h2},pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2:color=black[sm];[f][sm]overlay=0:0:enable='lt(t,${hd})',${vf}[v]`
-      : `${full},${fxv ? fxv + ',' : ''}${vf}[v]`;
-    vArgs = ['-filter_complex', fc, '-map', '[v]'];
-    ctx.log(`훅 제목(처음 ${hd}초) + 워터마크를 입혀요…`);
-  } else if (look) {
-    // 영상은 아래 칸(배너 빼고)에 꽉 차게 → 흑백(인트로) → 위에 배너색 띠 → 글자
-    const bw = (P.bw || []).filter(([a, b]) => b > a);
-    vf = `scale=${W}:${H - look.bannerH}:force_original_aspect_ratio=increase,crop=${W}:${H - look.bannerH},setsar=1` + (fxv ? ',' + fxv : '') +
-      (bw.length ? `,hue=s=0:enable='${bw.map(([a, b]) => `between(t,${a},${b})`).join('+')}'` : '') +
-      `,pad=${W}:${H}:0:${look.bannerH}:color=0x${String(look.bg).replace('#', '')},` + vf;
-    vArgs = ['-vf', vf, '-map', '0:v'];
-    ctx.log(`배너를 입혀요${bw.length ? ' (인트로는 흑백)' : ''}…`);
-  } else {
-    if (fxv) { vf = fxv + ',' + vf; vArgs = ['-vf', vf, '-map', '0:v']; }
-    ctx.log('제목 카드(처음 1.5초)를 입혀요…');
-  }
+  const hasAudio = look?.kind === 'mat' ? (await probe(E.p(base), ctx)).hasAudio : false;
+  const { vArgs, aArgs, aMap } = fxGraph(look, P, fxv, assFile, hasAudio, ctx.log);
   try {
     await ff(['-i', E.p(base), ...aArgs, ...vArgs,
       ...aMap, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '19', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', E.p('편집/완성본.mp4')], ctx);
@@ -1268,6 +1298,20 @@ async function fx(E, ctx) {
 
 // ---------- 9. 목소리·음악 (스튜디오 ⑦ 음악/녹음 의 마지막 단계) ----------
 // 대본 줄 자막(배너 룩의 나레이션·한영 자막, 펀치 룩의 굵은 자막 등)은 여기서 영상에 입혀요. 예전 방식(완성본에 이미 들어 있음)이면 건너뛰어요.
+// 이펙트 팩 효과음 입력·체인을 inputs/chains/mixIn 에 붙이고 다음 입력 번호를 돌려줘요 (목소리·음악 단계와 견본이 같이 써요)
+function sfxChains(E, P, inputs, chains, mixIn, idx, log) {
+  const fxp = FX_PACKS.find(p => p.id === P.fxPack), said = new Set();
+  for (const e of (fxp && P.fxEvents ? P.fxEvents : []).slice(0, 60)) {
+    const name = fxp.sfx?.[e.kind]; if (!name) continue;
+    const file = findSfx(E, name);
+    if (file) inputs.push('-i', file); else inputs.push('-f', 'lavfi', '-t', String(SFX_SYNTH[name].d), '-i', SFX_SYNTH[name].src);
+    chains.push(`[${idx}:a]aresample=44100,aformat=channel_layouts=stereo,atrim=0:${file ? 2 : SFX_SYNTH[name].d},asetpts=PTS-STARTPTS,adelay=${Math.round(e.t * 1000)}:all=1,volume=${fxp.sfxVol ?? 0.8}[x${idx}]`);
+    mixIn.push(`[x${idx}]`); idx++;
+    if (!said.has(name)) { said.add(name); log?.(`  효과음 "${name}": ${file ? path.basename(file) : '소리/효과음 폴더에 파일이 없어서 기본 소리로 만들어요'}`); }
+    log?.(`  효과음 ${name} · ${e.t.toFixed(1)}초 (${{ cut: '컷', slow: '슬로우', hit: '강조', label: '라벨', ok: '✓', x: '✕' }[e.kind]})`);
+  }
+  return idx;
+}
 export async function mix(E, ctx) {
   const P = readJson(E.p('편집/편집계획.json'));
   if (P) P.lines = P.lines || [];
@@ -1319,16 +1363,7 @@ export async function mix(E, ctx) {
     mixIn.push('[st]'); ctx.log(`  시그니처 소리: ${E.s.mix.sting} (${at.toFixed(1)}초)`);
   }
   // 이펙트 팩 효과음: 이펙트 단계가 남긴 강조 순간(P.fxEvents)마다. 파일이 없으면 ffmpeg 로 만든 기본 소리
-  const fxp = FX_PACKS.find(p => p.id === P.fxPack), said = new Set();
-  for (const e of (fxp && P.fxEvents ? P.fxEvents : []).slice(0, 60)) {
-    const name = fxp.sfx?.[e.kind]; if (!name) continue;
-    const file = findSfx(E, name);
-    if (file) inputs.push('-i', file); else inputs.push('-f', 'lavfi', '-t', String(SFX_SYNTH[name].d), '-i', SFX_SYNTH[name].src);
-    chains.push(`[${idx}:a]aresample=44100,aformat=channel_layouts=stereo,atrim=0:${file ? 2 : SFX_SYNTH[name].d},asetpts=PTS-STARTPTS,adelay=${Math.round(e.t * 1000)}:all=1,volume=${fxp.sfxVol ?? 0.8}[x${idx}]`);
-    mixIn.push(`[x${idx}]`); idx++;
-    if (!said.has(name)) { said.add(name); ctx.log(`  효과음 "${name}": ${file ? path.basename(file) : '소리/효과음 폴더에 파일이 없어서 기본 소리로 만들어요'}`); }
-    ctx.log(`  효과음 ${name} · ${e.t.toFixed(1)}초 (${{ cut: '컷', slow: '슬로우', hit: '강조', label: '라벨', ok: '✓', x: '✕' }[e.kind]})`);
-  }
+  idx = sfxChains(E, P, inputs, chains, mixIn, idx, ctx.log);
   let args;
   if (mixIn.length) {
     chains.push(`${mixIn.join('')}amix=inputs=${mixIn.length}:normalize=0:duration=longest,apad=whole_dur=${T},alimiter=limit=0.95[aout]`);
@@ -1406,3 +1441,99 @@ export function migrateState(s) {
   return s;
 }
 export const STEP_FN = { research, download, clip, plan, rough, subs, fx, script, mix, upload };
+
+// ---------- 견본: 고른 룩·이펙트가 실제 영상에서 어떻게 보이는지 4초만 미리 만들어 봐요 ----------
+// 진짜 편집과 같은 길을 가요: 구간 자르기(cutClip) → 이어 붙이기 → 이펙트(fxDecorate·fxPackApply·fxGraph, 줄 자막 ASS 포함) → 효과음. 에피소드 상태·단계·파일은 건드리지 않고 '미리보기/' 폴더에만 써요.
+export const PREVIEW_SEC = 4, PREVIEW_W = 540, PREVIEW_H = 960, PREVIEW_KEEP = 12;
+const PREVIEW_LINES = {
+  mat: ['[태그] 선수 A / 레드', '[점수] 2 / 테이크다운', '이 기술을 *보세요*', '*낮게* 시작해요'],
+  punch: ['!이 *한 방*!', '낮게 *시작*해요'],
+  banner: ['이 기술을 *보세요* | Watch this move', '*낮게* 시작해요 | Start low'],
+  plain: ['이 기술을 보세요', '낮게 시작해요'],
+};
+// 견본 입력을 검사하고 캐시 이름까지 정해요. 틀리면 StepError (짧은 한국어 사유).
+export async function previewPlan(E, spec) {
+  if (E.s.format === 'long') throw new StepError('가로 영상은 견본을 만들지 않아요.');
+  const look = String(spec.look || ''), packId = String(spec.pack || '');
+  if (!CHANNEL_PROFILES[look]) throw new StepError('모르는 편집 룩이에요: ' + look);
+  if (packId && !FX_PACKS.some(p => p.id === packId)) throw new StepError('모르는 이펙트 팩이에요: ' + packId);
+  let times; try { times = parseFxTimes(spec.times).text; } catch (e) { throw new StepError(e.message); }
+  const labels = (Array.isArray(spec.labels) ? spec.labels : String(spec.labels || '').split(',')).map(x => String(x || '').replace(/[{}\\]/g, '').trim().slice(0, 20)).slice(0, 12);
+  while (labels.length && !labels[labels.length - 1]) labels.pop();
+  const PE = { ...E, s: { ...E.s, look, fxPack: packId, fxTimes: times, fxLabels: labels } };   // 진짜 에피소드는 그대로, 복사본만 룩·팩을 바꿔요
+  const info = readJson(E.p('소스.json')), s0 = info?.[0];
+  if (!s0) throw new StepError('링크 영상을 먼저 받아 주세요.');
+  const input = s0.local ? localPath(s0.url) : (s0.full && exists(E.p(s0.full)) ? E.p(s0.full) : '');
+  if (!input || !exists(input)) throw new StepError('링크 영상을 먼저 받아 주세요.');
+  const pack = fxPackOf(PE);
+  // 어디를 보여 줄까: 첫 구간(없으면 영상 한가운데). 슬로우 구간이면 보이는 길이가 4초가 되도록 원본은 짧게.
+  let a = 0, sp = 1, d = PREVIEW_SEC, range = '';
+  let dur = s0.duration || null; if (!dur) dur = (await probe(input)).duration || null;
+  const r0 = (E.s.sources[0]?.ranges || [])[0];
+  if (r0 && isFinite(rangeSecs(r0)[1])) { const [ra, rb] = rangeSecs(r0); a = ra; sp = rangeSpeed(r0); d = Math.min(PREVIEW_SEC * sp, rb - ra); range = r0; }
+  else { d = Math.min(PREVIEW_SEC, dur || PREVIEW_SEC); a = Math.max(0, (dur || d) / 2 - d / 2); }
+  if (dur && a + d > dur) { a = Math.max(0, dur - d); d = Math.min(d, dur); }
+  if (d < 0.5) throw new StepError('견본을 만들 만큼 영상이 길지 않아요.');
+  const clips = [{ a, b: a + d, sp, range }];
+  if (pack.replay && sp === 1 && d >= 2.2) { clips[0].b = a + 2.2; clips.push({ a: a + 1.2, b: a + 2.2, sp: 0.5, replay: true }); }   // 한 방 리얼: 끝에 마지막 1초 0.5배 REPLAY
+  const mt = (() => { try { const st = fs.statSync(input); return `${st.size}:${Math.round(st.mtimeMs)}`; } catch { return ''; } })();
+  const hash = crypto.createHash('sha1').update(JSON.stringify({ v: 1, look, pack: pack.id, times, labels, clips, title: E.s.title, mt })).digest('hex').slice(0, 10);
+  return { PE, info, input, clips, look, pack, rel: `미리보기/${look}-${pack.id}-${hash}.mp4`, hash };
+}
+// previewPlan 결과로 견본 mp4 를 만들어 E.p(rel) 에 놓아요. ctx = { aborted, setChild } (멈추면 StopError)
+export async function renderPreview(E, plan, ctx0 = {}) {
+  const { PE, info, input, clips, pack } = plan, look = lookOf(PE), ctx = { log: () => {}, ...ctx0 }, nolog = () => {};
+  const dir = E.p('미리보기'), tmp = path.join(dir, '.tmp-' + plan.hash), out = E.p(plan.rel);
+  fs.rmSync(tmp, { recursive: true, force: true }); fs.mkdirSync(tmp, { recursive: true });
+  try {
+    const files = [];
+    for (const [i, c] of clips.entries()) {
+      const f = path.join(tmp, `clip_${i + 1}.mp4`);
+      try { await cutClip(PE, ctx, { input, offset: c.a, d: c.b - c.a, sp: c.sp, out: f, preset: 'ultrafast', crf: '20' }); }
+      catch (e) { if (e instanceof StopError) throw e; throw new StepError(`견본 영상을 자르지 못했어요: ${lastLines(e.err)}`); }
+      files.push(f);
+    }
+    let rough = files[0];
+    if (files.length > 1) {
+      const list = path.join(tmp, 'concat.txt'); rough = path.join(tmp, 'rough.mp4');
+      fs.writeFileSync(list, files.map(f => `file '${f.replace(/'/g, "'\\''")}'\n`).join(''));
+      try { await ff(['-f', 'concat', '-safe', '0', '-i', list, '-c', 'copy', rough], ctx); }
+      catch (e) { if (e instanceof StopError) throw e; throw new StepError(`견본 영상을 이어 붙이지 못했어요: ${lastLines(e.err)}`); }
+    }
+    // 편집 계획 (plan 단계와 같은 모양)
+    let T = 0; const used = clips.map((c, i) => { const d = (c.b - c.a) / c.sp, o = { file: `클립/clip_${String(i + 1).padStart(2, '0')}.mp4`, start: +T.toFixed(3), duration: +d.toFixed(3), si: 0, range: c.range || `${fmtTime(c.a)}-${fmtTime(c.b)}`, a: c.a, b: c.b, ...(c.sp < 1 ? { speed: c.sp } : {}), ...(c.replay ? { replay: true } : {}) }; T += d; return o; });
+    const { w: W, h: H } = specOf(PE), P = { title: PE.s.title, format: PE.s.format, width: W, height: H, total: +T.toFixed(2), clips: used, lines: [] };
+    if (look) P.look = look;
+    fxDecorate(PE, P, '', look?.kind === 'mat' ? info : [], nolog);
+    P.lines = placeLines(itemsOf(PREVIEW_LINES[look?.kind === 'mat' ? 'mat' : look?.kind === 'punch' ? 'punch' : look ? 'banner' : 'plain'], look), look, P);
+    const area = look?.kind === 'mat' ? [W, look.footH] : look?.kind === 'punch' || !look ? [W, H] : [W, H - look.bannerH];
+    const fxv = fxPackApply(PE, P, pack, area, nolog);
+    const assFx = path.join(tmp, '효과.ass'), assCap = path.join(tmp, '대본자막.ass');
+    fs.writeFileSync(assFx, buildAss(P, 'fx'));
+    const burn = P.lines.length > 0 && P.fxPack !== 'raw';   // 목소리·음악 단계와 같은 규칙: 한 방 리얼은 줄 자막을 넣지 않아요
+    if (burn) fs.writeFileSync(assCap, buildAss(P, 'lines'));
+    const tail = `${burn ? `,ass='${escFilterPath(assCap)}':fontsdir='${FONT_DIR}'` : ''},scale=${PREVIEW_W}:${PREVIEW_H},setsar=1`;
+    const hasAudio = look?.kind === 'mat' ? (await probe(rough, ctx)).hasAudio : false;
+    const g = fxGraph(look, P, fxv, assFx, hasAudio, nolog, tail), fxOut = path.join(tmp, 'fx.mp4');
+    try {
+      await ff(['-i', rough, ...g.aArgs, ...g.vArgs, ...g.aMap, '-t', String(P.total), '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '30', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '96k', '-movflags', '+faststart', fxOut], ctx);
+    } catch (e) { if (e instanceof StopError) throw e; throw new StepError(`견본에 이펙트를 입히지 못했어요: ${lastLines(e.err)}`); }
+    // 소리: 원본 경기 소리(룩이 살리면) + 이펙트 팩 효과음
+    const inputs = ['-i', fxOut], chains = [], mixIn = [];
+    if (look?.audio === 'orig' && (await probe(fxOut, ctx)).hasAudio) { chains.push(`[0:a]aresample=44100,aformat=channel_layouts=stereo,volume=${look.origVol}[orig]`); mixIn.push('[orig]'); }
+    sfxChains(PE, P, inputs, chains, mixIn, 1, nolog);
+    let done = fxOut;
+    if (mixIn.length) {
+      chains.push(`${mixIn.join('')}amix=inputs=${mixIn.length}:normalize=0:duration=longest,apad=whole_dur=${P.total},alimiter=limit=0.95[aout]`);
+      done = path.join(tmp, 'mixed.mp4');
+      try { await ff([...inputs, '-filter_complex', chains.join(';'), '-map', '0:v', '-map', '[aout]', '-t', String(P.total), '-c:v', 'copy', '-c:a', 'aac', '-b:a', '96k', '-movflags', '+faststart', done], ctx); }
+      catch (e) { if (e instanceof StopError) throw e; throw new StepError(`견본 소리를 합치지 못했어요: ${lastLines(e.err)}`); }
+    }
+    fs.renameSync(done, out);
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+  try {   // 오래된 견본은 정리해요 (최근 PREVIEW_KEEP 개만)
+    const all = fs.readdirSync(dir).filter(f => f.endsWith('.mp4')).map(f => ({ f, t: fs.statSync(path.join(dir, f)).mtimeMs })).sort((x, y) => y.t - x.t);
+    for (const o of all.slice(PREVIEW_KEEP)) fs.rmSync(path.join(dir, o.f), { force: true });
+  } catch {}
+  return plan.rel;
+}

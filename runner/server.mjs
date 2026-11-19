@@ -3,15 +3,16 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { HOME, StepError, StopError, sanitize, exists, parseRanges, isLocalSource, localPath, run, FFMPEG, lastLines, fmtTime, MAX_RANGE } from './util.mjs';
 import { createHighlights, LEN_MIN, LEN_MAX } from './highlights.mjs';
 import { listStyles, saveStyle, enqueue, cancelJob, listJobs, resolveReadable, thumbOf, shutdownImages, ImgError } from './images.mjs';
-import { STEP_DEFS, STEP_FN, outputsFor, listAssets, checkScript, cleanPasted, parseScript, parseBanner, parseHook, PLACEHOLDER, SCRIPT_MAX_LINES, CHANNEL_PROFILES, LOOK_CHOICES, lookKeyOf, FX_PACKS, fxPackOf, parseFxTimes, migrateState, layoutLines, draftText, splitAnswer, feedbackPrompt, callClaude, parseCredit } from './steps.mjs';
+import { STEP_DEFS, STEP_FN, outputsFor, listAssets, checkScript, cleanPasted, parseScript, parseBanner, parseHook, PLACEHOLDER, SCRIPT_MAX_LINES, CHANNEL_PROFILES, LOOK_CHOICES, lookKeyOf, FX_PACKS, fxPackOf, parseFxTimes, migrateState, layoutLines, draftText, splitAnswer, feedbackPrompt, callClaude, parseCredit, previewPlan, renderPreview } from './steps.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // 작업판이 쓰는 기능 수준. 3 = 새 9칸 순서 (/look, /ranges, deferRanges, 단계 clip·subs·fx)
-const API_LEVEL = 6;   // 6 = 하이라이트 찾기(/hl/*) ·  4 = 7칸 순서 (/edit 1차·2차 편집, /draft, /feedback, 슬로우 구간 x0.5, 매트 스토리 룩) · 5 = 최종 결과물 레퍼런스(이펙트 팩: /fxpack, status.fxPacks)
+const API_LEVEL = 8;   // 8 = 미리보기 견본(/preview, 고른 룩·이펙트를 실제 영상 4초로) · 7 = 에피소드 완전히 지우기(/episode/delete, 휴지통으로) · 6 = 하이라이트 찾기(/hl/*) ·  4 = 7칸 순서 (/edit 1차·2차 편집, /draft, /feedback, 슬로우 구간 x0.5, 매트 스토리 룩) · 5 = 최종 결과물 레퍼런스(이펙트 팩: /fxpack, status.fxPacks)
 let VERSION = 'dev';
 try { VERSION = fs.readFileSync(path.join(HERE, 'version.txt'), 'utf8').trim() || 'dev'; } catch {}
 const PORT = +(process.env.FIELDNOTE_RUNNER_PORT || 4777);
@@ -268,6 +269,28 @@ const hlDynamic = async (method, url, body) => {
 };
 
 const imgWrap = fn => a => { try { return fn(a); } catch (e) { if (e instanceof ImgError) throw new HttpError(e.code || 400, e.message); throw e; } };
+// ---------- 견본 작업 (한 번에 하나) ----------
+let pvJob = null;   // { key, ctrl, promise }
+async function previewRun(E, spec) {
+  let plan;
+  try { plan = await previewPlan(E, spec); } catch (e) { if (e instanceof StepError) throw new HttpError(400, e.message); throw e; }
+  if (exists(E.p(plan.rel))) return { ok: true, path: plan.rel, cached: true };
+  const key = E.s.ep + '|' + plan.rel;
+  if (pvJob && pvJob.key === key) return pvJob.promise;   // 같은 견본을 이미 만드는 중이면 그걸 기다려요
+  if (pvJob) { pvJob.ctrl.aborted = true; try { pvJob.ctrl.child?.kill('SIGTERM'); } catch {} }   // 새 요청이 오면 옛 견본은 멈춰요
+  const ctrl = { aborted: false, child: null }, job = { key, ctrl, promise: null };
+  job.promise = (async () => {
+    try { await renderPreview(E, plan, { aborted: () => ctrl.aborted, setChild: c => { ctrl.child = c; } }); return { ok: true, path: plan.rel }; }
+    catch (e) {
+      if (e instanceof StopError) throw new HttpError(409, '새 견본 요청이 와서 이 견본은 멈췄어요.');
+      if (e instanceof StepError) throw new HttpError(422, e.message);
+      throw e;
+    } finally { if (pvJob === job) pvJob = null; }
+  })();
+  pvJob = job;
+  return job.promise;
+}
+
 const routes = {
   'GET /img/styles': imgWrap(() => ({ json: { styles: listStyles() } })),
   'POST /img/styles': imgWrap(({ body }) => ({ json: { ok: true, style: saveStyle(body) } })),
@@ -422,6 +445,36 @@ const routes = {
     try { E.ctrl.child?.kill('SIGTERM'); setTimeout(() => { try { E.ctrl.child?.kill('SIGKILL'); } catch {} }, 3000); } catch {}
     return { json: { ok: true } };
   },
+  'POST /episode/delete': async ({ body }) => {
+    const E = getEp(body.ep);
+    const root = path.resolve(DATA), dir = path.resolve(E.dir);
+    if (path.dirname(dir) !== root || dir === root || E.s.ep !== path.basename(dir)) throw new HttpError(400, '이 폴더는 지울 수 없어요.');
+    if (E.running) {   // 돌고 있으면 먼저 멈추고 쉬는 상태가 될 때까지 잠깐 기다려요
+      E.ctrl.aborted = true;
+      try { E.ctrl.child?.kill('SIGTERM'); setTimeout(() => { try { E.ctrl.child?.kill('SIGKILL'); } catch {} }, 3000); } catch {}
+      for (let i = 0; i < 50 && E.running; i++) await new Promise(r => setTimeout(r, 100));
+      if (E.running) throw new HttpError(409, '아직 멈추는 중이에요. 잠시 뒤에 다시 눌러 주세요.');
+    }
+    const trashRoot = process.env.FIELDNOTE_TRASH_DIR || path.join(os.homedir(), '.Trash');
+    fs.mkdirSync(trashRoot, { recursive: true });
+    const d = new Date(), p2 = n => String(n).padStart(2, '0');
+    const ts = `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`;
+    let dest = path.join(trashRoot, `${path.basename(dir)} ${ts}`), n = 1;
+    while (exists(dest)) dest = path.join(trashRoot, `${path.basename(dir)} ${ts}-${++n}`);
+    try { fs.renameSync(dir, dest); }
+    catch (e) {   // 다른 디스크면 이름 바꾸기가 안 돼서 복사한 뒤 지워요
+      try { fs.cpSync(dir, dest, { recursive: true }); fs.rmSync(dir, { recursive: true, force: true }); }
+      catch (e2) { try { fs.rmSync(dest, { recursive: true, force: true }); } catch {} throw new HttpError(500, '휴지통으로 옮기지 못했어요: ' + e2.message); }
+    }
+    episodes.delete(E.s.ep);
+    try { HL.dropEpisodeRef(E.s.ep); } catch {}
+    return { json: { ok: true, trashed: dest } };
+  },
+  // 견본: 고른 룩·이펙트 팩이 이 에피소드의 진짜 영상에서 어떻게 보이는지 4초짜리(540x960)로. 에피소드 단계·상태는 건드리지 않아요. 한 번에 하나만, 새 요청이 오면 옛 요청은 멈춰요.
+  'POST /preview': async ({ body }) => {
+    const E = getEp(body.ep);
+    return { json: await previewRun(E, { look: body.look || lookKeyOf(E), pack: body.pack || '', times: body.times, labels: body.labels }) };
+  },
   'POST /open': ({ body }) => { const E = getEp(body.ep); spawn('/usr/bin/open', [E.dir], { stdio: 'ignore', detached: true }).unref(); return { json: { ok: true } }; },
   'GET /log': ({ q }) => {
     const E = getEp(q.get('ep')), id = String(q.get('step') || ''); if (!STEP_FN[id]) throw new HttpError(400, '모르는 단계예요.');
@@ -533,5 +586,5 @@ const server = http.createServer(async (req, res) => {
 
 loadAll();
 server.listen(PORT, '127.0.0.1', () => console.log(`실행기 주소 http://127.0.0.1:${PORT} · 에피소드 폴더 ${DATA}${process.env.ANTHROPIC_API_KEY ? ' · 대본 AI 켜짐' : ''}`));
-const bye = () => { shutdownImages(); HL.shutdown(); for (const E of episodes.values()) { E.ctrl.aborted = true; try { E.ctrl.child?.kill('SIGTERM'); } catch {} } setTimeout(() => process.exit(0), 300); };
+const bye = () => { shutdownImages(); try { if (pvJob) { pvJob.ctrl.aborted = true; pvJob.ctrl.child?.kill('SIGTERM'); } } catch {} HL.shutdown(); for (const E of episodes.values()) { E.ctrl.aborted = true; try { E.ctrl.child?.kill('SIGTERM'); } catch {} } setTimeout(() => process.exit(0), 300); };
 process.on('SIGINT', bye); process.on('SIGTERM', bye);

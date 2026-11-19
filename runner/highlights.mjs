@@ -317,6 +317,8 @@ export function createHighlights({ dataDir, log: logErr = console.error }) {
     get: id => jobs.get(String(id || '')) || null,
     list: () => [...jobs.values()].sort((a, b) => b.s.created - a.s.created).map(summary),
     summary, detail, videoOf,
+    // 에피소드를 지울 때: 하이라이트 작업이 들고 있던 그 에피소드 이름만 비워요 (작업·원본.mp4 는 그대로)
+    dropEpisodeRef(ep) { let n = 0; for (const J of jobs.values()) if (J.s.fromEpisode && J.s.fromEpisode === ep) { J.s.fromEpisode = ''; try { save(J); } catch {} n++; } return n; },
     // 링크(url) 또는 이미 받은 에피소드 영상(local + info)으로 시작
     async start({ url, local, info, count, len, fromEpisode }) {
       if (anyRunning()) throw new StepError('지금 다른 하이라이트 작업이 돌고 있어요. 끝나거나 멈춘 뒤에 눌러 주세요.');

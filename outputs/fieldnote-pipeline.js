@@ -484,19 +484,31 @@
     { id: 'calm', name: '잔잔', desc: '클립마다 천천히 줌인 · 컷 사이 짧게 어둡다 밝아짐 · 첫 강조점에 부드러운 "띵"', ref: 'https://www.youtube.com/shorts/op51yRlhjjI' },
     { id: 'punch', name: '펀치', desc: '컷마다 빠른 줌 펀치 · 강조 순간 흔들림 + 흰 플래시 · "팡" 효과음 · 강조 단어 팝', ref: 'https://www.youtube.com/shorts/1zpjOi8_LH0' },
   ];  // 이펙트 미리보기: 9:16 미니 화면이 2.4초마다 되풀이 (CSS 애니메이션만). 룩 미리보기(.lm)와 같은 크기·틀.
-  const YT_FX_MOCKS = {
-    none: '<i class="lm-v"></i><i class="lm-a lm-sub" style="top:68%;left:0;right:0">이펙트 없음</i>',
-    calm: '<i class="lm-v fxm-v fxm-kb"></i><i class="fxm-dip"></i><i class="lm-a lm-sub" style="top:68%;left:0;right:0">잔잔하게</i><i class="lm-a fxm-t fxm-ding" style="top:30%;left:0;right:0">띵</i>',
-    punch: '<i class="lm-v fxm-v fxm-pz"></i><i class="fxm-flash fxm-fl-p"></i><i class="lm-a fxm-t fxm-pop" style="top:30%;left:0;right:0">팡!</i><i class="lm-a lm-sub" style="top:68%;left:0;right:0">오늘의 <u class="fxm-word">핵심</u></i>',
-    match: '<i class="lm-v fxm-v fxm-mz"></i><i class="fxm-flash fxm-fl-m"></i><i class="lm-a fxm-slow" style="top:7%;right:5%">SLOW</i><i class="lm-a fxm-t fxm-swish" style="top:36%;left:0;right:0">휙</i><i class="lm-a lm-sub" style="top:68%;left:0;right:0">역전 순간</i>',
+  // 팩 하나 = 영상 칸에 붙는 움직임(v) + 영상 칸 안의 층(vo: 플래시·어둡게·잔상) + 화면 위에 얹는 글·도장(o) + 따로 볼 때만 쓰는 자막(own) + 룩의 줄 자막을 가리는지(strip).
+  // 칩 하나만 볼 때는 회색 영상 칸 + own + o, "이렇게 나와요" 패널에서는 고른 룩의 그림이 바탕이 되고 그 위에 팩의 층이 얹혀요.
+  const ytSub = t => `<i class="lm-a lm-sub" style="top:68%;left:0;right:0">${t}</i>`;
+  const YT_FX_LAYERS = {
+    none: { v: '', vo: '', o: '', own: ytSub('이펙트 없음') },
+    calm: { v: 'fxm-kb', vo: '<i class="fxm-dip"></i>', o: '<i class="lm-a fxm-t fxm-ding" style="top:30%;left:0;right:0">띵</i>', own: ytSub('잔잔하게') },
+    punch: { v: 'fxm-pz', vo: '<i class="fxm-flash fxm-fl-p"></i>', o: '<i class="lm-a fxm-t fxm-pop" style="top:30%;left:0;right:0">팡!</i>', own: ytSub('오늘의 <u class="fxm-word">핵심</u>') },
+    match: { v: 'fxm-mz', vo: '<i class="fxm-flash fxm-fl-m"></i>', o: '<i class="lm-a fxm-slow" style="top:7%;right:5%">SLOW</i><i class="lm-a fxm-t fxm-swish" style="top:36%;left:0;right:0">휙</i>', own: ytSub('역전 순간') },
+    raw: { v: '', vo: '', o: '<i class="lm-a lm-y" style="top:68%;left:0;right:0;font-size:9px">이 한 방!</i><i class="lm-a fxm-rep" style="top:6%;right:5%">REPLAY</i>', own: '', strip: true },
+    steps: { v: '', vo: '<i class="fxm-ghost"></i>', o: '<i class="lm-a fxm-box fxm-st0" style="top:6%;left:14%;right:14%">더블렉 강의</i><i class="lm-a fxm-box fxm-st1" style="top:6%;left:20%;right:20%">1. 낮추기</i><i class="lm-a fxm-box fxm-st2" style="top:6%;left:20%;right:20%">2. 밀기</i>', own: '' },
+    words: { v: 'fxm-wz', vo: '', o: '<i class="lm-a lm-wd fxm-w1" style="top:58%;left:0;right:0">머리를</i><i class="lm-a lm-wd fxm-w2" style="top:58%;left:0;right:0">낮추고 <u style="color:#3EE6FF">밀어요</u></i><i class="lm-a fxm-x" style="top:22%;left:50%">✕</i>', own: '', strip: true },
+    tags: { v: '', vo: '', o: '<i class="lm-a fxm-pill" style="top:62%;left:10%;right:10%">레벨 체인지</i>', own: '' },
   };
-  Object.assign(YT_FX_MOCKS, {
-    raw: '<i class="lm-v"></i><i class="lm-a lm-y" style="top:68%;left:0;right:0;font-size:9px">이 한 방!</i><i class="lm-a fxm-rep" style="top:6%;right:5%">REPLAY</i>',
-    steps: '<i class="lm-v fxm-v"></i><i class="fxm-ghost"></i><i class="lm-a fxm-box fxm-st0" style="top:6%;left:14%;right:14%">더블렉 강의</i><i class="lm-a fxm-box fxm-st1" style="top:6%;left:20%;right:20%">1. 낮추기</i><i class="lm-a fxm-box fxm-st2" style="top:6%;left:20%;right:20%">2. 밀기</i>',
-    words: '<i class="lm-v fxm-v fxm-wz"></i><i class="lm-a lm-wd fxm-w1" style="top:58%;left:0;right:0">머리를</i><i class="lm-a lm-wd fxm-w2" style="top:58%;left:0;right:0">낮추고 <u style="color:#3EE6FF">밀어요</u></i><i class="lm-a fxm-x" style="top:22%;left:50%">✕</i>',
-    tags: '<i class="lm-v fxm-v"></i><i class="lm-a fxm-pill" style="top:62%;left:10%;right:10%">레벨 체인지</i>',
-  });
-  const ytFxMock = id => (YT_FX_MOCKS[id] ? `<span class="lm fxm fxm-${id}" aria-hidden="true">${YT_FX_MOCKS[id]}</span>` : '');
+  // 영상 칸(<i class="lm-v">) 하나를 감싸는 칸으로: 줌·흔들림이 칸 밖으로 번지지 않게 (룩의 검은 띠를 덮지 않도록)
+  const YT_VBOX_RE = /<i class="lm-v"(?: style="([^"]*)")?><\/i>/;
+  const YT_STRIP_RE = /<i class="lm-a lm-(?:sub|y|wd)"[^>]*>.*?<\/i>/g;
+  // 룩(바탕) + 팩(움직임·글) 합친 9:16 미니 화면. lookId 가 없으면 회색 영상 칸 하나 (칩 하나만 볼 때: alone)
+  function ytMockHtml(lookId, packId, alone) {
+    const L = YT_FX_LAYERS[packId] || YT_FX_LAYERS.none;
+    let base = !alone && YT_LOOK_MOCKS[lookId] ? YT_LOOK_MOCKS[lookId] : '<i class="lm-v"></i>';
+    if (L.strip && !alone) base = base.replace(YT_STRIP_RE, '');
+    base = base.replace(YT_VBOX_RE, (m, st) => `<i class="lm-vw"${st ? ` style="${st}"` : ''}><i class="lm-v fxm-v ${L.v}"></i>${L.vo}</i>`);
+    return `<span class="lm fxm fxm-${YT_FX_LAYERS[packId] ? packId : 'none'}" aria-hidden="true">${base}${alone ? L.own : ''}${L.o}</span>`;
+  }
+  const ytFxMock = id => (YT_FX_LAYERS[id] ? ytMockHtml('', id, true) : '');
   const ytFxPacks = () => (runnerData && runnerData.fxPacks && runnerData.fxPacks.length ? runnerData.fxPacks : YT_FX_PACKS);
   const ytFxDefault = ch => (ch === 'yt-christian' ? 'calm' : ch === 'yt-politics' ? 'punch' : 'match');
   // 짝: 레퍼런스 룩 ↔ 이펙트 팩. 팩을 직접 고르기 전에는 고른 룩의 짝 팩이 미리 골라져 있어요.
@@ -508,6 +520,108 @@
   const ytFxTimes = (it, ep) => (it.idea && ytPipe.fxIdea === it.idea.id && ytPipe.fxTimes != null ? ytPipe.fxTimes : (ep && ep.fxTimes) || '');
   const ytFxRef = p => (S.fxRefs && S.fxRefs[p.id]) || p.ref || '';   // 내가 넣은 링크가 먼저
   const ytFxOld = () => typeof runnerApi === 'number' && runnerApi < 5;
+  // ===== "이렇게 나와요" 패널: 지금 고른 대로 만들면 최종 영상이 어떻게 나오는지 (모든 유튜브 단계 카드에 붙어요) =====
+  // 그림(CSS 움직이는 미니 화면) + 한 줄 요약 + (링크 영상을 받은 뒤) 실행기가 진짜 영상으로 만든 4초 견본. 칩을 누르면 정하기 전에도 바로 바뀌어요.
+  const YT_ORIG_AUDIO = new Set(['yt-mat', 'yt-raw', 'yt-steps', 'yt-words', 'yt-tags']);   // 원본 경기 소리를 살리는 룩 (실행기 MAT_DEFAULTS.audio)
+  const YT_SFX_PACKS = new Set(['words', 'tags', 'match', 'calm', 'punch']);                // 효과음이 들어가는 팩
+  const ytClock = x => String(x).split(':').reduce((a, n) => a * 60 + (+n || 0), 0);
+  // "0:30-0:42, 1:05-1:09x0.5" → { n, sec, all }  (슬로우는 길어져요: 0.5배 = 2배 길이)
+  function ytRangeInfo(str) {
+    const s = String(str || '').trim(); if (!s) return null;
+    if (/^(전체|all)$/i.test(s)) return { n: 1, sec: 58, all: true };
+    let n = 0, sec = 0;
+    for (const t of s.split(/[,\s]+/).filter(Boolean)) {
+      const m = /^(\d+(?::\d{1,2}){0,2})\s*[-~–]\s*(\d+(?::\d{1,2}){0,2})(?:[x×*@](\d*\.?\d+))?$/i.exec(t); if (!m) continue;
+      const a = ytClock(m[1]), b = ytClock(m[2]), sp = m[3] == null ? 1 : +m[3];
+      if (b > a) { n++; sec += (b - a) / (sp >= 0.25 && sp <= 1 ? sp : 1); }
+    }
+    return n ? { n, sec } : null;
+  }
+  const ytDlOk = ep => !!ep && ['research', 'download'].every(id => (ep.steps || []).some(x => x.id === id && x.status === 'done'));
+  const ytRangesNow = (it, ep) => ytPipe.ranges || ((ep && ep.sources && ep.sources[0] && ep.sources[0].ranges) || []).join(', ');
+  function ytOutInfo(it) {
+    const ep = it.ep, has = !!it.idea;
+    if (!has) return { has: false };
+    const look = ytLookPick(it, ep), pack = ytFxPick(it, ep), lk = ytLooks().find(l => l.id === look), pk = ytFxPacks().find(p => p.id === pack);
+    const lookSet = (ytPipe.lookIdea === it.idea.id && ytPipe.look) || (ep && ep.look), packSet = (ytPipe.fxIdea === it.idea.id && ytPipe.fxPack) || (ep && ep.fxPack);
+    const r = ytRangeInfo(ytRangesNow(it, ep));
+    const sec = r ? Math.min(58, Math.round(r.sec + (pack === 'raw' && !r.all && r.sec >= 2 ? 4 : 0))) : 0;   // 한 방 리얼: 끝에 마지막 2초를 0.5배로 한 번 더 (= 4초)
+    const orig = YT_ORIG_AUDIO.has(look), sfx = YT_SFX_PACKS.has(pack);
+    return { has: true, look, pack, lookName: lk ? lk.name : look, packName: pk ? pk.name : pack, lookSet: !!lookSet, packSet: !!packSet,
+      n: r ? (r.all ? '전체' : r.n + '개') : '', sec, sound: (orig ? '원본 경기 소리' : '목소리·배경음악') + (sfx ? ' + 효과음' : '') };
+  }
+  // 견본 상태 (실행기 api 8 이상). 같은 입력이면 다시 만들지 않고, 바뀌면 600ms 뒤에 요청해요.
+  const YP = { key: '', state: 'idle', path: '', msg: '', mode: 'real', seq: 0, timer: 0, cache: new Map(), ms: 0 };
+  const ytPrevOn = () => typeof runnerApi === 'number' && runnerApi >= 8 && runnerOnline === true;
+  function ytPrevWanted(it) {
+    const ep = it.ep; if (!ep || !ytPrevOn() || !ytDlOk(ep)) return null;
+    const dl = ((ep.steps || []).find(x => x.id === 'download') || { outputs: [] }).outputs.map(o => o.mtime || 0).join(',');
+    const look = ytLookPick(it, ep), pack = ytFxPick(it, ep), times = ytFxTimes(it, ep).trim(), labels = ytFxLabels(it, ep).split(',').map(x => x.trim()).filter(Boolean);
+    const first = ((ep.sources && ep.sources[0] && ep.sources[0].ranges) || [])[0] || '';
+    return { body: { ep: ep.ep, look, pack, times, labels }, key: JSON.stringify([ep.ep, look, pack, times, labels, first, dl]) };
+  }
+  const ytPrevMsg = m => { const t = String(m || '').replace(/^Error:\s*/, ''); return /Failed to fetch|NetworkError|Load failed/i.test(t) ? '실행기와 연결이 끊겼어요.' : t.length > 80 ? t.slice(0, 80) + '…' : t || '견본을 만들지 못했어요.'; };
+  function ytPrevSync() {
+    if (!document.getElementById('plRoot')) return;
+    const { it } = evalSteps('youtube'), w = ytPrevWanted(it);
+    if (!w) { clearTimeout(YP.timer); YP.seq++; YP.key = ''; YP.state = 'idle'; YP.path = ''; ytOutRefresh(); return; }
+    if (w.key === YP.key) return;
+    YP.key = w.key; clearTimeout(YP.timer); const seq = ++YP.seq, hit = YP.cache.get(w.key);
+    if (hit) { YP.state = 'ok'; YP.path = hit; ytOutRefresh(); return; }
+    YP.state = 'wait'; YP.path = ''; YP.msg = ''; ytOutRefresh();
+    YP.timer = setTimeout(async () => {
+      if (seq !== YP.seq) return;
+      YP.state = 'busy'; YP.ms = Date.now(); ytOutRefresh();
+      try { const r = await runnerFetch('/preview', w.body); if (seq !== YP.seq) return; YP.cache.set(w.key, r.path); YP.path = r.path; YP.state = 'ok'; }
+      catch (e) { if (seq !== YP.seq) return; if (/멈췄어요/.test(e.message)) return; YP.state = 'err'; YP.msg = ytPrevMsg(e.message); }
+      ytOutRefresh();
+    }, 600);
+  }
+  // 패널만 다시 그려요 (카드 전체를 다시 그리면 입력 중인 글이 끊겨서). 보던 견본 영상은 그대로 두고요.
+  function ytOutRefresh() {
+    const el = document.getElementById('plOut'); if (!el) return;
+    const { it } = evalSteps('youtube'), tmp = document.createElement('div'); tmp.innerHTML = ytOutHtml(it);
+    const nx = tmp.firstElementChild, ov = el.querySelector('#plOutVid'), nv = nx.querySelector('#plOutVid');
+    if (ov && nv && ov.getAttribute('src') === nv.getAttribute('src')) nv.replaceWith(ov);
+    el.replaceWith(nx);
+  }
+  const ytOutOpen = () => (T.outOpen != null ? T.outOpen : !(window.matchMedia && matchMedia('(max-width:640px)').matches));
+  function ytOutHtml(it) {
+    const I = ytOutInfo(it), open = ytOutOpen(), ep = it.ep, real = I.has && YP.state === 'ok' && YP.path && YP.mode === 'real' && ep;
+    const can = I.has && !!ytPrevWanted(it);
+    const line = I.has
+      ? `<span><i>스타일</i> <b>${esc(I.lookName)}</b>${I.lookSet ? '' : ' <small>(자동)</small>'}</span><span><i>레퍼런스</i> <b>${esc(I.packName)}</b>${I.packSet ? '' : ' <small>(자동)</small>'}</span><span><i>구간</i> <b>${I.n ? esc(I.n) : '아직'}</b></span><span><i>예상 길이</i> <b>${I.sec ? '약 ' + I.sec + '초' : '아직'}</b></span><span><i>소리</i> <b>${esc(I.sound)}</b></span>`
+      : '<span><i>스타일</i> <b>아직</b></span><span><i>레퍼런스</i> <b>아직</b></span><span><i>구간</i> <b>아직</b></span><span><i>예상 길이</i> <b>아직</b></span><span><i>소리</i> <b>아직</b></span>';
+    const pv = real
+      ? `<video id="plOutVid" class="pl-out-vid" muted loop playsinline autoplay preload="auto" src="${esc(`${RUNNER}/file?ep=${encodeURIComponent(ep.ep)}&path=${encodeURIComponent(YP.path)}`)}" aria-label="실제 영상으로 만든 견본"></video>`
+      : `<span class="pl-out-mock${I.has ? '' : ' dim'}">${ytMockHtml(I.has ? I.look : 'yt-mat', I.has ? I.pack : 'none')}</span>`;
+    let st = '';
+    if (ytPrevOn() && I.has) {
+      if (!ytDlOk(ep)) st = '링크 영상을 받으면 실제 영상으로 견본을 보여 줘요.';
+      else if (YP.state === 'wait' || YP.state === 'busy') st = '견본 만드는 중…';
+      else if (YP.state === 'err') st = YP.msg;
+      else if (YP.state === 'ok' && YP.mode === 'real') st = '실제 영상 4초 견본이에요 (자막은 예시 문구).';
+      else if (YP.state === 'ok') st = '움직이는 그림이에요. "실제 견본"을 누르면 진짜 영상으로 봐요.';
+    }
+    const seg = can ? `<div class="pl-out-seg" role="group" aria-label="보기 방식"><button type="button" data-pl-outmode="mock" aria-pressed="${YP.mode === 'mock'}">그림</button><button type="button" data-pl-outmode="real" aria-pressed="${YP.mode === 'real'}">실제 견본</button></div>` : '';
+    const big = real ? `<a class="pl-link" href="${esc(`${RUNNER}/file?ep=${encodeURIComponent(ep.ep)}&path=${encodeURIComponent(YP.path)}`)}" target="_blank" rel="noopener noreferrer">크게 보기 ↗</a>` : '';
+    const mini = I.has ? `${esc(I.lookName)}${I.sec ? ' · 약 ' + I.sec + '초' : ''}` : '아직';
+    return `<section class="pl-out ${open ? 'open' : ''}" id="plOut" aria-label="이렇게 나와요"><button type="button" class="pl-out-h" data-pl-outtoggle aria-expanded="${open}"><b>이렇게 나와요</b><span class="pl-out-mini">${mini}</span><i class="pl-out-car" aria-hidden="true">▾</i></button>
+      <div class="pl-out-b"><div class="pl-out-pv">${pv}</div><div class="pl-out-tx"><p class="pl-out-line">${line}</p>${seg}${st ? `<p class="small pl-out-st ${YP.state === 'err' ? 'err' : ''}" role="status">${esc(st)}</p>` : ''}${big}</div></div></section>`;
+  }
+  // 칸마다 자기 결과물을 바로 볼 수 있게: 받은 원본 · 편집본 · 최종본·썸네일·업로드 글
+  const ytSrc = (ep, p, mt) => `${RUNNER}/file?ep=${encodeURIComponent(ep.ep)}&path=${encodeURIComponent(p)}${mt ? '&t=' + mt : ''}`;
+  const ytVideoBox = (id, ep, o, label, preload, poster) => `<figure class="pl-vid"><video id="${id}" controls playsinline preload="${preload || 'metadata'}"${poster ? ` poster="${esc(poster)}"` : ''} src="${esc(ytSrc(ep, o.path, o.mtime))}"></video><figcaption class="small">${esc(label)} · <a class="pl-link" href="${esc(ytSrc(ep, o.path, o.mtime))}" target="_blank" rel="noopener noreferrer">새 창 ↗</a></figcaption></figure>`;
+  const ytUpTxt = new Map();   // 업로드 글 (경로+시각 → 글). 칸을 다시 그려도 깜빡이지 않게 모아 둬요
+  async function ytUpTextHydrate() {
+    for (const el of document.querySelectorAll('#plRoot [data-pl-uptxt]')) {
+      const k = el.dataset.plUptxt, [p, mt] = k.split('|'), ep = ytItem().ep; if (!ep) continue;
+      const key = ep.ep + '|' + k;
+      if (ytUpTxt.has(key)) { el.textContent = ytUpTxt.get(key); continue; }
+      try { const r = await fetch(ytSrc(ep, p, mt)); if (!r.ok) throw new Error(r.status); const t = (await r.text()).trim(); ytUpTxt.set(key, t); el.textContent = t || '(비어 있어요)'; }
+      catch (_) { el.textContent = '업로드 글을 불러오지 못했어요. 위 "제목·설명·태그" 버튼으로 내려받으세요.'; }
+    }
+  }
   const YT_GROUPS = [
     { id: 'g-dl', name: '링크 영상 다운', ids: ['research', 'download'], desc: '링크의 영상을 맥에 통째로 받아요. 영어 자막이 있으면 같이 받아요.', go: '영상 받기' },
     { id: 'g-cut', name: '컷 편집', ids: ['clip', 'plan', 'rough'], desc: '쓸 구간을 넣으세요. 한 구간은 15초까지예요. 구간을 잘라 이어 붙여 가편집을 만들어요.', go: '컷 편집 실행' },
@@ -707,6 +821,7 @@
         result: it => {
           const parts = [];
           if (G.failed && G.failed.error) parts.push(`<p class="pl-error"><b>${esc(G.failed.name)}</b> · ${esc(runnerFriendly(G.failed.error))}${!isVoice && /여기에 대사/.test(G.failed.error) ? ' <button type="button" class="pl-link" data-ya-goscript>대본 단계로 가기</button>' : ''}</p>`);
+          if (g.id === 'g-dl') { const dl = G.sts.flatMap(x => x.outputs).find(o => o.exists && ytVideoRe.test(o.path)); if (dl) parts.push(ytVideoBox('plDlVid', ep, dl, '받은 원본 영상')); }
           parts.push(`<p class="small pl-subs">${G.sts.map(x => `${esc(x.name)} ${x.status === 'done' ? '✓' : x.status === 'running' ? '…' : x.status === 'failed' ? '✕' : '·'}`).join(' · ')}</p>`);
           const files = G.sts.flatMap(x => x.outputs.filter(o => o.exists));
           parts.push(files.length ? `<ul class="pl-files">${files.map(o => `<li>${ytFileLink(ep.ep, o)}</li>`).join('')}</ul>` : (G.running ? '' : '<span class="small">아직 결과 파일이 없어요.</span>'));
@@ -761,7 +876,7 @@
     const editResult = r => () => {
       const parts = [];
       if (failed && failed.error && (ep.editRound || 1) === r) parts.push(`<p class="pl-error"><b>${esc(failed.name)}</b> · ${esc(runnerFriendly(failed.error))}</p>`);
-      if (round >= r) { const v = ytEditVideo(ep); parts.push(`<p><b>${r}차 편집본이 나왔어요.</b> 위 플레이어에서 보세요.${v ? ' ' + ytFileLink(ep.ep, { path: v.path }) : ''}</p>`); if (!ep.hasScript) parts.push('<p class="small">아직 자막 대본이 없어서 자막 없이 만들었어요. 피드백에서 대본을 넣어요.</p>'); }
+      if (round >= r) { const v = ytEditVideo(ep); parts.push(`<p><b>${r}차 편집본이 나왔어요.</b>${v ? ' 아래에서 바로 볼 수 있어요. ' + ytFileLink(ep.ep, { path: v.path }) : ''}</p>`); if (v) parts.push(ytVideoBox('plEdVid' + r, ep, v, v.label)); if (!ep.hasScript) parts.push('<p class="small">아직 자막 대본이 없어서 자막 없이 만들었어요. 피드백에서 대본을 넣어요.</p>'); }
       parts.push(logs()); return parts.join('');
     };
     const rangesNow = ((ep.sources && ep.sources[0] && ep.sources[0].ranges) || []).join(', ');
@@ -812,7 +927,13 @@
       hideBtn: () => !!(upDone && it.idea && it.idea.publicationCheck),
       disabled: () => off || round < 1 || !!ep.running,
       isDone: () => upDone,
-      result: () => upDone ? `<div class="pl-files">${has('업로드/영상.mp4') ? dlLink('업로드/영상.mp4', '영상 내려받기') : ''} ${has('업로드/썸네일.jpg') ? dlLink('업로드/썸네일.jpg', '썸네일') : ''} ${has('업로드/업로드.txt') ? dlLink('업로드/업로드.txt', '제목·설명·태그') : ''}</div>` : '',
+      result: () => {
+        if (!upDone) return '';
+        const vid = has('업로드/영상.mp4'), th = has('업로드/썸네일.jpg'), tx = has('업로드/업로드.txt'), thSrc = th ? ytSrc(ep, th.path, th.mtime) : '', txKey = tx ? `${tx.path}|${tx.mtime || ''}` : '';
+        return `<div class="pl-files">${vid ? dlLink('업로드/영상.mp4', '영상 내려받기') : ''} ${th ? dlLink('업로드/썸네일.jpg', '썸네일') : ''} ${tx ? dlLink('업로드/업로드.txt', '제목·설명·태그') : ''}</div>
+          <div class="pl-fin">${vid ? ytVideoBox('plFinVid', ep, vid, '최종 영상', 'none', thSrc) : ''}${th ? `<figure class="pl-th"><img src="${esc(thSrc)}" alt="썸네일" loading="lazy"><figcaption class="small">썸네일</figcaption></figure>` : ''}</div>
+          ${tx ? `<div class="pl-uptx"><b class="small">올릴 때 쓸 글 (제목·설명·태그)</b><pre class="pl-up" data-pl-uptxt="${esc(txKey)}">${esc(ytUpTxt.get(ep.ep + '|' + txKey) || '불러오는 중…')}</pre></div>` : ''}`;
+      },
       body: () => {
         if (!upDone || !it.idea) return '';
         const done = it.idea.publicationCheck;
@@ -849,10 +970,46 @@
   function ytWipHtml(curId) {
     const list = ytWipList();
     const card = i => { const th = ytThumb(i);
-      return `<div class="pl-wc ${i.id === curId ? 'on' : ''}"><button type="button" class="pl-wc-main" data-pl-wip="${esc(i.id)}" ${i.id === curId ? 'aria-current="true"' : ''}>${th ? `<img src="${esc(th)}" alt="" loading="lazy">` : '<span class="pl-wc-ph" aria-hidden="true">🎬</span>'}<span class="pl-wc-t">${esc(i.title)}</span><span class="pl-wc-s">${ytWipStatus(i)}</span></button><button type="button" class="pl-wc-x" data-pl-wiphide="${esc(i.id)}" aria-label="작업 중에서 숨기기" title="숨기기">×</button></div>`; };
+      return `<div class="pl-wc ${i.id === curId ? 'on' : ''}"><button type="button" class="pl-wc-main" data-pl-wip="${esc(i.id)}" ${i.id === curId ? 'aria-current="true"' : ''}>${th ? `<img src="${esc(th)}" alt="" loading="lazy">` : '<span class="pl-wc-ph" aria-hidden="true">🎬</span>'}<span class="pl-wc-t">${esc(i.title)}</span><span class="pl-wc-s">${ytWipStatus(i)}</span></button><button type="button" class="pl-wc-x" data-pl-wiphide="${esc(i.id)}" aria-label="완전히 지우기" title="완전히 지우기">×</button></div>`; };
     const pubs = db.ideas.filter(i => ideaPlatform(i) === 'YouTube' && ytCh(i) === ytTab() && i.publicationCheck);
     const pubHtml = pubs.length ? `<details class="pl-wpub"><summary>올린 영상 ${pubs.length}개</summary><ul>${pubs.map(i => { const u = typeof i.publicationCheck === 'string' ? i.publicationCheck : (i.publicationCheck && i.publicationCheck.url) || ''; return `<li>${/^https?:/.test(u) ? `<a class="pl-link" href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(i.title)} ↗</a>` : esc(i.title)}</li>`; }).join('')}</ul></details>` : '';
     return `<div class="pl-wip" aria-label="작업 중인 영상"><div class="pl-wip-h"><b>작업 중 ${list.length}개</b>${list.length ? '' : '<span class="small">작업 중인 영상이 없어요. 링크를 넣어 시작하세요.</span>'}</div><div class="pl-wip-row"><button type="button" class="pl-wc pl-wc-new" data-pl-ytchange>＋ 새 링크로 시작</button>${list.map(card).join('')}</div>${pubHtml}</div>`;
+  }
+  // 작업 중 카드의 ×: 실행기의 영상 폴더(휴지통으로) + 이 브라우저의 소재·선택·초안 기록을 모두 지운다
+  let ytPurging = false;
+  async function ytWipPurge(id) {
+    const idea = db.ideas.find(x => x.id === id); if (!idea || ytPurging) return;
+    ytPurging = true;
+    try {
+      let msg = '지웠어요. 영상 파일은 휴지통에 있어요.';
+      let eps = null, api = 0;
+      try { const h = await runnerFetch('/health'); api = Number.isInteger(h.api) ? h.api : 0; } catch (_) { api = -1; }   // -1 = 실행기 꺼짐
+      if (api >= 7) {
+        try { eps = ((await runnerFetch('/status')).episodes || []).filter(e => e.ideaId === id); }
+        catch (e) { toast('지우지 못했어요: ' + e.message + ' (다시 눌러 보세요)'); return; }
+        for (const e of eps) {
+          try { await runnerFetch('/episode/delete', { ep: e.ep }); }
+          catch (er) { toast('지우지 못했어요: ' + er.message + ' (다시 눌러 보세요)'); return; }
+        }
+        if (runnerData && runnerData.episodes) runnerData.episodes = runnerData.episodes.filter(e => e.ideaId !== id);
+      } else {
+        msg = '실행기가 꺼져 있어서 맥의 영상 파일은 그대로예요. 실행기를 켜면 바탕화면 유투브/에피소드 에서 직접 지우세요.';
+      }
+      const key = 'y:' + id, gone = new Set(db.posts.filter(p => p.ideaId === id && p.channel === 'youtube').map(p => p.id));
+      gone.forEach(pid => { try { clearTimeout(draftTimer); draftDel(pid); } catch (_) {} delete S.opened[pid]; });
+      db.posts = db.posts.filter(p => !gone.has(p.id));
+      db.ideas = db.ideas.filter(x => x.id !== id);
+      const sel = S.sel.youtube;
+      if (sel && (sel.ideaId === id || gone.has(sel.postId))) S.sel.youtube = { empty: true };
+      delete S.opened[key];
+      for (const m of Object.values(T)) if (m && typeof m === 'object' && !Array.isArray(m) && key in m) delete m[key];
+      if (ytPipe.ideaId === id) ytPipe.ideaId = '';
+      if (ytPipe.lookIdea === id) { ytPipe.look = ''; ytPipe.lookIdea = ''; }
+      if (ytPipe.fxIdea === id) { ytPipe.fxPack = ''; ytPipe.fxIdea = ''; ytPipe.fxTimes = null; ytPipe.fxLabels = null; }
+      if (T.ytPick === id) T.ytPick = '';
+      T.ytSkipAdopt = false;
+      save(); persist(); render(); toast(msg);
+    } finally { ytPurging = false; }
   }
   function selectYt(id) { const idea = db.ideas.find(i => i.id === id); if (!idea) return; ytPick(id); S.sel.youtube = { ideaId: id }; T.ytPick = id; save(); }
 
@@ -1042,7 +1199,7 @@
       <div class="pl-top">${items}${insta}</div>${c === 'youtube' ? ytPlayerHtml(it) : ''}${bar}
       <article class="pl-card" aria-live="polite"><div class="pl-steplabel">${v + 1} / ${N} 단계 ${lastLabel}</div>
         <h2>${esc(val(s.title, it))}</h2><p class="pl-desc">${esc(val(s.desc, it))}</p>
-        ${val(s.body || '', it) || ''}${err}
+        ${c === 'youtube' ? ytOutHtml(it) : ''}${val(s.body || '', it) || ''}${err}
         ${btn}${statusLine ? `<p class="small pl-status">${esc(statusLine)}</p>` : ''}
         <div class="pl-result" aria-label="이 단계의 결과"><div class="pl-result-h">결과</div>${res || '<span class="small">아직 없어요. 위 버튼을 누르면 여기에 나와요.</span>'}</div>
         ${finish}
@@ -1067,8 +1224,7 @@
     const tmp = document.createElement('div'); tmp.innerHTML = html;
     const next = tmp.firstElementChild; next.dataset.sig = html;
     [...next.querySelectorAll('details')].forEach((d, k) => { if (open[k]) d.open = true; });
-    const ov = root.querySelector('#ytPlayerVid'), nv = next.querySelector('#ytPlayerVid');
-    if (ov && nv && ov.getAttribute('src') === nv.getAttribute('src')) nv.replaceWith(ov);   // 보고 있던 영상은 끊지 않는다
+    for (const nv of next.querySelectorAll('video[id]')) { const ov = root.querySelector('video[id="' + nv.id + '"]'); if (ov && ov.getAttribute('src') === nv.getAttribute('src')) nv.replaceWith(ov); }   // 보고 있던 영상은 끊지 않는다
     root.replaceWith(next);
     afterPaint(root.dataset.c);
   }
@@ -1076,6 +1232,7 @@
   window.ytGoScript = function () { const { steps } = evalSteps('youtube'), k = steps.findIndex(x => x.id === 'g-voice'); if (k >= 0) { T.view.youtube = k; repaint('youtube', true); } };
   window.ytRepaint = function () { repaint('youtube'); };
   function afterPaint(c) {
+    if (c === 'youtube') { setTimeout(ytPrevSync, 0); setTimeout(ytUpTextHydrate, 0); }
     if (window.CodexImg) setTimeout(() => CodexImg.hydrate(), 0);
     if (c === 'insta') setTimeout(() => window.InstaToon && window.InstaToon.hydrateArt(), 0);
     if (c === 'youtube' && T.logOpen) { const el = document.getElementById('plLog'), ep = ytItem().ep; if (el && ep) runnerFetch(`/log?ep=${encodeURIComponent(ep.ep)}&step=${T.logOpen}&tail=6000`).then(t => { el.textContent = t || '(로그 없음)'; el.scrollTop = el.scrollHeight; }).catch(e => { el.textContent = '로그를 못 읽었어요: ' + e.message; }); }
@@ -1167,9 +1324,11 @@
     if (t.dataset.plPick) { T.pick[c] = t.dataset.plPick; T.custom[c] = ''; repaint(c, true); return; }
     if (t.hasAttribute('data-pl-more')) { T.page[c] = (T.page[c] || 0) + 1; repaint(c, true); return; }
     if (t.dataset.plWip) { selectYt(t.dataset.plWip); T.view.youtube = null; T.err.youtube = ''; render(); return; }
-    if (t.dataset.plWiphide) { const i = db.ideas.find(x => x.id === t.dataset.plWiphide); if (i && confirm('작업 중 목록에서 뺄까요?\n(영상과 작업 내용은 지워지지 않아요)')) { delete i.ytStarted; i.ytHidden = Date.now(); persist(); const sel = S.sel.youtube; if (sel && sel.ideaId === i.id) { S.sel.youtube = { empty: true }; ytPipe.ideaId = ''; T.ytSkipAdopt = false; T.ytPick = ''; save(); } render(); } return; }
+    if (t.dataset.plWiphide) { ytWipPurge(t.dataset.plWiphide); return; }
     if (t.dataset.plYtpick) { selectYt(t.dataset.plYtpick); T.view.youtube = null; repaint('youtube', true); return; }
     if (t.dataset.plYlchip) { ylSetUrl(t.dataset.plYlchip, true); return; }
+    if (t.hasAttribute('data-pl-outtoggle')) { T.outOpen = !ytOutOpen(); ytOutRefresh(); return; }
+    if (t.dataset.plOutmode) { YP.mode = t.dataset.plOutmode === 'mock' ? 'mock' : 'real'; ytOutRefresh(); return; }
     if (t.dataset.yaFxpick) { const { it } = ctx(); ytPipe.fxPack = t.dataset.yaFxpick; ytPipe.fxIdea = it.idea ? it.idea.id : ''; repaint('youtube', true); return; }
     if (t.dataset.yaLookpick) { const { it } = ctx(); ytPipe.look = t.dataset.yaLookpick; ytPipe.lookIdea = it.idea ? it.idea.id : ''; repaint('youtube', true); return; }
     if (t.hasAttribute('data-pl-ytchange')) { ytLinkReset(); adapter('youtube').fresh(); T.view.youtube = 0; repaint('youtube', true); return; }
@@ -1222,9 +1381,9 @@
     else if (t.dataset.plUrlinput) T.url[t.dataset.plUrlinput] = t.value;
     else if (t.hasAttribute('data-pl-caption')) { const p = c === 'insta' && window.InstaToon.current(); if (p) { p.caption = t.value; persist(); } }
     else if (t.dataset.yl) { if (t.dataset.yl === 'url') ylSetUrl(t.value); else if (t.dataset.yl === 'title') { YL.title = t.value; YL.edited = true; } else YL.view = t.value; }
-    else if (t.dataset.yaNew === 'fxtimes') { const { it } = evalSteps('youtube'); ytPipe.fxTimes = t.value; ytPipe.fxIdea = it.idea ? it.idea.id : ''; if (!ytPipe.fxPack) ytPipe.fxPack = ytFxPick(it, it.ep); document.querySelector('#plRoot [data-ya-act="fxpack"]')?.removeAttribute('disabled'); }
-    else if (t.dataset.yaNew === 'fxlabels') { const { it } = evalSteps('youtube'); ytPipe.fxLabels = t.value; ytPipe.fxIdea = it.idea ? it.idea.id : ''; if (!ytPipe.fxPack) ytPipe.fxPack = ytFxPick(it, it.ep); document.querySelector('#plRoot [data-ya-act="fxpack"]')?.removeAttribute('disabled'); }
-    else if (t.dataset.yaNew) { if (t.dataset.yaNew === 'url') ytPipe.url = t.value; else ytPipe.ranges = t.value; }
+    else if (t.dataset.yaNew === 'fxtimes') { const { it } = evalSteps('youtube'); ytPipe.fxTimes = t.value; ytPipe.fxIdea = it.idea ? it.idea.id : ''; if (!ytPipe.fxPack) ytPipe.fxPack = ytFxPick(it, it.ep); document.querySelector('#plRoot [data-ya-act="fxpack"]')?.removeAttribute('disabled'); ytOutRefresh(); ytPrevSync(); }
+    else if (t.dataset.yaNew === 'fxlabels') { const { it } = evalSteps('youtube'); ytPipe.fxLabels = t.value; ytPipe.fxIdea = it.idea ? it.idea.id : ''; if (!ytPipe.fxPack) ytPipe.fxPack = ytFxPick(it, it.ep); document.querySelector('#plRoot [data-ya-act="fxpack"]')?.removeAttribute('disabled'); ytOutRefresh(); ytPrevSync(); }
+    else if (t.dataset.yaNew) { if (t.dataset.yaNew === 'url') ytPipe.url = t.value; else { ytPipe.ranges = t.value; ytOutRefresh(); } }
   });
   document.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing && e.target.id === 'plLinkUrl') { e.preventDefault(); const c = e.target.closest('#plRoot').dataset.c; linkRead(c, false); } });
   document.addEventListener('submit', e => { const f = e.target.closest('[data-pl-urlform]'); if (f) { e.preventDefault(); f.closest('#plRoot').querySelector('.pl-primary')?.click(); } });
@@ -1323,6 +1482,29 @@
 .pl-looks .pl-topic{justify-content:flex-start;align-items:flex-start;gap:12px}
 .pl-lk-txt{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}
 @media (max-width:640px){.pl-looks{grid-template-columns:1fr}}
+.pl-out{margin:10px 0 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel2)}
+.pl-out-h{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;padding:8px 14px;background:none;border:0;color:var(--text);font-size:15px;text-align:left;cursor:default}
+.pl-out-h b{color:var(--pc)}
+.pl-out-mini{color:var(--muted);font-size:13px;display:none;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pl-out-car{display:none;margin-left:auto;font-style:normal;color:var(--muted)}
+.pl-out-b{display:flex;gap:16px;align-items:flex-start;padding:0 14px 12px}
+.pl-out-pv{flex:none;width:120px;height:213px;border-radius:10px;overflow:hidden;background:#000;border:1px solid rgba(255,255,255,.18);position:relative}
+.pl-out-mock{display:block;width:120px;height:213px;overflow:hidden}.pl-out-mock.dim{opacity:.45}
+.pl-out-mock .lm{transform:scale(1.4286);transform-origin:0 0;border:0;border-radius:0}
+.pl-out-vid{display:block;width:120px;height:213px;object-fit:cover;background:#000}
+.pl-out-tx{flex:1;min-width:0;display:grid;gap:8px;align-content:start}
+.pl-out-line{margin:0;display:flex;flex-wrap:wrap;gap:4px 14px;font-size:14px;line-height:1.5}
+.pl-out-line span{white-space:nowrap}.pl-out-line i{font-style:normal;color:var(--muted);font-size:12px;margin-right:2px}.pl-out-line small{color:var(--muted)}
+.pl-out-seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;justify-self:start}
+.pl-out-seg button{min-height:40px;padding:0 14px;background:none;border:0;color:var(--text);font-size:14px;cursor:pointer}
+.pl-out-seg button[aria-pressed="true"]{background:var(--pc);color:#000;font-weight:700}
+.pl-out-st{margin:0;color:var(--muted)}.pl-out-st.err{color:#ff8a80}
+.pl-vid{margin:0 0 10px}.pl-vid video{display:block;width:100%;max-width:300px;max-height:420px;aspect-ratio:9/16;border-radius:8px;background:#000;margin-bottom:4px}
+.pl-fin{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start}
+.pl-th{margin:0 0 10px}.pl-th img{display:block;max-width:240px;max-height:240px;width:auto;height:auto;border-radius:8px;border:1px solid var(--line)}
+.pl-up{margin:4px 0 0;padding:10px 12px;max-height:220px;overflow:auto;white-space:pre-wrap;background:#0f1216;border:1px solid var(--line);border-radius:8px;font-size:13px;line-height:1.5}
+.lm .lm-vw{position:absolute;inset:0;overflow:hidden}
+@media (max-width:640px){.pl-out-h{cursor:pointer}.pl-out-mini,.pl-out-car{display:block}.pl-out:not(.open) .pl-out-b{display:none}.pl-out.open .pl-out-car{transform:rotate(180deg)}.pl-out-b{flex-direction:column;align-items:center}.pl-out-tx{width:100%}.pl-out-line span{white-space:normal}}
 .lm{position:relative;display:block;flex:none;width:84px;height:150px;border-radius:10px;overflow:hidden;background:#000;border:1px solid rgba(255,255,255,.18);pointer-events:none;font-style:normal;color:#fff;font-family:inherit}
 .lm i,.lm u{font-style:normal;display:block}.lm u{display:inline;text-decoration:none;color:#3DE0C0}
 .lm .lm-a{position:absolute;text-align:center;white-space:nowrap;line-height:1.2}
