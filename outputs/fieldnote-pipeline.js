@@ -453,6 +453,14 @@
     { id: 'yt-politics', name: '펀치 룩', desc: '첫 1초 훅 제목 + 굵은 자막 + 노란 강조 + 워터마크 (정치 채널 기본)' },
     { id: 'yt-mat', name: '매트 스토리 룩', desc: '검은 바탕 + 위 2줄 제목(노랑·빨강) + 굵은 자막 + 선수 태그·점수 도장·SLOW 표시 + 원본 경기 소리 (레슬링 추천)' },
   ];
+  // 룩 미리보기: 9:16 미니 화면 (HTML/CSS만, 이미지·네트워크 없음). 모르는 id는 빈 문자열 → 칩은 글자만.
+  const YT_LOOK_MOCKS = {
+    'yt-wrestling': '<i class="lm-v"></i><i class="lm-a lm-w1" style="top:10%;left:0;right:0">오늘의 경기</i><i class="lm-a lm-sub" style="top:68%;left:0;right:0">이 기술 보세요</i>',
+    'yt-christian': '<i class="lm-a" style="top:0;left:0;right:0;height:23%;background:#0E1B33"></i><i class="lm-a lm-s" style="top:4%;left:0;right:0">오늘의 말씀</i><i class="lm-a" style="top:11%;left:8%;right:8%;height:1px;background:#3DE0C0"></i><i class="lm-a lm-b" style="top:14%;left:0;right:0;font-size:9px">은혜의 <u>길</u></i><i class="lm-v" style="top:23%;filter:grayscale(1)"></i><i class="lm-a" style="top:60%;left:7%;right:7%;height:8%;border-radius:4px;background:rgba(10,14,24,.78)"></i><i class="lm-a lm-s" style="top:60.6%;left:0;right:0;font-size:5.5px;font-weight:700">빛 가운데 <u>걸으라</u></i><i class="lm-a lm-s" style="top:64.6%;left:0;right:0;font-size:4px;opacity:.85">Walk in the light</i>',
+    'yt-politics': '<i class="lm-v" style="left:11%;right:11%;top:11%;bottom:11%"></i><i class="lm-a" style="top:2.5%;left:6%;font-size:4px;font-weight:700;color:#fff;letter-spacing:.3px">FIELDNOTE</i><i class="lm-a lm-p" style="top:59%;left:14%;transform:rotate(-4deg)">폭로!</i><i class="lm-a lm-y" style="top:71%;left:0;right:0">오늘의 핵심</i>',
+    'yt-mat': '<i class="lm-a lm-t1" style="top:11.5%;left:0;right:0;font-size:7px;color:#FFE100">레슬링 명승부</i><i class="lm-a lm-t1" style="top:17%;left:0;right:0;font-size:7px;color:#FF2B2B">역전의 순간</i><i class="lm-v" style="top:24%;bottom:25%"></i><i class="lm-a" style="top:25.5%;left:3%;padding:1px 3px;border-radius:6px;background:#F23A3A;color:#fff;font-size:4px;font-weight:800">선수 A</i><i class="lm-a" style="top:25.8%;right:3%;font-size:3.5px;font-weight:800;color:#fff;opacity:.85">SLOW</i><i class="lm-a lm-stamp" style="top:40%;left:50%">+2</i><i class="lm-a lm-sub" style="top:61%;left:0;right:0">이 순간 보세요</i><i class="lm-a" style="top:70%;right:3%;font-size:3px;font-weight:800;color:#fff;opacity:.55">MAT STORY</i>',
+  };
+  const ytLookMock = id => (YT_LOOK_MOCKS[id] ? `<span class="lm" aria-hidden="true">${YT_LOOK_MOCKS[id]}</span>` : '');
   const ytLooks = () => (runnerData && runnerData.looks && runnerData.looks.length ? runnerData.looks : YT_LOOKS);
   const ytLookDefault = ch => (ch === 'yt-wrestling' || !ch ? 'yt-mat' : YT_LOOKS.some(l => l.id === ch) ? ch : 'yt-mat');
   const ytLookPick = (it, ep) => (it.idea && ytPipe.lookIdea === it.idea.id && ytPipe.look) || (ep && ep.look) || ytLookDefault(ytCh(it.idea));
@@ -591,7 +599,7 @@
       body: it => {
         if (!it.idea) return '';
         const pick = ytLookPick(it, it.ep), def = ytLookDefault(ytCh(it.idea));
-        const chips = `<div class="pl-looks" role="radiogroup" aria-label="편집 룩">${ytLooks().map(l => `<button type="button" role="radio" aria-checked="${pick === l.id}" class="pl-topic ${pick === l.id ? 'on' : ''}" data-ya-lookpick="${esc(l.id)}"><b>${esc(l.name)}${l.id === def ? ' · 이 채널 기본' : ''}</b><span class="small">${esc(l.desc)}</span></button>`).join('')}</div>`;
+        const chips = `<div class="pl-looks" role="radiogroup" aria-label="편집 룩">${ytLooks().map(l => `<button type="button" role="radio" aria-checked="${pick === l.id}" class="pl-topic ${pick === l.id ? 'on' : ''}" data-ya-lookpick="${esc(l.id)}">${ytLookMock(l.id)}<span class="pl-lk-txt"><b>${esc(l.name)}${l.id === def ? ' · 이 채널 기본' : ''}</b><span class="small">${esc(l.desc)}</span></span></button>`).join('')}</div>`;
         return (off ? offMsg : runnerOld ? RUNNER_OLD_MSG : '') + chips;
       },
       run: () => {},
@@ -1227,6 +1235,21 @@
 .pl-picker{margin-bottom:6px}
 .pl-empty{padding:4px 0 10px}.pl-topics{display:grid;gap:8px;margin-bottom:8px}
 .pl-topic{display:flex;gap:10px;align-items:center;justify-content:space-between;text-align:left;min-height:52px;padding:10px 14px;border-radius:12px;border:2px solid var(--line);background:var(--panel2);color:var(--text);font-size:16px;line-height:1.4;cursor:pointer}
+.pl-looks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:8px}
+.pl-looks .pl-topic{justify-content:flex-start;align-items:flex-start;gap:12px}
+.pl-lk-txt{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}
+@media (max-width:640px){.pl-looks{grid-template-columns:1fr}}
+.lm{position:relative;display:block;flex:none;width:84px;height:150px;border-radius:10px;overflow:hidden;background:#000;border:1px solid rgba(255,255,255,.18);pointer-events:none;font-style:normal;color:#fff;font-family:inherit}
+.lm i,.lm u{font-style:normal;display:block}.lm u{display:inline;text-decoration:none;color:#3DE0C0}
+.lm .lm-a{position:absolute;text-align:center;white-space:nowrap;line-height:1.2}
+.lm .lm-v{position:absolute;inset:0;background:radial-gradient(ellipse 22% 30% at 50% 55%,rgba(150,165,190,.45),transparent 70%),linear-gradient(170deg,#6f7f96,#3b4658 55%,#262d3a)}
+.lm .lm-w1{font-size:8px;font-weight:800;color:#fff;text-shadow:0 1px 2px #000}
+.lm .lm-sub{font-size:6px;font-weight:800;color:#fff;text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000}
+.lm .lm-s{font-size:4.5px;color:#fff}.lm .lm-b{font-weight:800;color:#fff}
+.lm .lm-y{font-size:8px;font-weight:900;color:#FFD400;text-shadow:-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000}
+.lm .lm-p{font-size:9px;font-weight:900;color:#FFD400;text-shadow:0 1px 2px #000}
+.lm .lm-t1{font-weight:900;text-shadow:0 1px 2px #000}
+.lm .lm-stamp{font-size:15px;font-weight:900;color:#FF2B2B;border:2px solid #FF2B2B;border-radius:4px;padding:0 3px;transform:translate(-50%,-50%) rotate(-10deg);background:rgba(0,0,0,.25)}
 .pl-topic.on{border-color:var(--pc);background:color-mix(in srgb,var(--pc) 12%,var(--panel2))}
 .pl-topic em{font-style:normal;font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:1px 6px;flex:none}
 .pl-help{margin:10px 0;font-size:14px}.pl-help summary{cursor:pointer;color:var(--pc);min-height:36px;display:flex;align-items:center}.pl-help ol{margin:6px 0 0;padding-left:20px;line-height:1.7}.pl-help code{background:var(--panel2);padding:1px 5px;border-radius:4px}
