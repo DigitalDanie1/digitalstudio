@@ -42,7 +42,7 @@
     } finally { igLock = pIg; db.profile.ytChannelTab = pYt; }
   }
   // ----- 잠깐 쓰는 상태 -----
-  const T = { view: {}, manual: {}, busy: {}, err: {}, askCopied: {}, answer: {}, pick: {}, custom: {}, page: {}, url: {}, seen: {}, link: {}, caption: {}, logOpen: null, ytFmt: null };
+  const T = { view: {}, manual: {}, busy: {}, err: {}, askCopied: {}, answer: {}, pick: {}, custom: {}, page: {}, url: {}, seen: {}, link: {}, caption: {}, logOpen: null, ytFmt: null, redo1: {} };
 
   const marksOf = body => {
     const b = String(body || '');
@@ -756,6 +756,8 @@
     const failed = EDIT_IDS.map(st).find(x => x.status === 'failed');
     const runLine = () => editing ? `실행 중… (${esc(YT_STEP_NAME[ep.running] || ep.running)}) 끝나면 자동으로 바뀌어요.` : '';
     const logs = () => `<div class="pl-logs">${EDIT_IDS.map(id => `<button type="button" class="pl-link" data-pl-log="${id}" aria-expanded="${T.logOpen === id}">${esc(YT_STEP_NAME[id])} 로그${T.logOpen === id ? ' 닫기' : ''}</button>`).join('')}</div>${EDIT_IDS.includes(T.logOpen) ? '<pre class="pl-log" id="plLog">불러오는 중…</pre>' : ''}`;
+    const redo = !!(T.redo1 && T.redo1[it.key]) && round >= 1;
+    const redoBtn = (hint, cls) => round >= 1 && !editing && !ep.running ? `<p class="${cls || 'small'}"><button type="button" class="pl-nav-btn" data-pl-redo1>↺ 1차 편집 다시</button>${hint ? ' ' + esc(hint) : ''}</p>` : '';
     const editResult = r => () => {
       const parts = [];
       if (failed && failed.error && (ep.editRound || 1) === r) parts.push(`<p class="pl-error"><b>${esc(failed.name)}</b> · ${esc(runnerFriendly(failed.error))}</p>`);
@@ -766,8 +768,8 @@
     const e1 = {
       id: 'e1', name: '1차 편집', title: '1차 편집',
       desc: !dlDone ? '링크 영상을 먼저 받아 주세요.' : '쓸 구간을 넣으면 고른 스타일로 1차 편집본을 만들어요. 한 구간은 15초까지, 끝에 x0.5 를 붙이면 0.5배 슬로우예요.',
-      btn: () => editing && (ep.editRound || 1) === 1 ? '실행 멈춤' : round >= 1 ? '1차 편집 다시 만들기' : '1차 편집 만들기',
-      attrs: () => editing && (ep.editRound || 1) === 1 ? 'data-ya-act="stop"' : `data-ya-act="edit" data-ya-round="1"${round >= 1 ? ' data-ya-confirm="1차 편집을 다시 만들어요. 계속할까요?"' : ''}`,
+      btn: () => editing && (ep.editRound || 1) === 1 ? '실행 멈춤' : round >= 1 && !redo ? '1차 편집 다시 만들기' : '1차 편집 만들기',
+      attrs: () => editing && (ep.editRound || 1) === 1 ? 'data-ya-act="stop"' : `data-ya-act="edit" data-ya-round="1"${round >= 1 && !redo ? ' data-ya-confirm="1차 편집을 다시 만들어요. 계속할까요?"' : ''}`,
       cls: editing && (ep.editRound || 1) === 1 ? 'danger' : '',
       disabled: () => off || !dlDone || busyOther || (editing && (ep.editRound || 1) !== 1),
       isDone: () => round >= 1,
@@ -784,7 +786,7 @@
       disabled: () => off || round < 1 || !!ep.running,
       isDone: () => fbNew || (round >= 2 && !fbNew),
       result: () => fbNew ? '<b>수정안을 저장했어요.</b> 2차 편집을 누르세요.' : '',
-      body: () => round >= 1 ? ytFeedbackPanel(ep) : '',
+      body: () => round >= 1 ? redoBtn('1차 편집본이 마음에 안 들면 눌러요. 구간·스타일을 바꿔 다시 만들 수 있어요.') + ytFeedbackPanel(ep) : '',
       run: () => {},
     };
     const e3 = {
@@ -797,7 +799,7 @@
       isDone: () => round >= 2 && !fbNew,
       statusLine: () => (ep.editRound || 0) >= 2 ? runLine() : '',
       result: editResult(Math.max(2, ep.editRound || 2)),
-      body: () => '',
+      body: () => round >= 1 ? redoBtn('1차 편집본이 마음에 안 들면 눌러요. 구간·스타일을 바꿔 다시 만들 수 있어요.') : '',
       run: () => {},
     };
     const up = st('upload'), upDone = up.status === 'done', has = p => (up.outputs || []).find(o => o.path === p && o.exists);
@@ -1157,6 +1159,7 @@
       CXI().chosenBlobs(o).then(async list => { for (const x of list) await window.InstaToon.setCardImage(it.toon.cards[x.index].id, x.blob); toast(list.length ? `그림 ${list.length}장을 가져왔어요.` : '가져올 그림이 없어요.'); }).catch(() => toast('그림을 가져오지 못했어요. 실행기가 켜져 있나요?'));
       return;
     }
+    if (t.hasAttribute('data-pl-redo1')) { const { it, steps } = ctx(), k = steps.findIndex(x => x.id === 'e1'); if (k >= 0) { T.redo1[it.key] = true; go(c, k); } return; }
     if (t.hasAttribute('data-pl-go')) { go(c, +t.dataset.plGo); return; }
     if (t.hasAttribute('data-pl-prev')) { go(c, Math.max(0, v - 1)); return; }
     if (t.hasAttribute('data-pl-next')) { go(c, v + 1); return; }
@@ -1196,6 +1199,7 @@
     if (e.target.closest('#plRoot [data-yp-format]')) { S.sel.youtube = { empty: true }; save(); return; }
     const b = e.target.closest('#plRoot [data-ya-run], #plRoot [data-ya-steps], #plRoot [data-ya-act], #plRoot [data-ya-recopen]'); if (!b) return;
     const root = b.closest('#plRoot'); T.view.youtube = +root.dataset.v;
+    if (b.dataset.yaAct === 'edit') T.redo1 = {};
     setTimeout(() => repaint('youtube', true), 700);
   }, true);
   document.addEventListener('change', e => {
