@@ -112,13 +112,13 @@ function prepare() {   // 새로 불러온 결과에서 쓸 값 정리
 const statusTag = j => j.status === 'done' ? `<span class="hl-tag ok">후보 ${j.found}개</span>` : running(j) ? `<span class="hl-tag run">${e_(j.stage || '돌아가는 중')}</span>` : j.status === 'stopped' ? '<span class="hl-tag">멈춤</span>' : `<span class="hl-tag bad">실패</span>`;
 function startCard() {
   const eps = S.eps.map(e => `<option value="${e_(e.ep)}" ${S.ep === e.ep ? 'selected' : ''}>${e_(e.title)}</option>`).join('');
-  const busy = S.busy || (S.cur && running(S.cur));
+  const busy = S.busy || (S.cur && running(S.cur)), off = dead() || S.online === null;
   return `<section class="hl-card"><h2>① 긴 영상 넣기</h2><p class="hl-sub">긴 경기 영상을 한 번 받아서, 움직임이 크고 관중 소리가 커지는 장면을 골라 줘요. (AI 필요 없어요)</p>
   <div class="hl-row"><label class="hl-f hl-grow">유튜브 주소<input type="text" data-hl-url value="${e_(S.url)}" placeholder="https://www.youtube.com/watch?v=..." autocomplete="off" inputmode="url"></label>
   ${S.eps.length ? `<span class="hl-or">또는</span><label class="hl-f hl-grow">이미 받은 영상 (작업판의 에피소드)<select data-hl-ep><option value="">고르지 않음</option>${eps}</select></label>` : ''}</div>
   <div class="hl-row" style="margin-top:12px"><label class="hl-f" style="width:110px">몇 개 찾을까요<input type="number" min="1" max="30" step="1" data-hl-count value="${S.count}"></label>
   <label class="hl-f" style="width:200px">길이 <b data-hl-lenv style="color:var(--text)">${S.len}초</b><input type="range" min="5" max="15" step="1" data-hl-len value="${S.len}"></label>
-  <button type="button" class="btn primary" data-hl-act="start" ${busy ? 'disabled' : ''}>${busy ? '돌아가는 중…' : '하이라이트 찾기'}</button></div>
+  <button type="button" class="btn primary" data-hl-act="start" ${busy || off ? 'disabled' : ''}>${busy ? '돌아가는 중…' : off ? '실행기가 켜지면 눌러져요' : '하이라이트 찾기'}</button></div>
   ${S.err ? `<div class="pl-error" role="alert">${e_(S.err)}</div>` : ''}</section>`;
 }
 function jobsCard() {
@@ -165,7 +165,7 @@ function offlineCard() {
   if (S.api < NEED_API) return '<div class="ya-off pl-error" role="alert"><b>실행기를 업데이트해야 써요.</b> 저장소를 <code>git pull</code> 한 뒤 <code>runner/설치·업데이트.command</code> 를 더블클릭하세요.</div>';
   return '';
 }
-function html() { return dead() || S.online === null ? offlineCard() : `<div class="hl-wrap">${startCard()}${progressCard()}${resultCard()}${jobsCard()}</div>`; }
+function html() { return dead() || S.online === null ? `<div class="hl-wrap">${offlineCard()}${startCard()}</div>` : `<div class="hl-wrap">${startCard()}${progressCard()}${resultCard()}${jobsCard()}</div>`; }
 function paint() { const r = document.getElementById('hlRoot'); if (r) r.innerHTML = html(); }
 function paintProgress() {
   const j = S.cur, r = document.getElementById('hlRoot'); if (!r || !j) return;
