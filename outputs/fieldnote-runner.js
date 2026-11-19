@@ -1,7 +1,7 @@
 // ===== YouTube 작업판: ⚡ 자동 실행 (맥 실행기 http://127.0.0.1:4777 와 연결) =====
 // 실행기는 ~/Desktop/유투브/실행기/실행기 켜기.command 로 켠다. 작업판은 버튼만 누르고, 실제 작업은 맥에서 돈다.
 const RUNNER = 'http://127.0.0.1:4777';
-const RUNNER_API_NEEDED = 4;  // 4 = 7칸 순서(1차 편집·피드백·2차 편집)  // 실행기 /health 의 api 가 이 숫자보다 작으면 예전 버전 안내
+const RUNNER_API_NEEDED = 4;  // 4 = 7칸 순서(1차 편집·자막 넣기·2차 편집)  // 실행기 /health 의 api 가 이 숫자보다 작으면 예전 버전 안내
 const RUNNER_OLD_MSG = '<div class="ya-off pl-error" role="alert"><b>이 맥의 실행기가 예전 버전이에요.</b> 저장소를 <code>git pull</code> 한 뒤 <code>runner/설치·업데이트.command</code> 를 더블클릭하세요.</div>';
 let runnerApi = null;  // 실행기 /health 의 api (모르면 null). 5 = 최종 결과물 레퍼런스(/fxpack)
 let runnerData = null, runnerOnline = null, runnerOld = false, runnerBusy = false, runnerTimer = null, runnerOpenLog = null, runnerSelectedStep = null;
@@ -111,41 +111,47 @@ document.addEventListener('click', async e => {
     if (await copyText(d.request)) toast('Claude 채팅에 붙여 넣으세요.'); else toast('복사가 안 됐어요. 대본-요청.txt 파일을 열어 복사하세요.');
   } catch (err) { toast('실행기: ' + runnerFriendly(err.message)); }
 });
-// ===== ⑤ 피드백: 피드백 글 → Claude 요청문(또는 AI 바로 반영) / 구간·대본 직접 고치기 / 배경음악 =====
+// ===== ⑤ 자막 넣기: 한국어 자막 쓰기(Claude 요청문 / AI 바로 반영 / 직접) · 원본 영어 자막 참고 · 고칠 점·구간·배경음악 =====
 const ytFbState = {};
-function ytFb(ep) { return ytFbState[ep] = ytFbState[ep] || { loaded: false, loading: false, ranges: '', text: '', ranges0: '', text0: '', fb: '', ans: '', ai: false, bgm: [], mix: {}, busy: false }; }
+function ytFb(ep) { return ytFbState[ep] = ytFbState[ep] || { loaded: false, loading: false, ranges: '', text: '', ranges0: '', text0: '', fb: '', ans: '', ai: false, transcript: [], bgm: [], mix: {}, busy: false }; }
 async function ytFbLoad(ep, force) {
   const st = ytFb(ep); if (st.loading || (st.loaded && !force)) return; st.loading = true;
   try {
     const d = await runnerFetch('/draft?ep=' + encodeURIComponent(ep));
-    Object.assign(st, { ranges: d.ranges, ranges0: d.ranges, text: d.text, text0: d.text, ai: !!d.ai, loaded: true });
+    Object.assign(st, { ranges: d.ranges, ranges0: d.ranges, text: d.text, text0: d.text, ai: !!d.ai, transcript: Array.isArray(d.transcript) ? d.transcript : [], loaded: true });
     if (!st.fb) st.fb = d.feedback || '';
     try { const l = await runnerFetch('/lines?ep=' + encodeURIComponent(ep)); st.bgm = (l.assets && l.assets.bgm) || []; st.mix = l.mix || {}; } catch (_) {}
   } catch (_) { st.loaded = true; }
   st.loading = false;
   if (typeof ytRepaint === 'function') ytRepaint();
 }
-function ytFeedbackPanel(ep) {
+function ytSubsPanel(ep) {
   const st = ytFb(ep.ep);
   if (!st.loaded) { setTimeout(() => ytFbLoad(ep.ep), 0); return '<p class="small">불러오는 중…</p>'; }
   const ph = /여기에 대사|\[여기에/.test(st.text);
-  const ai = st.ai ? `<button type="button" class="pl-chip on" data-ya-act="fbai" ${st.busy ? 'disabled' : ''}>AI로 바로 반영</button> <button type="button" class="pl-chip" data-ya-act="fbcopy">요청문만 복사</button>`
-    : `<button type="button" class="pl-chip" data-ya-act="fbcopy">① Claude 요청문 복사</button>
-       <label class="pl-scr-l">② Claude 답 붙여 넣기 (받은 답 통째로)<textarea class="pl-input" rows="6" data-ya-fbans placeholder="구간: 0:30-0:42, 1:05-1:09x0.5&#10;> 배너: 위 줄 / 아랫줄 ㄷㄷ&#10;자막 줄…">${esc(st.ans)}</textarea></label>
-       <button type="button" class="pl-chip on" data-ya-act="fbans" ${st.busy ? 'disabled' : ''}>③ 답 반영해서 저장</button>`;
+  const shown = ph ? st.text.split(/\r?\n/).filter(l => /^>\s*(배너|훅|출처)\s*[:：]/.test(l.trim()) && !/\[여기에/.test(l)).join('\n') : st.text;
+  const nLines = shown.split(/\r?\n/).filter(l => l.trim() && !/^>/.test(l.trim())).length;
+  const ai = st.ai ? `<div class="pl-chips"><button type="button" class="pl-chip on" data-ya-act="fbai" ${st.busy ? 'disabled' : ''}>AI로 자막 쓰기</button></div>`
+    : `<div class="pl-chips"><button type="button" class="pl-chip" data-ya-act="fbcopy">① Claude 요청문 복사</button></div>
+       <label class="pl-scr-l">② 받은 답 붙여 넣기 (통째로)<textarea class="pl-input" rows="5" data-ya-fbans placeholder="구간: 0:30-0:42, 1:05-1:09x0.5&#10;> 배너: 위 줄 / 아랫줄 ㄷㄷ&#10;자막 줄…">${esc(st.ans)}</textarea></label>
+       <div class="pl-chips"><button type="button" class="pl-chip on" data-ya-act="fbans" ${st.busy ? 'disabled' : ''}>③ 답으로 자막 채우기</button></div>`;
   const opt = (list, v) => `<option value="">없음</option>` + list.map(f => `<option value="${esc(f)}" ${f === v ? 'selected' : ''}>${esc(f)}</option>`).join('');
+  const tr = (st.transcript || []).filter(t => t && t.text);
+  const trHtml = tr.length ? tr.map(t => `<p class="small"><b>${esc(t.range)}</b><br>${esc(t.text)}</p>`).join('') : '<p class="small">원본 영어 자막이 없어요.</p>';
   return `<div class="pl-scr">
-    <label class="pl-scr-l">고칠 점 (피드백)<textarea class="pl-input" rows="3" data-ya-fb placeholder="예: 첫 자막 더 세게 / 0:12~0:15 는 슬로우로 / 마지막에 점수 도장 넣어 줘">${esc(st.fb)}</textarea></label>
-    <p class="small">${st.ai ? '실행기에 AI 키가 있어서 바로 반영할 수 있어요.' : 'AI 키가 없어서 Claude 채팅으로 받아요. 요청문에 지금 구간·대본·피드백이 다 들어가요.'}${ph ? ' 아직 자막 대본이 없어요. 이번에 새로 써 달라고 해요.' : ''}</p>
+    <label class="pl-scr-l"><span>자막 (한 줄 = 화면 한 장면, 25자 안팎) · <b id="yaSubCount">${nLines}줄</b></span><textarea class="pl-input" rows="10" data-ya-draft="text" placeholder="예:&#10;이 *기술* 보이지?&#10;상대가 균형을 잃는 순간이야&#10;자, 한 번 더 볼까">${esc(shown)}</textarea></label>
+    <b class="small">자동으로 받기</b>
     ${ai}
-    <details class="pl-peek" ${ph ? '' : 'open'}><summary>직접 고치기 (구간·대본)</summary>
+    <p class="small">${st.ai ? '실행기에 AI 키가 있어서 바로 받을 수 있어요.' : '요청문에 원본 영어 자막과 구간이 다 들어가요.'}</p>
+    <details class="pl-peek"><summary>원본 영어 자막 (참고)</summary>${trHtml}</details>
+    <details class="pl-peek"><summary>더 고치기 (선택)</summary>
+      <label class="pl-scr-l">고칠 점<textarea class="pl-input" rows="3" data-ya-fb placeholder="예: 첫 자막 더 세게 / 0:12~0:15 는 슬로우로 / 마지막에 점수 도장 넣어 줘">${esc(st.fb)}</textarea></label>
       <label class="pl-scr-l">쓸 구간 (슬로우: 0:30-0:34x0.5 · 영상 전체: 전체)<input class="pl-input" data-ya-draft="ranges" value="${esc(st.ranges)}"></label>
-      <label class="pl-scr-l">대본<textarea class="pl-input" rows="12" data-ya-draft="text">${esc(st.text)}</textarea></label>
       <p class="small"><code>&gt; 배너: 위 줄 / 아랫줄 ㄷㄷ</code> 위 2줄 제목 · <code>&gt; 출처: 채널 이름</code> · <code>[태그] 선수 (나라) / 대회 · 체급</code> 빨간 이름표 · <code>[점수] 4 : 0 / 설명</code> 큰 도장 · <code>*단어*</code> 노란 강조. 태그·점수 줄은 바로 다음 자막 줄에 붙어요.</p>
+      <div class="ya-mixset"><label>배경음악 <select data-ya-fbbgm>${opt(st.bgm, st.mix.bgm)}</select></label><span class="small">원본 경기 소리 위에 작게 깔려요. <code>~/Desktop/유투브/소리/BGM</code> 에 넣으면 목록에 떠요.</span></div>
+      <p class="small"><button type="button" class="pl-link" data-ya-recopen>🎙 내 목소리도 녹음하기 (선택)</button></p>
+      <div id="yaRec">${recState.open ? recPanel() : ''}</div>
     </details>
-    <div class="ya-mixset"><label>배경음악 <select data-ya-fbbgm>${opt(st.bgm, st.mix.bgm)}</select></label><span class="small">원본 경기 소리 위에 작게 깔려요. <code>~/Desktop/유투브/소리/BGM</code> 에 넣으면 목록에 떠요.</span></div>
-    <p class="small"><button type="button" class="pl-link" data-ya-recopen>🎙 내 목소리도 녹음하기 (선택)</button></p>
-    <div id="yaRec">${recState.open ? recPanel() : ''}</div>
   </div>`;
 }
 document.addEventListener('click', e => {
@@ -160,7 +166,7 @@ document.addEventListener('input', e => {
   if (t.matches('textarea[data-ya-fb]')) st.fb = t.value;
   else if (t.matches('textarea[data-ya-fbans]')) st.ans = t.value;
   else if (t.matches('[data-ya-draft="ranges"]')) st.ranges = t.value;
-  else if (t.matches('[data-ya-draft="text"]')) st.text = t.value;
+  else if (t.matches('[data-ya-draft="text"]')) { st.text = t.value; const c = document.getElementById('yaSubCount'); if (c) c.textContent = t.value.split(/\r?\n/).filter(l => l.trim() && !/^>/.test(l.trim())).length + '줄'; }
 });
 document.addEventListener('change', async e => {
   const sel = e.target.closest && e.target.closest('select[data-ya-fbbgm]'); if (!sel) return;
@@ -350,19 +356,19 @@ document.addEventListener('click', async e => {
             const d = await runnerFetch('/feedback', { ep: cur.ep, feedback: st.fb, copyOnly: true });
             toast((await copyText(d.request)) ? 'Claude 채팅에 붙여 넣고, 받은 답을 ② 칸에 붙여 넣으세요.' : '복사가 안 됐어요.');
           } else if (a === 'fbai') {
-            toast('Claude가 고치는 중…');
+            toast('Claude가 자막을 쓰는 중…');
             const d = await runnerFetch('/feedback', { ep: cur.ep, feedback: st.fb });
-            st.loaded = false; toast(`반영했어요: 대본 ${d.lines}줄${d.rangesChanged ? ' · 구간 바뀜' : ''}. 2차 편집을 누르세요.`);
+            st.loaded = false; toast(`반영했어요: 자막 ${d.lines}줄${d.rangesChanged ? ' · 구간 바뀜' : ''}. 2차 편집을 누르세요.`);
           } else if (a === 'fbans') {
             if (!st.ans.trim()) throw new Error('Claude 답을 ② 칸에 붙여 넣어 주세요.');
             const d = await runnerFetch('/draft', { ep: cur.ep, answer: st.ans, feedback: st.fb });
-            st.ans = ''; st.loaded = false; toast(`반영했어요: 대본 ${d.lines}줄${d.rangesChanged ? ' · 구간 바뀜' : ''}. 2차 편집을 누르세요.`);
+            st.ans = ''; st.loaded = false; toast(`반영했어요: 자막 ${d.lines}줄${d.rangesChanged ? ' · 구간 바뀜' : ''}. 2차 편집을 누르세요.`);
           } else {
             const body = { ep: cur.ep, feedback: st.fb };
             if (st.ranges.trim() !== st.ranges0.trim()) body.ranges = st.ranges;
             if (st.text !== st.text0) body.text = st.text;
             const d = await runnerFetch('/draft', body);
-            st.loaded = false; toast(`수정안을 저장했어요${d.lines ? ` (대본 ${d.lines}줄)` : ''}. 2차 편집을 누르세요.`);
+            st.loaded = false; toast(`자막을 저장했어요${d.lines ? ` (${d.lines}줄)` : ''}. 2차 편집을 누르세요.`);
           }
         } finally { st.busy = false; }
       } else if (a === 'addsrc') {

@@ -604,7 +604,7 @@ ${said}
 규칙:
 ${rules.map((r, i) => `${i + 1}. ${r}`).join('\n')}`;
 };
-// 매트 스토리 룩 대본 규칙 (대본 요청문·피드백 요청문이 같이 써요)
+// 매트 스토리 룩 대본 규칙 (대본 요청문·자막 넣기 요청문이 같이 써요)
 export const MAT_RULES = n => [
   '맨 첫 줄은 "> 배너: 위 줄 / 아랫줄" 형식의 제목 두 줄. 위 줄(노란 글씨)은 12자 안팎으로 놀라운 사실, 아랫줄(빨간 글씨)은 선수 별명·결과 + " ㄷㄷ". 예: > 배너: 15초 만에 130kg급을 / 들어 던진 5연패 ㄷㄷ',
   `그다음은 자막 줄. 영상 길이에 맞춰 약 ${n}줄, 한 줄 18자 이내. 친구한테 말하듯 반말 해설 ("~했어", "~지?", "~거든").`,
@@ -688,7 +688,7 @@ async function script(E, ctx) {
   ctx.log('대본 확인 대기: 편집/대본.md 를 읽고 고친 뒤 "대본 확인 완료 · 계속"을 누르세요.');
 }
 
-// ---------- 피드백 (1차 편집을 보고 고칠 점 → 구간·대본 고치기) ----------
+// ---------- 자막 넣기 (1차 편집 뒤: 한국어 자막 쓰기 + 고칠 점 → 구간·대본 저장) ----------
 // 지금 대본 글: "> 배너:"·"> 출처:" 줄 + 대사 줄 (설명 머리말은 빼요)
 export function draftText(E) {
   let t = ''; try { t = fs.readFileSync(E.p('편집/대본.md'), 'utf8'); } catch { return ''; }
@@ -704,14 +704,27 @@ export function splitAnswer(text) {
   }
   return { ranges, text: out.join('\n').trim() };
 }
+// 쓸 구간의 원본 영어 자막 [{range,text}] (소스 여러 개면 이어 붙여요, 빈 건 빼요, 오류가 나도 [] )
+export function draftTranscript(E) {
+  try {
+    const info = readJson(E.p('소스.json'), []), out = [];
+    (E.s.sources || []).forEach((_, si) => {
+      const s = info[si] || E.s.sources[si];
+      for (const t of transcriptFor(cuesOf(E, s), rangesFor(E, si, s))) if (t.text) out.push(t);
+    });
+    return out;
+  } catch { return []; }
+}
 export async function feedbackPrompt(E, feedback, ctx = {}) {
   const info = readJson(E.p('소스.json'), []), clips = exists(E.p('클립')) ? await clipDurations(E, ctx) : [];
   const T = Math.min(clips.reduce((a, c) => a + c.duration, 0) || 30, specOf(E).maxTotal), look = lookOf(E), P = profileOf(E);
   const cur = draftText(E), hasPh = !cur || cur.includes(PLACEHOLDER) || /\[여기에/.test(cur);
   const rng = E.s.sources.map((s, i) => `소스 ${i + 1} (${(info[i] && fmtTime(info[i].duration || 0)) || '?'}): ${s.ranges.join(', ') || '(없음)'}`).join('\n');
+  const tr = draftTranscript(E);
+  const said = tr.length ? `\n원본 영어 자막 (쓰는 구간별, 이 말을 바탕으로 한국어 자막을 써 줘):\n${tr.map(t => `- ${t.range}: ${t.text.slice(0, 700)}`).join('\n')}\n` : '';
   const rules = look?.kind === 'mat' ? MAT_RULES(Math.max(6, Math.min(16, Math.round(T / 3.2)))) : ['한 줄 = 자막 한 장면, 25자 이내.', '확인되지 않은 기록·숫자는 쓰지 마.', '친구에게 말하듯 쉬운 말.'];
   return `너는 ${P.persona(E.s.format === 'long' ? '롱폼' : '쇼츠')}야.
-1차 편집본을 본 내 피드백을 반영해서, 쓸 구간과 자막 대본을 고쳐 줘.
+1차 편집본에 넣을 한국어 자막을 써 줘. 필요하면 쓸 구간도 같이 고쳐 줘.
 
 - 제목: ${E.s.title}
 - 메모: ${E.s.note || '(없음)'}
@@ -720,18 +733,18 @@ export async function feedbackPrompt(E, feedback, ctx = {}) {
 
 지금 쓰는 구간 (한 구간 15초까지, 끝에 x0.5 를 붙이면 0.5배 슬로우):
 ${rng}
-
-지금 대본:
+${said}
+지금 자막:
 ${hasPh ? '(아직 없음 → 새로 써 줘)' : cur}
 
-내 피드백:
-${String(feedback || '').trim() || '(없음 → 더 재밌고 잘 보이게 다듬어 줘)'}
+더 고칠 점:
+${String(feedback || '').trim() || '(없음)'}
 
 출력 형식 (이 형식 그대로, 다른 설명 없이):
 구간: 0:30-0:42, 1:05-1:09x0.5   ← 구간을 안 바꿔도 지금 구간을 그대로 적어 줘. 소스가 여러 개면 첫 소스 구간만.
-그다음 줄부터 대본.
+그다음 줄부터 자막 (한 줄 = 화면 한 장면).
 
-대본 규칙:
+자막 규칙:
 ${rules.map((r, i) => `${i + 1}. ${r}`).join('\n')}`;
 }
 

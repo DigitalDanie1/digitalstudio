@@ -226,6 +226,11 @@ try {
     const P = JSON.parse(fs.readFileSync(path.join(tmp, 'data', E, '편집/편집계획.json'), 'utf8'));
     assert.deepEqual(P.lines, []); assert.equal(P.clips.length, 2); assert.equal(P.clips[0].range, '0:01-0:07'); assert.equal(P.clips[1].si, 0); assert.equal(P.clips[1].a, 3); assert.equal(P.srcSubs, true);
   });
+  await check('GET /draft: transcript 배열 (소스 옆 VTT 의 쓰는 구간 글)', async () => {
+    const { d } = await J('/draft?ep=' + encodeURIComponent(E));
+    assert.ok(Array.isArray(d.transcript)); assert.ok(d.transcript.length >= 1);
+    assert.match(d.transcript.map(t => t.text).join(' '), /God is love/); assert.ok(d.transcript.every(t => t.range && t.text));
+  });
   await check('자막 자동화: 소스 자막이 편집 시간으로 옮겨져 입혀짐 ([Music] 같은 줄은 뺌)', async () => {
     const P = JSON.parse(fs.readFileSync(path.join(tmp, 'data', E, '편집/편집계획.json'), 'utf8')), info = JSON.parse(fs.readFileSync(path.join(tmp, 'data', E, '소스.json'), 'utf8'));
     const fakeEp = { p: (...a) => path.join(tmp, 'data', E, ...a), s: { sources: [{ url: src, ranges: ['0:01-0:07', '0:03-0:08'] }] } };
@@ -892,6 +897,14 @@ try {
     assert.equal((await J('/episode/delete', { ep: name })).r.status, 404, '두 번째는 없는 에피소드');
     // 다시 켜도 안 살아나요
     await stop(); await start(); assert.ok(!(await J('/status')).d.episodes.some(x => x.ep === name));
+  });
+  await check('에피소드 폴더를 밖에서 지웠으면: /status 에서 빠지고, 지우기도 오류 없이 돼요', async () => {
+    const one = await J('/episodes', { title: '밖에서 지울 주제', url: 'https://example.com/y', ranges: '0:00-0:05' }); assert.equal(one.r.status, 200, JSON.stringify(one.d));
+    const two = await J('/episodes', { title: '밖에서 지울 주제 둘', url: 'https://example.com/z', ranges: '0:00-0:05' }); assert.equal(two.r.status, 200, JSON.stringify(two.d));
+    fs.rmSync(path.join(tmp, 'data', one.d.ep), { recursive: true, force: true });
+    const del = await J('/episode/delete', { ep: one.d.ep }); assert.equal(del.r.status, 200, JSON.stringify(del.d)); assert.equal(del.d.trashed, null);
+    fs.rmSync(path.join(tmp, 'data', two.d.ep), { recursive: true, force: true });
+    assert.ok(!(await J('/status')).d.episodes.some(x => x.ep === two.d.ep), '폴더가 없으면 목록에서 빠져야 해요');
   });
   await check('유튜브 초기화(/reset): 돌고 있으면 409로 아무것도 안 옮기고, 아니면 에피소드·하이라이트를 휴지통 한 폴더로 (+ 재시작해도 비어 있음)', async () => {
     await waitIdle();

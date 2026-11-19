@@ -445,7 +445,7 @@
   }
 
   // ===== YouTube (맥 실행기 단계를 같은 틀에 그린다) =====
-  // 유튜브 작업 순서 (모든 채널·형식 같음, 8칸): 원본 링크 → 편집 스타일 선택 → 최종 결과물 레퍼런스 → 링크 영상 다운 → 1차 편집 → 피드백 → 2차 편집 → 최종 편집안 다운로드
+  // 유튜브 작업 순서 (모든 채널·형식 같음, 8칸): 원본 링크 → 편집 스타일 선택 → 최종 결과물 레퍼런스 → 링크 영상 다운 → 1차 편집 → 자막 넣기 → 2차 편집 → 최종 편집안 다운로드
   // 편집 룩 목록: 실행기 /status 의 looks 와 같아요. 실행기가 꺼져 있어도 고를 수 있게 여기에도 둬요.
   const YT_LOOKS = [
     { id: 'yt-wrestling', name: '기본 룩', desc: '흰 자막 + 첫 1.5초 제목 카드 (레슬링 채널 기본)' },
@@ -631,7 +631,7 @@
     { id: 'g-upload', name: '업로드 패키지', ids: ['upload'], desc: '제목·설명란·태그·썸네일 문구를 한 파일로 만들어요.', go: '업로드 패키지 만들기' },
   ];
   const YT_STEP_NAME = { research: '소스 확인', download: '영상 받기', clip: '구간 자르기', plan: '편집 계획', rough: '가편집', subs: '자막 자동화', fx: '이펙트', script: '대본', mix: '목소리·음악', upload: '업로드 패키지' };
-  const YT_PLACEHOLDER = ['원본 링크', '편집 스타일 선택', '최종 결과물 레퍼런스', '링크 영상 다운', '1차 편집', '피드백', '2차 편집', '최종 편집안 다운로드'];
+  const YT_PLACEHOLDER = ['원본 링크', '편집 스타일 선택', '최종 결과물 레퍼런스', '링크 영상 다운', '1차 편집', '자막 넣기', '2차 편집', '최종 편집안 다운로드'];
   // 실행기 단계들을 칸(그룹)으로 묶은 상태
   function ytGroupState(ep, g) {
     const sts = g.ids.map(id => (ep.steps || []).find(x => x.id === id)).filter(Boolean);
@@ -860,9 +860,9 @@
     };
     return [topic, look, fxref, ...mid, ...edits];
   }
-  // ===== ④ 1차 편집 · ⑤ 피드백 · ⑥ 2차 편집 · ⑦ 최종 편집안 다운로드 =====
+  // ===== ④ 1차 편집 · ⑤ 자막 넣기 · ⑥ 2차 편집 · ⑦ 최종 편집안 다운로드 =====
   function ytEditCards(it, ep, off) {
-    const names = ['1차 편집', '피드백', '2차 편집', '최종 편집안 다운로드'];
+    const names = ['1차 편집', '자막 넣기', '2차 편집', '최종 편집안 다운로드'];
     if (!ep) return names.map((n, i) => ({ id: 'e' + i, name: n, title: n, desc: '앞 단계를 끝내면 열려요.', btn: n, disabled: () => true, isDone: () => false, result: () => '', run: () => {} }));
     const st = id => (ep.steps || []).find(x => x.id === id) || { status: 'todo', outputs: [] }, ok = id => st(id).status === 'done';
     const dlDone = ok('research') && ok('download'), round = ep.round || 0, editing = !!ep.running && ['clip', 'plan', 'rough', 'subs', 'fx', 'script', 'mix'].includes(ep.running);
@@ -876,7 +876,7 @@
     const editResult = r => () => {
       const parts = [];
       if (failed && failed.error && (ep.editRound || 1) === r) parts.push(`<p class="pl-error"><b>${esc(failed.name)}</b> · ${esc(runnerFriendly(failed.error))}</p>`);
-      if (round >= r) { const v = ytEditVideo(ep); parts.push(`<p><b>${r}차 편집본이 나왔어요.</b>${v ? ' 아래에서 바로 볼 수 있어요. ' + ytFileLink(ep.ep, { path: v.path }) : ''}</p>`); if (v) parts.push(ytVideoBox('plEdVid' + r, ep, v, v.label)); if (!ep.hasScript) parts.push('<p class="small">아직 자막 대본이 없어서 자막 없이 만들었어요. 피드백에서 대본을 넣어요.</p>'); }
+      if (round >= r) { const v = ytEditVideo(ep); parts.push(`<p><b>${r}차 편집본이 나왔어요.</b>${v ? ' 아래에서 바로 볼 수 있어요. ' + ytFileLink(ep.ep, { path: v.path }) : ''}</p>`); if (v) parts.push(ytVideoBox('plEdVid' + r, ep, v, v.label)); if (!ep.hasScript) parts.push('<p class="small">아직 자막이 없어서 자막 없이 만들었어요. 다음 \'자막 넣기\'에서 자막을 넣어요.</p>'); }
       parts.push(logs()); return parts.join('');
     };
     const rangesNow = ((ep.sources && ep.sources[0] && ep.sources[0].ranges) || []).join(', ');
@@ -894,19 +894,19 @@
       run: () => {},
     };
     const e2 = {
-      id: 'e2', name: '피드백', title: '피드백',
-      desc: round < 1 ? '1차 편집이 끝나면 열려요.' : '1차 편집본을 보고 고칠 점을 적으세요. Claude 요청문으로 받거나, 구간·대본을 직접 고쳐서 저장하면 돼요.',
-      btn: '수정안 저장',
+      id: 'e2', name: '자막 넣기', title: '자막 넣기',
+      desc: round < 1 ? '1차 편집이 끝나면 열려요.' : '영상에 들어갈 한국어 자막을 넣어요. Claude에게 한 번에 받거나, 한 줄씩 직접 써요.',
+      btn: '자막 저장',
       attrs: () => 'data-ya-act="draftsave"',
       disabled: () => off || round < 1 || !!ep.running,
       isDone: () => fbNew || (round >= 2 && !fbNew),
-      result: () => fbNew ? '<b>수정안을 저장했어요.</b> 2차 편집을 누르세요.' : '',
-      body: () => round >= 1 ? redoBtn('1차 편집본이 마음에 안 들면 눌러요. 구간·스타일을 바꿔 다시 만들 수 있어요.') + ytFeedbackPanel(ep) : '',
+      result: () => fbNew ? '<b>자막을 저장했어요.</b> 2차 편집을 누르면 자막이 들어가요.' : '',
+      body: () => round >= 1 ? redoBtn('1차 편집본이 마음에 안 들면 눌러요. 구간·스타일을 바꿔 다시 만들 수 있어요.') + ytSubsPanel(ep) : '',
       run: () => {},
     };
     const e3 = {
       id: 'e3', name: '2차 편집', title: '2차 편집',
-      desc: round < 1 ? '1차 편집이 끝나면 열려요.' : fbNew || round < 2 ? '저장한 수정안으로 다시 편집해요. 자막·제목·선수 태그·점수 도장·원본 소리·배경음악이 들어가요.' : '다시 고치려면 피드백에서 수정안을 저장하고 누르세요.',
+      desc: round < 1 ? '1차 편집이 끝나면 열려요.' : fbNew || round < 2 ? '저장한 자막으로 다시 편집해요. 자막·제목·선수 태그·점수 도장·원본 소리·배경음악이 들어가요.' : "다시 고치려면 '자막 넣기'에서 자막을 저장하고 누르세요.",
       btn: () => editing && (ep.editRound || 0) >= 2 ? '실행 멈춤' : round >= 2 ? `${round + 1}차 편집 만들기` : '2차 편집 만들기',
       attrs: () => editing && (ep.editRound || 0) >= 2 ? 'data-ya-act="stop"' : `data-ya-act="edit" data-ya-round="${Math.max(round + 1, 2)}"`,
       cls: editing && (ep.editRound || 0) >= 2 ? 'danger' : '',

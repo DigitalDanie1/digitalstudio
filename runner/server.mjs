@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { HOME, StepError, StopError, sanitize, exists, parseRanges, isLocalSource, localPath, run, FFMPEG, lastLines, fmtTime, MAX_RANGE } from './util.mjs';
 import { createHighlights, LEN_MIN, LEN_MAX } from './highlights.mjs';
 import { listStyles, saveStyle, enqueue, cancelJob, listJobs, resolveReadable, thumbOf, shutdownImages, ImgError } from './images.mjs';
-import { STEP_DEFS, STEP_FN, outputsFor, listAssets, checkScript, cleanPasted, parseScript, parseBanner, parseHook, PLACEHOLDER, SCRIPT_MAX_LINES, CHANNEL_PROFILES, LOOK_CHOICES, lookKeyOf, FX_PACKS, fxPackOf, parseFxTimes, migrateState, layoutLines, draftText, splitAnswer, feedbackPrompt, callClaude, parseCredit, previewPlan, renderPreview } from './steps.mjs';
+import { STEP_DEFS, STEP_FN, outputsFor, listAssets, checkScript, cleanPasted, parseScript, parseBanner, parseHook, PLACEHOLDER, SCRIPT_MAX_LINES, CHANNEL_PROFILES, LOOK_CHOICES, lookKeyOf, FX_PACKS, fxPackOf, parseFxTimes, migrateState, layoutLines, draftText, draftTranscript, splitAnswer, feedbackPrompt, callClaude, parseCredit, previewPlan, renderPreview } from './steps.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // 작업판이 쓰는 기능 수준. 3 = 새 9칸 순서 (/look, /ranges, deferRanges, 단계 clip·subs·fx)
@@ -126,7 +126,7 @@ function launchEdit(E, round) {
       E.s.gate = false; save(E);
       const ctx = makeCtx(E, 'mix');
       if (hasScript(E)) { try { layoutLines(E, ctx); } catch (e) { ctx.log('대본 시간표를 못 짰어요: ' + e.message); } }
-      else {   // 대본이 아직 빈 양식이면 자막 없이 만들어요 (피드백 단계에서 대본을 넣어요)
+      else {   // 대본이 아직 빈 양식이면 자막 없이 만들어요 (자막 넣기 단계에서 자막을 넣어요)
         try { const f = E.p('편집/편집계획.json'), P = JSON.parse(fs.readFileSync(f, 'utf8')); P.lines = []; fs.writeFileSync(f, JSON.stringify(P, null, 2)); } catch {}
       }
       if (E.ctrl.aborted) return;
@@ -170,6 +170,8 @@ const firstNotDone = E => orderIds().find(id => E.s.steps[id].status !== 'done')
 
 // ---------- 라우터 ----------
 class HttpError extends Error { constructor(code, msg) { super(msg); this.code = code; } }
+// 파인더에서 폴더를 지운 에피소드는 목록에서도 빼요 (돌고 있는 건 그대로)
+const pruneGone = () => { for (const [k, E] of episodes) if (!E.running && !exists(E.dir)) { episodes.delete(k); try { HL.dropEpisodeRef(k); } catch {} } };
 const getEp = name => { const E = episodes.get(String(name || '')); if (!E) throw new HttpError(404, '에피소드를 찾을 수 없어요.'); return E; };
 const mustIdle = E => { if (E.running) throw new HttpError(409, '지금 다른 단계가 돌고 있어요. 끝나거나 멈춘 뒤에 눌러 주세요.'); };
 
@@ -316,7 +318,7 @@ const routes = {
   'POST /hl/start': async ({ body }) => { const J = await hlStart(body); return { json: { ok: true, id: J.id } }; },
   'GET /': () => ({ text: '실행기가 켜져 있어요.' }),
   'GET /health': () => ({ json: { ok: true, api: API_LEVEL, version: VERSION, ffmpeg: exists(FFMPEG), data: DATA, ai: !!process.env.ANTHROPIC_API_KEY } }),
-  'GET /status': () => ({ json: { looks: LOOK_CHOICES, fxPacks: FX_PACKS, episodes: [...episodes.values()].sort((a, b) => b.s.created - a.s.created).map(view) } }),
+  'GET /status': () => { pruneGone(); return { json: { looks: LOOK_CHOICES, fxPacks: FX_PACKS, episodes: [...episodes.values()].sort((a, b) => b.s.created - a.s.created).map(view) } }; },
   'GET /episodes': () => routes['GET /status'](),
   'POST /episodes': ({ body }) => { const E = createEpisode(body); return { json: { ok: true, ep: E.s.ep } }; },
   'POST /source': ({ body }) => {
@@ -371,8 +373,8 @@ const routes = {
     const round = Math.max(1, Math.min(9, +body.round || (E.s.round || 0) + 1));
     save(E); launchEdit(E, round); return { json: { ok: true, round } };
   },
-  // ⑤ 피드백: 지금 구간·대본 읽기 / 고친 것 저장 / 피드백 글 → (AI 키가 있으면 바로 반영, 없으면 Claude 채팅용 요청문)
-  'GET /draft': ({ q }) => { const E = getEp(q.get('ep')); return { json: { ranges: (E.s.sources[0]?.ranges || []).join(', '), text: draftText(E), hasScript: hasScript(E), ai: !!process.env.ANTHROPIC_API_KEY, feedback: E.s.feedback || '' } }; },
+  // ⑤ 자막 넣기: 지금 구간·자막·원본 영어 자막 읽기 / 고친 것 저장 / 고칠 점 글 → (AI 키가 있으면 바로 반영, 없으면 Claude 채팅용 요청문)
+  'GET /draft': ({ q }) => { const E = getEp(q.get('ep')); return { json: { ranges: (E.s.sources[0]?.ranges || []).join(', '), text: draftText(E), hasScript: hasScript(E), ai: !!process.env.ANTHROPIC_API_KEY, feedback: E.s.feedback || '', transcript: draftTranscript(E) } }; },
   'POST /draft': ({ body }) => {
     const E = getEp(body.ep); mustIdle(E);
     let ranges = body.ranges, text = body.text;
@@ -470,7 +472,7 @@ const routes = {
       for (let i = 0; i < 50 && E.running; i++) await new Promise(r => setTimeout(r, 100));
       if (E.running) throw new HttpError(409, '아직 멈추는 중이에요. 잠시 뒤에 다시 눌러 주세요.');
     }
-    const dest = moveToTrash(dir, trashRoot(), `${path.basename(dir)} ${tsNow()}`);
+    const dest = exists(dir) ? moveToTrash(dir, trashRoot(), `${path.basename(dir)} ${tsNow()}`) : null;   // 폴더가 이미 없으면(파인더에서 지움 등) 목록에서만 빼요
     episodes.delete(E.s.ep);
     try { HL.dropEpisodeRef(E.s.ep); } catch {}
     return { json: { ok: true, trashed: dest } };
