@@ -4,13 +4,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { HOME, StepError, StopError, sanitize, exists, parseRanges, isLocalSource, localPath, run, FFMPEG, lastLines } from './util.mjs';
+import { HOME, StepError, StopError, sanitize, exists, parseRanges, isLocalSource, localPath, run, FFMPEG, lastLines, fmtTime, MAX_RANGE } from './util.mjs';
+import { createHighlights, LEN_MIN, LEN_MAX } from './highlights.mjs';
 import { listStyles, saveStyle, enqueue, cancelJob, listJobs, resolveReadable, thumbOf, shutdownImages, ImgError } from './images.mjs';
 import { STEP_DEFS, STEP_FN, outputsFor, listAssets, checkScript, cleanPasted, parseScript, parseBanner, parseHook, PLACEHOLDER, SCRIPT_MAX_LINES, CHANNEL_PROFILES, LOOK_CHOICES, lookKeyOf, FX_PACKS, fxPackOf, parseFxTimes, migrateState, layoutLines, draftText, splitAnswer, feedbackPrompt, callClaude, parseCredit } from './steps.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // 작업판이 쓰는 기능 수준. 3 = 새 9칸 순서 (/look, /ranges, deferRanges, 단계 clip·subs·fx)
-const API_LEVEL = 5;   // 4 = 7칸 순서 (/edit 1차·2차 편집, /draft, /feedback, 슬로우 구간 x0.5, 매트 스토리 룩) · 5 = 최종 결과물 레퍼런스(이펙트 팩: /fxpack, status.fxPacks)
+const API_LEVEL = 6;   // 6 = 하이라이트 찾기(/hl/*) ·  4 = 7칸 순서 (/edit 1차·2차 편집, /draft, /feedback, 슬로우 구간 x0.5, 매트 스토리 룩) · 5 = 최종 결과물 레퍼런스(이펙트 팩: /fxpack, status.fxPacks)
 let VERSION = 'dev';
 try { VERSION = fs.readFileSync(path.join(HERE, 'version.txt'), 'utf8').trim() || 'dev'; } catch {}
 const PORT = +(process.env.FIELDNOTE_RUNNER_PORT || 4777);
@@ -23,6 +24,7 @@ const ORIGINS = new Set(['https://digitalstudio-eight.vercel.app', 'http://local
 if (!process.env.ANTHROPIC_API_KEY) {
   try { const k = fs.readFileSync(path.join(HERE, 'anthropic-key.txt'), 'utf8').split(/\r?\n/)[0].trim(); if (k) process.env.ANTHROPIC_API_KEY = k; } catch {}
 }
+const HL_DATA = process.env.FIELDNOTE_HIGHLIGHT_DATA || path.join(path.dirname(DATA), '하이라이트');
 for (const d of [DATA, path.join(HOME_ROOT, '소리/BGM'), path.join(HOME_ROOT, '소리/시그니처'), path.join(HOME_ROOT, '소리/효과음')]) fs.mkdirSync(d, { recursive: true });
 
 // ---------- 에피소드 저장소 ----------
@@ -178,6 +180,93 @@ function addSource(E, url, ranges, defer = false) {
   E.s.sources.push({ url, ranges: rg });
 }
 
+// 에피소드 하나 만들기 (POST /episodes 와 하이라이트 만들기가 같이 써요)
+function createEpisode(body, nameBase = '') {
+  const title = String(body.title || '').trim(); if (!title) throw new HttpError(400, '제목이 필요해요.');
+  let ep = sanitize(nameBase || title) || '새 주제', n = 1; const base = ep;
+  while (exists(path.join(DATA, ep))) ep = `${base}-${++n}`;
+  const s = { ep, title, note: String(body.note || ''), ideaId: body.ideaId || '', format: body.format === 'long' ? 'long' : 'shorts',
+    channel: String(body.channel || '').toLowerCase().replace(/[^a-z-]/g, '').slice(0, 40), look: CHANNEL_PROFILES[body.look] ? body.look : '', voice: String(body.voice || '').slice(0, 2000), sources: [], created: Date.now(), gate: false, mix: {}, voices: {},
+    steps: Object.fromEntries(STEP_DEFS.map(d => [d.id, { status: 'todo' }])) };
+  const E = makeEpisode(path.join(DATA, ep), s);
+  addSource(E, body.url, body.ranges, !!body.deferRanges);
+  for (const d of ['원본', '클립', '편집/녹음', '업로드', '로그']) fs.mkdirSync(E.p(d), { recursive: true });
+  save(E); episodes.set(ep, E);
+  return E;
+}
+
+// ---------- 하이라이트 찾기 ----------
+const HL = createHighlights({ dataDir: HL_DATA });
+const readJsonSafe = (f, d = null) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return d; } };
+const getHL = id => { const J = HL.get(id); if (!J) throw new HttpError(404, '이 하이라이트 작업을 찾을 수 없어요.'); return J; };
+const hlErr = e => { if (e instanceof StepError) throw new HttpError(400, e.message); throw e; };
+const linkOrCopy = (from, to) => { fs.mkdirSync(path.dirname(to), { recursive: true }); fs.rmSync(to, { force: true }); try { fs.linkSync(from, to); } catch { fs.copyFileSync(from, to); } };
+// 하이라이트 → 에피소드. 받아 둔 통영상을 그대로 붙이고(하드링크, 안 되면 복사) "소스 확인·영상 받기"는 끝난 걸로 해 둬요. 구간 자르기부터 이어서 하면 돼요.
+function hlMake(J, body) {
+  const s = J.s, v = HL.videoOf(J);
+  if (!exists(v)) throw new HttpError(409, '원본 영상이 아직 없어요. 분석이 끝난 뒤에 눌러 주세요.');
+  const mode = body.mode === 'merge' ? 'merge' : body.mode === 'each' ? 'each' : ''; if (!mode) throw new HttpError(400, 'mode 는 each 또는 merge 여야 해요.');
+  if (!Array.isArray(body.picks) || !body.picks.length) throw new HttpError(400, '체크한 후보가 없어요.');
+  if (body.picks.length > 40) throw new HttpError(400, '한 번에 40개까지만 만들 수 있어요.');
+  const picks = body.picks.map((p, i) => {
+    const a = Math.round(+p?.a), b = Math.round(+p?.b);
+    if (!(a >= 0) || !(b > a)) throw new HttpError(400, `${i + 1}번째 구간이 이상해요. 끝이 시작보다 늦어야 해요.`);
+    if (b - a > MAX_RANGE) throw new HttpError(400, `${i + 1}번째 구간이 ${MAX_RANGE}초를 넘어요 (${fmtTime(a)}-${fmtTime(b)}).`);
+    if (s.duration && b > s.duration + 0.5) throw new HttpError(400, `${i + 1}번째 구간이 영상 길이(${fmtTime(s.duration)})를 넘어요.`);
+    return { a, b, rank: Number.isInteger(p?.rank) && p.rank > 0 ? p.rank : i + 1 };
+  });
+  const channel = String(body.channel || 'yt-wrestling').toLowerCase().replace(/[^a-z-]/g, '').slice(0, 40) || 'yt-wrestling';
+  const isLocal = isLocalSource(s.url), shortTitle = sanitize(s.title, 30) || '하이라이트';
+  const range = p => `${fmtTime(p.a)}-${fmtTime(p.b)}`;
+  const groups = mode === 'each' ? picks.map(p => ({ title: `${s.title} 하이라이트 ${p.rank}`, name: `${shortTitle} 하이라이트 ${p.rank}`, ranges: [range(p)] }))
+    : [{ title: `${s.title} 하이라이트 모음`, name: `${shortTitle} 하이라이트 모음`, ranges: [...picks].sort((x, y) => x.a - y.a).map(range) }];
+  const made = [], warns = [];
+  for (const g of groups) {
+    const E = createEpisode({ title: g.title, url: s.url, ranges: g.ranges, channel, format: 'shorts' }, g.name);
+    const info = { url: s.url, local: isLocal, title: s.title, channel: s.channel || (isLocal ? '(내 파일)' : ''), duration: s.duration || null, id: s.videoId || path.basename(s.url), license: s.license || null, ranges: parseRanges(g.ranges) };
+    if (!isLocal) {
+      linkOrCopy(v, E.p('원본/full_1.mp4')); info.full = '원본/full_1.mp4';
+      const sub = s.subFile && path.join(J.dir, s.subFile);
+      if (sub && exists(sub)) { const rel = `원본/자막/${path.basename(sub)}`; fs.mkdirSync(E.p('원본/자막'), { recursive: true }); fs.copyFileSync(sub, E.p(rel)); info.subFile = rel; } else info.subFile = '';
+    }
+    fs.writeFileSync(E.p('소스.json'), JSON.stringify([info], null, 2));
+    E.s.steps.research = { status: 'done' }; E.s.steps.download = { status: 'done' };
+    save(E);
+    const total = g.ranges.reduce((t, r) => { const [x, y] = r.split('-').map(z => z.split(':').reduce((a, n) => a * 60 + +n, 0)); return t + y - x; }, 0);
+    if (total > 58) warns.push(`"${g.title}" 는 합치면 ${total}초라서 쇼츠 한도(58초)를 넘어요. 컷 편집에서 줄여 주세요.`);
+    made.push({ ep: E.s.ep, title: g.title, ranges: g.ranges });
+  }
+  return { ok: true, mode, episodes: made, warnings: warns };
+}
+const hlStart = async body => {
+  try {
+    if (body.episode) {
+      const E = getEp(body.episode), info = readJsonSafe(E.p('소스.json')), si = Number.isInteger(body.source) ? body.source : 0, s = info?.[si];
+      if (!s) throw new HttpError(400, '이 에피소드는 소스 확인과 영상 받기가 먼저예요.');
+      const local = s.local ? localPath(s.url) : (s.full && exists(E.p(s.full)) ? E.p(s.full) : '');
+      if (!local || !exists(local)) throw new HttpError(400, '이 에피소드는 영상을 아직 못 받았어요. 영상 받기를 먼저 해 주세요.');
+      const J = await HL.start({ local, info: { url: s.url, title: s.local ? E.s.title : s.title, id: s.id, duration: s.duration, channel: s.channel, license: s.license }, count: body.count, len: body.len, fromEpisode: E.s.ep });
+      const sub = !s.local && s.subFile && E.p(s.subFile);
+      if (sub && exists(sub) && !J.s.subFile) { const rel = `원본/자막/${path.basename(sub)}`; fs.mkdirSync(path.join(J.dir, '원본/자막'), { recursive: true }); fs.copyFileSync(sub, path.join(J.dir, rel)); J.s.subFile = rel; }
+      return J;
+    }
+    return await HL.start({ url: body.url, count: body.count, len: body.len });
+  } catch (e) { hlErr(e); }
+};
+// /hl/<id>, /hl/<id>/make|stop|pick
+const HL_RESERVED = new Set(['start', 'list']);
+const hlDynamic = async (method, url, body) => {
+  const m = /^\/hl\/([^/]+)(?:\/(make|stop|pick))?$/.exec(url.pathname); if (!m) return null;
+  let id; try { id = decodeURIComponent(m[1]); } catch { throw new HttpError(400, '주소가 이상해요.'); }
+  if (HL_RESERVED.has(id)) return null;
+  const J = getHL(id), act = m[2] || '';
+  if (!act && method === 'GET') return { json: HL.detail(J) };
+  if (act === 'make' && method === 'POST') return { json: hlMake(J, body) };
+  if (act === 'stop' && method === 'POST') { HL.stop(J); return { json: { ok: true } }; }
+  if (act === 'pick' && method === 'POST') { try { HL.repick(J, body); } catch (e) { hlErr(e); } return { json: { ok: true } }; }
+  return null;
+};
+
 const imgWrap = fn => a => { try { return fn(a); } catch (e) { if (e instanceof ImgError) throw new HttpError(e.code || 400, e.message); throw e; } };
 const routes = {
   'GET /img/styles': imgWrap(() => ({ json: { styles: listStyles() } })),
@@ -185,23 +274,13 @@ const routes = {
   'POST /img/generate': imgWrap(({ body }) => ({ json: { ok: true, job: enqueue(body) } })),
   'GET /img/jobs': ({ q }) => ({ json: { jobs: listJobs(q.get('projectId') || '') } }),
   'POST /img/cancel': imgWrap(({ body }) => ({ json: { ok: true, job: cancelJob(body.id) } })),
+  'GET /hl/list': () => ({ json: { jobs: HL.list(), dir: HL.dir, limits: { lenMin: LEN_MIN, lenMax: LEN_MAX } } }),
+  'POST /hl/start': async ({ body }) => { const J = await hlStart(body); return { json: { ok: true, id: J.id } }; },
   'GET /': () => ({ text: '실행기가 켜져 있어요.' }),
   'GET /health': () => ({ json: { ok: true, api: API_LEVEL, version: VERSION, ffmpeg: exists(FFMPEG), data: DATA, ai: !!process.env.ANTHROPIC_API_KEY } }),
   'GET /status': () => ({ json: { looks: LOOK_CHOICES, fxPacks: FX_PACKS, episodes: [...episodes.values()].sort((a, b) => b.s.created - a.s.created).map(view) } }),
   'GET /episodes': () => routes['GET /status'](),
-  'POST /episodes': ({ body }) => {
-    const title = String(body.title || '').trim(); if (!title) throw new HttpError(400, '제목이 필요해요.');
-    let ep = sanitize(title) || '새 주제', n = 1; const base = ep;
-    while (exists(path.join(DATA, ep))) ep = `${base}-${++n}`;
-    const s = { ep, title, note: String(body.note || ''), ideaId: body.ideaId || '', format: body.format === 'long' ? 'long' : 'shorts',
-      channel: String(body.channel || '').toLowerCase().replace(/[^a-z-]/g, '').slice(0, 40), look: CHANNEL_PROFILES[body.look] ? body.look : '', voice: String(body.voice || '').slice(0, 2000), sources: [], created: Date.now(), gate: false, mix: {}, voices: {},
-      steps: Object.fromEntries(STEP_DEFS.map(d => [d.id, { status: 'todo' }])) };
-    const E = makeEpisode(path.join(DATA, ep), s);
-    addSource(E, body.url, body.ranges, !!body.deferRanges);
-    for (const d of ['원본', '클립', '편집/녹음', '업로드', '로그']) fs.mkdirSync(E.p(d), { recursive: true });
-    save(E); episodes.set(ep, E);
-    return { json: { ok: true, ep } };
-  },
+  'POST /episodes': ({ body }) => { const E = createEpisode(body); return { json: { ok: true, ep: E.s.ep } }; },
   'POST /source': ({ body }) => {
     const E = getEp(body.ep); mustIdle(E);
     if (!String(body.url || '').trim()) throw new HttpError(400, '영상 주소를 넣어 주세요.');
@@ -435,7 +514,11 @@ const server = http.createServer(async (req, res) => {
     }
     if (key === 'GET /file') { const E = getEp(url.searchParams.get('ep')), rel = url.searchParams.get('path'); return serveFile(req, res, E, rel, url.searchParams.get('dl') ? `${sanitize(E.s.title, 60) || E.s.ep}-${path.basename(String(rel || ''))}` : ''); }
     if (key === 'POST /voice') { const r = await saveVoice(getEp(url.searchParams.get('ep')), url.searchParams, req); return send(200, JSON.stringify(r.json)); }
-    const fn = routes[key]; if (!fn) throw new HttpError(404, '없는 주소예요: ' + url.pathname);
+    const hm = /^\/hl\/([^/]+)\/file$/.exec(url.pathname);
+    if (hm && key === 'GET /hl/' + hm[1] + '/file') { let id; try { id = decodeURIComponent(hm[1]); } catch { throw new HttpError(400, '주소가 이상해요.'); } return serveFile(req, res, { dir: getHL(id).dir }, url.searchParams.get('path')); }
+    let fn = routes[key];
+    if (!fn && url.pathname.startsWith('/hl/')) fn = async ({ body }) => { const r = await hlDynamic(req.method === 'HEAD' ? 'GET' : req.method, url, body); if (!r) throw new HttpError(404, '없는 주소예요: ' + url.pathname); return r; };
+    if (!fn) throw new HttpError(404, '없는 주소예요: ' + url.pathname);
     let body = {};
     if (req.method === 'POST') { const raw = (await readBody(req, 1e6)).toString('utf8'); try { body = raw ? JSON.parse(raw) : {}; } catch { throw new HttpError(400, '요청이 JSON 이 아니에요.'); } }
     const r = await fn({ body, q: url.searchParams });
@@ -450,5 +533,5 @@ const server = http.createServer(async (req, res) => {
 
 loadAll();
 server.listen(PORT, '127.0.0.1', () => console.log(`실행기 주소 http://127.0.0.1:${PORT} · 에피소드 폴더 ${DATA}${process.env.ANTHROPIC_API_KEY ? ' · 대본 AI 켜짐' : ''}`));
-const bye = () => { shutdownImages(); for (const E of episodes.values()) { E.ctrl.aborted = true; try { E.ctrl.child?.kill('SIGTERM'); } catch {} } setTimeout(() => process.exit(0), 300); };
+const bye = () => { shutdownImages(); HL.shutdown(); for (const E of episodes.values()) { E.ctrl.aborted = true; try { E.ctrl.child?.kill('SIGTERM'); } catch {} } setTimeout(() => process.exit(0), 300); };
 process.on('SIGINT', bye); process.on('SIGTERM', bye);

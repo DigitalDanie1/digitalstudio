@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { FFMPEG, probe, run } from './util.mjs';
 import { parseRanges, rangeSecs, rangeSpeed } from './util.mjs';
+import { pickHighlights, scoreSeries, graphicFactor, DT, GAP } from './highlights.mjs';
 import { matItems, splitAnswer, CHANNEL_PROFILES, profileOf, promptFor, parseVtt, transcriptFor, parseScript, parseHook, hookFromTitle, parseLine, parseBanner, bannerFromTitle, bwSpans, buildAss, resolveLook, lookOf, LOOK_CHOICES, lookKeyOf, migrateState, srcCues, translateCues, buildSrcAss, STEP_DEFS, FX_PACKS, fxPackOf, buildFxEvents, fxVideoFilter, parseFxTimes, parseMark, chunkLine, stepLabels, clipMap, LOOK_PACK, SFX_SYNTH } from './steps.mjs';
 // 옛 버전과 비교하는 검사: backup-20261118-banner 폴더가 있는 맥에서만 실행 (없으면 건너뜀)
 let oldBuildAss = null;
@@ -697,10 +698,10 @@ try {
     assert.equal(f(a).channel, 'yt-christian'); assert.equal(f(b).channel, ''); assert.equal(f(c).channel.length, 40);
     assert.equal(st(a).voice.length, 2000); assert.equal(st(b).voice, '');
   });
-  await check('/health: 버전(version)과 기능 수준(api = 5)', async () => {
+  await check('/health: 버전(version)과 기능 수준(api = 6)', async () => {
     const { r, d } = await J('/health');
     assert.equal(r.status, 200); assert.equal(d.ok, true);
-    assert.equal(d.api, 5);
+    assert.equal(d.api, 6);
     assert.equal(typeof d.version, 'string'); assert.ok(d.version.length > 0);
   });
   await check('재시작 복구: running → failed(한국어)', async () => {
@@ -717,6 +718,130 @@ try {
     for (let i = 0; i < 100; i++) { const x = (await J('/status')).d.episodes.find(y => y.ep === 'legacy-ep'); if (!x.running) break; await new Promise(r => setTimeout(r, 200)); }
     const lg2 = (await J('/status')).d.episodes.find(x => x.ep === 'legacy-ep'); assert.equal(step(lg2, 'mix').status, 'done', step(lg2, 'mix').error);
     const mlog = fs.readFileSync(path.join(tmp, 'data', 'legacy-ep', '로그/mix.log'), 'utf8'); assert.ok(!/대본 자막/.test(mlog), mlog);
+  });
+
+  // ---- 하이라이트 찾기 ----
+  const lcg = (() => { let x = 12345; return () => (x = (x * 1664525 + 1013904223) % 4294967296) / 4294967296; })();
+  const synth = (secs, bursts, { cuts = [], spikes = [] } = {}) => {   // bursts: [시각, 높이]
+    const n = secs * 4, motion = [], loud = [];
+    for (let i = 0; i < n; i++) {
+      const t = i * DT; let m = 2 + lcg() * 0.6, l = -40 + lcg() * 2;
+      for (const [bt, h] of bursts) if (t >= bt - 1.5 && t <= bt + 1.5) { m += h; l += h * 3; }
+      for (const sp of spikes) if (Math.abs(t - sp) < 0.3) m += 80;
+      motion.push(m); loud.push(l);
+    }
+    return { dt: DT, duration: secs, motion, loud, cuts };
+  };
+  await check('하이라이트 봉우리 고르기: 진짜 봉우리 찾기 · 20초 간격 · 구간 맞추기 · 정점은 끝 쪽', () => {
+    const an = synth(200, [[30, 12], [80, 8], [85, 6], [150, 12], [3, 9], [198, 9]]);
+    const r = pickHighlights(an, { count: 8, len: 10 });
+    const peaks = r.map(c => c.peak).sort((a, b) => a - b);
+    for (const t of [30, 80, 150]) assert.ok(peaks.some(p => Math.abs(p - t) < 2), `${t}초 봉우리를 못 찾았어요: ${peaks}`);
+    assert.ok(!peaks.some(p => Math.abs(p - 85) < 2), '80초 옆의 85초는 20초 안이라 빠져야 해요');
+    for (let i = 1; i < peaks.length; i++) assert.ok(peaks[i] - peaks[i - 1] >= GAP - 0.01, '봉우리 간격 ' + peaks);
+    for (const c of r) { assert.ok(c.a >= 0 && c.b <= 200 && c.b - c.a === 10, JSON.stringify(c)); assert.ok(c.peak >= c.a - 0.01 && c.peak <= c.b + 0.01); }
+    const mid = r.find(c => Math.abs(c.peak - 80) < 2); assert.ok(mid.peak - mid.a >= 6 && mid.peak - mid.a <= 8, '정점이 구간 끝 쪽이어야 해요: ' + (mid.peak - mid.a));
+    const first = r.find(c => c.peak < 6), last = r.find(c => c.peak > 195);
+    assert.ok(first && first.a === 0 && first.b === 10, '맨 앞 봉우리는 0초에서 시작: ' + JSON.stringify(first));
+    assert.ok(last && last.b === 200 && last.b - last.a === 10, '맨 뒤 봉우리는 영상 끝에서 끝나요: ' + JSON.stringify(last));
+    assert.deepEqual(r.map(c => c.rank), r.map((_, i) => i + 1)); assert.ok(r.every((c, i) => i === 0 || r[i - 1].score >= c.score));
+    assert.equal(pickHighlights(an, { count: 2, len: 5 }).length, 2); assert.equal(pickHighlights(an, { count: 3, len: 99 })[0].b - pickHighlights(an, { count: 3, len: 99 })[0].a, 15);
+  });
+  await check('하이라이트: 장면 전환(컷) 순간은 움직임이 아니고, 컷 덩어리 구간은 점수가 깎여요', () => {
+    const an = synth(120, [[60, 10]], { spikes: [100], cuts: [100] });
+    const r = pickHighlights(an, { count: 5, len: 10 });
+    assert.ok(!r.some(c => Math.abs(c.peak - 100) < 1), '컷 순간이 봉우리로 뽑혔어요: ' + JSON.stringify(r.map(c => c.peak)));
+    const two = synth(150, [[40, 10], [110, 10]], { cuts: [105, 106.5, 108, 109, 110.5, 112] });
+    const s = pickHighlights(two, { count: 2, len: 10 }), a = s.find(c => Math.abs(c.peak - 40) < 2), b = s.find(c => Math.abs(c.peak - 110) < 3);
+    assert.ok(a && b && a.score > b.score && b.cuts >= 3, JSON.stringify(s));
+    assert.equal(scoreSeries({ dt: DT, motion: [1, 1, 1, 1], loud: null, cuts: [] }).score.length, 4);   // 소리가 없는 영상도 계산돼요
+  });
+  await check('하이라이트: 화면이 통째로 바뀌거나 밝기가 출렁이는 구간(중계 그래픽·카메라 휙)은 깎여요', () => {
+    const n = 400, calm = Buffer.alloc(n * 144, 120), flash = Buffer.alloc(n * 144, 120);
+    for (let i = 0; i < n; i++) for (let k = 0; k < 144; k++) { calm[i * 144 + k] = 120 + ((i * 7 + k) % 5); flash[i * 144 + k] = (i % 2 ? 40 : 200) + (k % 7); }   // flash = 프레임마다 크게 바뀜
+    assert.equal(graphicFactor(calm, n, 100, 140).f, 1); assert.ok(graphicFactor(flash, n, 100, 140).f <= 0.35);
+    assert.equal(graphicFactor(null, n, 100, 140).f, 1);
+    const an = synth(120, [[40, 10], [90, 10]]); an.sig = Buffer.alloc(an.motion.length * 144, 120);
+    for (let i = 85 * 4; i < 96 * 4; i++) for (let k = 0; k < 144; k++) an.sig[i * 144 + k] = i % 2 ? 30 : 220;
+    const r = pickHighlights(an, { count: 2, len: 10 }), a = r.find(c => Math.abs(c.peak - 40) < 2), b = r.find(c => Math.abs(c.peak - 90) < 2);
+    assert.ok(a && (!b || a.score > b.score * 2), JSON.stringify(r));
+  });
+  const HL_DIR = path.join(tmp, '하이라이트'), hlWait = async (id, timeout = 120000) => {
+    const t0 = Date.now();
+    for (;;) { const { d } = await J('/hl/' + encodeURIComponent(id)); if (!d.running && d.status !== 'queued') return d; if (Date.now() - t0 > timeout) throw new Error('하이라이트 시간 초과: ' + JSON.stringify(d).slice(0, 300)); await new Promise(r => setTimeout(r, 300)); }
+  };
+  const hlsrc = path.join(tmp, 'match.mp4');
+  await run(FFMPEG, ['-hide_banner', '-y', '-loglevel', 'error', '-f', 'lavfi', '-i', `color=c=gray:s=320x240:r=25:d=70,noise=alls=100:allf=t:enable='between(t,20,26)+between(t,48,54)'`,
+    '-f', 'lavfi', '-i', `aevalsrc='0.02*sin(2*PI*220*t)+0.6*sin(2*PI*440*t)*(between(t,21,26)+between(t,49,54))':s=44100:d=70`, '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', hlsrc]);
+  let HE, HJ, hlDetail;
+  await check('하이라이트 찾기: 이미 받은 에피소드 영상으로 시작 → 분석 → 후보(썸네일 3장 + 미리보기)', async () => {
+    const { d } = await J('/episodes', { title: '긴 경기', url: hlsrc, ranges: '0:01-0:05', channel: 'yt-wrestling' }); HE = d.ep;
+    await J('/run', { ep: HE, step: 'research' });
+    for (let i = 0; i < 100; i++) { const e = (await J('/status')).d.episodes.find(x => x.ep === HE); if (!e.running) break; await new Promise(r => setTimeout(r, 200)); }
+    assert.equal((await J('/hl/start', { url: 'ftp://x' })).r.status, 400);
+    assert.equal((await J('/hl/start', { episode: 'nope' })).r.status, 404);
+    const st = await J('/hl/start', { episode: HE, count: 4, len: 10 }); assert.equal(st.r.status, 200, JSON.stringify(st.d)); HJ = st.d.id;
+    assert.equal((await J('/hl/start', { episode: HE })).r.status, 400);   // 이미 돌고 있을 땐 거절
+    hlDetail = await hlWait(HJ); assert.equal(hlDetail.status, 'done', hlDetail.error + hlDetail.log);
+    assert.ok(hlDetail.candidates.length >= 2 && hlDetail.candidates.length <= 4);
+    const top = hlDetail.candidates.slice(0, 2).map(c => c.peak).sort((a, b) => a - b);
+    assert.ok(top[0] > 19 && top[0] < 27 && top[1] > 47 && top[1] < 55, '상위 둘이 노이즈 구간이어야 해요: ' + top);
+    for (const c of hlDetail.candidates) { assert.equal(c.thumbs.length, 3); assert.ok(c.preview); assert.ok(c.b - c.a === 10); for (const f of [...c.thumbs, c.preview]) assert.ok(fs.existsSync(path.join(HL_DIR, HJ, f)), f); }
+    assert.ok(fs.existsSync(path.join(HL_DIR, HJ, '원본.mp4')) && fs.existsSync(path.join(HL_DIR, HJ, '분석.json')));
+    const list = (await J('/hl/list')).d; assert.ok(list.jobs.some(j => j.id === HJ && j.found === hlDetail.candidates.length));
+    assert.equal((await J('/hl/nope')).r.status, 404);
+  });
+  await check('하이라이트: 개수·길이만 바꿔 다시 고르기(분석은 그대로) + 파일 서빙 · 경로 막기', async () => {
+    const mt = fs.statSync(path.join(HL_DIR, HJ, '분석.json')).mtimeMs;
+    const { r } = await J(`/hl/${encodeURIComponent(HJ)}/pick`, { count: 3, len: 7 }); assert.equal(r.status, 200);
+    const d = await hlWait(HJ); assert.equal(d.status, 'done', d.error); assert.equal(fs.statSync(path.join(HL_DIR, HJ, '분석.json')).mtimeMs, mt);
+    assert.ok(d.candidates.length <= 3 && d.candidates.every(c => c.b - c.a === 7)); assert.match(d.log, /이미 분석한 영상/);
+    hlDetail = d;
+    const f = p => fetch(`${B}/hl/${encodeURIComponent(HJ)}/file?path=${encodeURIComponent(p)}`);
+    const t = await f(d.candidates[0].thumbs[0]); assert.equal(t.status, 200); assert.equal(t.headers.get('content-type'), 'image/jpeg'); assert.ok((await t.arrayBuffer()).byteLength > 500);
+    const v = await fetch(`${B}/hl/${encodeURIComponent(HJ)}/file?path=${encodeURIComponent(d.candidates[0].preview)}`, { headers: { Range: 'bytes=0-99' } }); assert.equal(v.status, 206); assert.equal(v.headers.get('content-type'), 'video/mp4');
+    for (const bad of ['../job.json', '../../data/' + HE + '/state.json', '/etc/hosts', '후보/../../' + HE, '', '후보']) assert.ok([403, 404].includes((await f(bad)).status), '막혀야 해요: ' + bad);
+    assert.equal((await f('../job.json')).status, 403);
+    assert.equal((await fetch(`${B}/hl/${encodeURIComponent('../' + HE)}/file?path=x`)).status, 404);
+  });
+  await check('하이라이트 → 에피소드: 각각(each) = 후보마다 에피소드 하나, 구간 15초 이하', async () => {
+    const c = hlDetail.candidates, picks = c.slice(0, 2).map(x => ({ a: x.a, b: x.b, rank: x.rank }));
+    const { r, d } = await J(`/hl/${encodeURIComponent(HJ)}/make`, { mode: 'each', picks, channel: 'yt-politics' }); assert.equal(r.status, 200, JSON.stringify(d));
+    assert.equal(d.episodes.length, 2); const eps = (await J('/status')).d.episodes;
+    for (const [i, m] of d.episodes.entries()) {
+      const e = eps.find(x => x.ep === m.ep); assert.ok(e, m.ep); assert.equal(e.channel, 'yt-politics'); assert.equal(e.title, `긴 경기 하이라이트 ${picks[i].rank}`);
+      assert.equal(e.sources.length, 1); assert.equal(e.sources[0].ranges.length, 1); const [x, y] = rangeSecs(e.sources[0].ranges[0]); assert.ok(y - x <= 15 && x === picks[i].a && y === picks[i].b);
+    }
+    assert.equal((await J(`/hl/${encodeURIComponent(HJ)}/make`, { mode: 'each', picks: [{ a: 5, b: 5 }] })).r.status, 400);
+    assert.equal((await J(`/hl/${encodeURIComponent(HJ)}/make`, { mode: 'each', picks: [{ a: 0, b: 30 }] })).r.status, 400);
+    assert.equal((await J(`/hl/${encodeURIComponent(HJ)}/make`, { mode: 'each', picks: [{ a: 60, b: 80 }] })).r.status, 400);
+    assert.equal((await J(`/hl/${encodeURIComponent(HJ)}/make`, { mode: 'x', picks })).r.status, 400);
+    assert.equal((await J(`/hl/${encodeURIComponent(HJ)}/make`, { mode: 'each', picks: [] })).r.status, 400);
+  });
+  await check('하이라이트 → 에피소드: 합치기(merge) = 에피소드 하나, 구간은 시간 순서', async () => {
+    const picks = [{ a: 48, b: 55, rank: 1 }, { a: 12, b: 19, rank: 2 }, { a: 30, b: 37, rank: 3 }];
+    const { r, d } = await J(`/hl/${encodeURIComponent(HJ)}/make`, { mode: 'merge', picks }); assert.equal(r.status, 200, JSON.stringify(d));
+    assert.equal(d.episodes.length, 1); assert.deepEqual(d.episodes[0].ranges, ['0:12-0:19', '0:30-0:37', '0:48-0:55']); assert.equal(d.warnings.length, 0);
+    const e = (await J('/status')).d.episodes.find(x => x.ep === d.episodes[0].ep); assert.equal(e.title, '긴 경기 하이라이트 모음'); assert.equal(e.channel, 'yt-wrestling'); assert.deepEqual(e.sources[0].ranges, d.episodes[0].ranges);
+    const many = await J(`/hl/${encodeURIComponent(HJ)}/make`, { mode: 'merge', picks: Array.from({ length: 6 }, (_, i) => ({ a: i * 10, b: i * 10 + 10 })) }); assert.equal(many.d.warnings.length, 1); assert.match(many.d.warnings[0], /58초/);
+  });
+  await check('하이라이트 → 에피소드(링크 영상): 받아 둔 통영상을 하드링크로 붙이고 소스 확인·영상 받기는 끝난 상태', async () => {
+    await stop();
+    const fid = '가짜 링크 영상', fdir = path.join(HL_DIR, fid); fs.mkdirSync(path.join(fdir, '후보'), { recursive: true }); fs.mkdirSync(path.join(fdir, '원본/자막'), { recursive: true });
+    fs.copyFileSync(hlsrc, path.join(fdir, '원본.mp4')); fs.writeFileSync(path.join(fdir, '원본/자막/abc123.en.vtt'), 'WEBVTT\n\n00:00:01.000 --> 00:00:03.000\nhello there\n');
+    fs.writeFileSync(path.join(fdir, 'job.json'), JSON.stringify({ id: fid, title: '가짜 링크 영상', url: 'https://www.youtube.com/watch?v=abc123', videoId: 'abc123', duration: 70, channel: 'Chan', license: null, created: Date.now(), status: 'done', progress: 1, count: 8, len: 10, candidates: [], subFile: '원본/자막/abc123.en.vtt' }));
+    await start();
+    const { r, d } = await J(`/hl/${encodeURIComponent(fid)}/make`, { mode: 'each', picks: [{ a: 20, b: 30 }] }); assert.equal(r.status, 200, JSON.stringify(d));
+    const dir = path.join(tmp, 'data', d.episodes[0].ep), full = path.join(dir, '원본/full_1.mp4');
+    assert.ok(fs.existsSync(full)); assert.equal(fs.statSync(full).ino, fs.statSync(path.join(fdir, '원본.mp4')).ino, '하드링크여야 해요');
+    const info = JSON.parse(fs.readFileSync(path.join(dir, '소스.json'), 'utf8'))[0];
+    assert.equal(info.full, '원본/full_1.mp4'); assert.equal(info.url, 'https://www.youtube.com/watch?v=abc123'); assert.deepEqual(info.ranges, ['0:20-0:30']); assert.equal(info.local, false); assert.ok(fs.existsSync(path.join(dir, info.subFile)));
+    const e = (await J('/status')).d.episodes.find(x => x.ep === d.episodes[0].ep);
+    assert.equal(step(e, 'research').status, 'done'); assert.equal(step(e, 'download').status, 'done'); assert.ok(step(e, 'download').outputs[0].exists); assert.equal(step(e, 'clip').status, 'todo');
+    await J('/run', { ep: e.ep, step: 'clip' });   // 받기 없이 곧바로 자르기
+    for (let i = 0; i < 150; i++) { const x = (await J('/status')).d.episodes.find(y => y.ep === e.ep); if (!x.running) break; await new Promise(r => setTimeout(r, 200)); }
+    const e2 = (await J('/status')).d.episodes.find(x => x.ep === e.ep); assert.equal(step(e2, 'clip').status, 'done', step(e2, 'clip').error);
+    assert.ok(step(e2, 'clip').outputs.length === 1 && step(e2, 'clip').outputs[0].exists);
   });
   console.log(`\n전부 통과 (${ok}개)  · 산출물: ${tmp}`);
 } catch (e) { console.error('\n테스트 실패:', e.message); process.exitCode = 1; }

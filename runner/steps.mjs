@@ -279,7 +279,7 @@ export function transcriptFor(cues, ranges) {
   });
 }
 // 영어 자막(VTT) 받기. 못 받아도 단계는 멈추지 않고 로그만 남겨요 (사용자가 멈춘 경우만 예외). 돌려주는 값 = 에피소드 폴더 안 상대 경로 ('' = 없음)
-async function fetchSubs(E, url, id, ctx) {
+export async function fetchSubs(E, url, id, ctx) {
   const dir = E.p('원본/자막');
   try {
     fs.mkdirSync(dir, { recursive: true });
@@ -437,7 +437,7 @@ async function research(E, ctx) {
 }
 
 // ---------- 2. 영상 받기: 링크 영상을 통째로 (+ 영어 자막) ----------
-const SRC_FORMAT = 'bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080][ext=mp4]/b[ext=mp4]/b';
+export const SRC_FORMAT = 'bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080][ext=mp4]/b[ext=mp4]/b';
 async function download(E, ctx) {
   const info = readJson(E.p('소스.json'));
   if (!info) throw new StepError('소스 확인이 먼저예요. "소스 확인" 단계를 실행하세요.');
