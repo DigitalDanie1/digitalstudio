@@ -7,7 +7,8 @@ import crypto from 'node:crypto';
 import {
   FFMPEG, YTDLP, FONT_DIR, FONT_NAME, StepError, StopError, run, ff, probe, lastLines, exists,
   parseRanges, rangeSecs, rangeSpeed, fmtTime, parseTime, isLocalSource, localPath, MAX_RANGE,
-} from './util.mjs';
+  parseVtt, vttSecs } from './util.mjs';
+export { parseVtt };
 import { AI_FN, AI_OUT } from './ai.mjs';
 
 export const STEP_DEFS = [
@@ -259,23 +260,6 @@ export const SFX_SYNTH = {
 };
 
 // ---------- 영어 자막(VTT) 읽기 ----------
-const vttSecs = t => { const p = t.replace(',', '.').split(':').map(Number); return p.reduce((a, n) => a * 60 + n, 0); };
-const decodeEnt = s => s.replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
-// VTT 글 → [{start,end,text}]. 태그 지우고, 자동자막이 윗줄을 되풀이하는 것은 한 번만 남김
-export function parseVtt(text) {
-  const out = []; let prev = new Set();
-  for (const block of String(text || '').replace(/\r/g, '').split(/\n\n+/)) {
-    const lines = block.split('\n'), ti = lines.findIndex(l => l.includes('-->'));
-    if (ti < 0) continue;
-    const m = /([\d:.,]+)\s*-->\s*([\d:.,]+)/.exec(lines[ti]); if (!m) continue;
-    const start = vttSecs(m[1]), end = vttSecs(m[2]);
-    const ls = lines.slice(ti + 1).map(l => decodeEnt(l.replace(/<[^>]*>/g, '')).replace(/\s+/g, ' ').trim()).filter(Boolean);
-    const fresh = ls.filter(l => !prev.has(l));
-    prev = new Set(ls);
-    if (fresh.length) out.push({ start, end, text: fresh.join(' ') });
-  }
-  return out;
-}
 // 사용한 구간과 겹치는 자막만 모아서 [{range,text}]
 export function transcriptFor(cues, ranges) {
   return ranges.map(range => {

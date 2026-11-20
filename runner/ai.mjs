@@ -3,7 +3,7 @@
 // 인트로·아웃트로는 모든 단계에서 후크로 다뤄요: 컷(첫 컷 intro, 마지막 컷 outro) / 스타일(위 제목) / 자막(0초 후크, 마지막 줄 후크).
 import fs from 'node:fs';
 import path from 'node:path';
-import { HOME, FFMPEG, YTDLP, FONT_DIR, FONT_NAME, StepError, StopError, run, ff, probe, lastLines, exists } from './util.mjs';
+import { HOME, FFMPEG, YTDLP, FONT_DIR, FONT_NAME, StepError, StopError, run, ff, probe, lastLines, exists, parseVtt } from './util.mjs';
 
 // 자동실행(launchd)은 PATH 가 짧아서 Claude Code 가 깔리는 곳을 직접 찾아요
 const CLAUDE = process.env.FIELDNOTE_CLAUDE || [path.join(HOME, '.local/bin/claude'), path.join(HOME, '.claude/local/claude'), '/opt/homebrew/bin/claude', '/usr/local/bin/claude'].find(exists) || 'claude';
@@ -181,6 +181,46 @@ function transcript(E, info) {
   return lines.map(x => `[${x.t}s] ${x.txt}`).join('\n').slice(0, 20000);
 }
 
+// 원본 영어 자막 -> 완성 영상 시각의 말 덩어리 (컷 순서·자르기 반영). 말 자막 시각은 코드가 정해서 말과 자막이 어긋나지 않게 해요.
+// 슬로우 컷은 소리가 없어서 빼요.
+export function speechSegs(cues, cuts) {
+  const out = [];
+  for (const c of cuts) {
+    const a = +c.a, b = +c.b, sp = +c.speed || 1, o = +c.out[0];
+    if (sp < 1) continue;
+    let cur = null;
+    for (const q of cues) {
+      if (q.end <= a || q.start >= b) continue;
+      const s = r1(o + (Math.max(q.start, a) - a) / sp), e = r1(o + (Math.min(q.end, b) - a) / sp);
+      if (e - s < 0.25) continue;
+      if (cur && s - cur.e < 0.4 && e - cur.s <= 3.2 && (cur.t + ' ' + q.text).split(/\s+/).length <= 14) { cur.e = e; cur.t += ' ' + q.text; }
+      else { cur = { s, e, t: q.text }; out.push(cur); }
+    }
+  }
+  return out.map((x, i) => ({ id: i + 1, ...x }));
+}
+const segsOf = (E, info, plan) => { const f = info.subFile && E.p(info.subFile); return f && exists(f) ? speechSegs(parseVtt(fs.readFileSync(f, 'utf8')), plan.cuts) : []; };
+// Claude 답 {lines:[[[S번호..],"한국어"]], captions:[[a,b,"글"]]} -> captions 하나로. lines 의 시각은 S 시각 그대로.
+export function mergeCaps(j, segs) {
+  const byId = new Map(segs.map(x => [x.id, x])), made = [];
+  for (const [i, l] of (j.lines || []).entries()) {
+    const ids = (Array.isArray(l[0]) ? l[0] : [l[0]]).map(Number);
+    if (!ids.length || ids.some(k => !byId.has(k))) return { err: `lines ${i + 1}번의 S 번호가 없어요.` };
+    if (ids.some((k, n) => n && k !== ids[n - 1] + 1)) return { err: `lines ${i + 1}번의 S 번호는 이어져야 해요.` };
+    if (!String(l[1] || '').trim()) return { err: `lines ${i + 1}번 한국어가 비었어요.` };
+    made.push([byId.get(ids[0]).s, byId.get(ids[ids.length - 1]).e, String(l[1]), true]);
+  }
+  for (const [i, c] of (j.captions || []).entries()) {
+    if (made.some(m => m[3] && c[0] < m[1] - 0.05 && c[1] > m[0] + 0.05)) return { err: `captions ${i + 1}번이 말 자막(lines)과 겹쳐요. 말이 있는 곳은 lines 로만.` };
+    made.push([+c[0], +c[1], String(c[2])]);
+  }
+  made.sort((x, y) => x[0] - y[0]);
+  for (const [k, m] of made.entries()) {   // 너무 짧은 말 자막은 다음 자막 전까지 조금 늘려서 읽히게
+    const nx = made[k + 1]; if (m[3] && m[1] - m[0] < 1.2) m[1] = r1(Math.min(m[0] + 1.2, nx ? nx[0] : m[0] + 1.2));
+  }
+  return { captions: made.map(m => [m[0], m[1], m[2]]) };
+}
+
 // 썸네일 시트: a 부터 fps 로 뽑아 cols x rows 로 붙여요
 async function sheets(E, ctx, src, name, a, dur, fps, cols, rows, width) {
   const out = E.p('분석'); fs.mkdirSync(out, { recursive: true });
@@ -317,13 +357,13 @@ function checkFinal(plan, needCaps, st = {}) {
     return '';
   };
 }
-const common = (E, st, info, plan) => `너는 한국어 ${st.genre} 쇼츠 채널${st.name ? ` "${st.name}"` : ''}의 편집 작가다.
+const common = (E, st, info, plan, noTr = false) => `너는 한국어 ${st.genre} 쇼츠 채널${st.name ? ` "${st.name}"` : ''}의 편집 작가다.
 원본: "${info.title}" (${info.channel}) ${info.url}
 1차 컷 편집안 (cuts 의 out = 완성 영상의 [시작초, 끝초], a/b = 원본 초, moments = 원본 시각에 보이는 것). 완성 영상 길이 ${plan.duration}초:
 ${JSON.stringify({ moments: plan.moments, cuts: plan.cuts, who: plan.who }, null, 1)}
 프레임 시트 (Read 로 확인):
 ${plan.sheets || `원본 ${r1(plan.window[0])}초부터 0.2초 간격, 5x5 타일: ${fineList(E)}`}
-${transcript(E, info) ? '영어 중계 자막(원본 시각):\n' + transcript(E, info) : ''}
+${!noTr && transcript(E, info) ? '영어 중계 자막(원본 시각):\n' + transcript(E, info) : ''}
 말투: ${st.tone}
 ${(st.rules || []).map(r => '- ' + r).join('\n')}
 사실은 화면/중계 자막에서 확인된 것, 또는 조사 파일 ${E.p('조사/research.md')} 의 A·B 등급만 쓴다. 확인 못 한 숫자/기록/과장은 쓰지 않는다. 시각은 모두 완성 영상 기준 초.`;
@@ -398,8 +438,15 @@ JSON 하나만 답해라: {"frame":{"l1":"","l2":""},"fx":[[시작,끝,{"type":"
 async function aisubs(E, ctx) {
   const st = styleOf(E), info = source(E), plan = readJson(E.p('편집/AI컷.json'));
   let base; try { base = readJson(E.p('편집/AI완성.json')); } catch { throw new StepError('스타일 입히기를 먼저 해 주세요.'); }
-  ctx.log('Claude 가 자막을 써요 (shorts-blueprint 자막 규칙)…');
-  const j = await askClaude(E, ctx, `${skills(ctx, ['shorts-blueprint'])}${common(E, st, info, plan)}
+  const segs = segsOf(E, info, plan), talk = st.kind !== 'sport';
+  ctx.log(`Claude 가 자막을 써요 (shorts-blueprint 자막 규칙${segs.length ? ', 말 자막 ' + segs.length + '덩어리는 원본 자막 시각에 맞춰요' : ''})…`);
+  const speech = segs.length ? `
+말 자막 S (원본 영어 자막을 완성 영상 시각으로 옮긴 것. 시각은 정확하다):
+${segs.map(x => `S${x.id} [${x.s}-${x.e}] ${x.t}`).join('\n')}
+- 말이 나오는 곳의 자막은 "lines" 로 쓴다: [[S번호들], "한국어"]. S번호는 이어지는 1~3개. 그 S 들에 실제로 있는 말만 옮긴다. 앞뒤 S 의 말을 끌어오거나 요약해서 섞지 마라. 자동자막이라 틀린 단어가 있으면 화면과 앞뒤 뜻으로 바로잡되, 없는 말을 지어내지 마라. 시각은 코드가 S 시각으로 넣는다.
+- ${talk ? '화자의 발언은 빠짐없이 lines 로 옮긴다 (짧은 맞장구는 빼도 된다).' : '중계·선수 말을 옮기고 싶을 때만 lines 를 쓴다. 해설 자막은 captions 로.'}
+- 말이 없는 곳(인트로·아웃트로 후크, 슬로우, 말 없는 장면)은 "captions" 로 [시작, 끝, "텍스트"]. captions 는 lines 로 쓴 S 구간과 겹치면 안 된다. 인트로 후크를 넣으려면 그 구간의 S 는 lines 로 쓰지 않는다.` : '';
+  const j = await askClaude(E, ctx, `${skills(ctx, ['shorts-blueprint'])}${common(E, st, info, plan, segs.length > 0)}
 이미 정한 위 제목·라벨·팝업 (바꾸지 말고 그대로 돌려줘라): ${JSON.stringify({ frame: base.frame, fx: base.fx, credits: base.credits, ranks: base.ranks, note: base.note })}
 
 ${st.check}
@@ -407,8 +454,9 @@ ${st.check}
 - 인트로(intro 컷 구간): 0초에 바로 시작. 결과/숫자/반전을 먼저 던진다 (예: "올림픽 5연패\\n시작 15초 만에 들어 던지기"). 인사, 설명, "오늘은" 금지.
 - 아웃트로(outro 컷 구간): 영상 끝까지. 다시 보게 만드는 한 줄 (예: "자, 15초 만에 [[한 번 더]].") 또는 댓글을 부르는 질문. 마지막 자막이 인트로로 이어지게.
 ${st.caps}
-- 한 자막 최대 2줄, 줄당 16자 이내, 줄바꿈은 \\n. 강조할 단어 하나만 [[단어]]. 자막끼리 겹치지 않게.
-JSON 하나만 답해라: {"frame":{...그대로},"fx":[...그대로],"credits":[...그대로],"captions":[[시작,끝,"텍스트"]],"facts":["쓴 사실과 근거 한 줄씩"]}`, checkFinal(plan, true, st));
+- 한 자막 최대 2줄, 줄당 16자 이내, 줄바꿈은 \\n. 강조할 단어 하나만 [[단어]]. 자막끼리 겹치지 않게.${speech}
+JSON 하나만 답해라: {"frame":{...그대로},"fx":[...그대로],"credits":[...그대로],${segs.length ? '"lines":[[[1,2],"한국어"]],' : ''}"captions":[[시작,끝,"텍스트"]],"facts":["쓴 사실과 근거 한 줄씩"]}`,
+    x => { if (segs.length) { const m = mergeCaps(x, segs); if (m.err) return m.err; x.captions = m.captions; } return checkFinal(plan, true, st)(x); });
   j.frame = base.frame; j.fx = base.fx; j.credits = base.credits; if (base.ranks) j.ranks = base.ranks; if (base.note) j.note = base.note;
   if (E.s.steps.aibrand) E.s.steps.aibrand = { status: 'todo' };
   writeJson(E.p('편집/AI완성.json'), j);
