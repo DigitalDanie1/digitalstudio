@@ -7,13 +7,13 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { HOME, StepError, StopError, sanitize, exists, parseRanges, isLocalSource, localPath, run, FFMPEG, YTDLP, lastLines, fmtTime, MAX_RANGE } from './util.mjs';
 import { createHighlights, LEN_MIN, LEN_MAX } from './highlights.mjs';
-import { AI_STYLES } from './ai.mjs';
+import { AI_STYLES, isRefLook } from './ai.mjs';
 import { listStyles, saveStyle, enqueue, cancelJob, listJobs, resolveReadable, thumbOf, shutdownImages, ImgError } from './images.mjs';
 import { STEP_DEFS, STEP_FN, outputsFor, listAssets, checkScript, cleanPasted, parseScript, parseBanner, parseHook, PLACEHOLDER, SCRIPT_MAX_LINES, CHANNEL_PROFILES, LOOK_CHOICES, lookKeyOf, FX_PACKS, fxPackOf, parseFxTimes, migrateState, layoutLines, draftText, draftTranscript, splitAnswer, feedbackPrompt, callClaude, parseCredit, previewPlan, renderPreview } from './steps.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // 작업판이 쓰는 기능 수준. 3 = 새 9칸 순서 (/look, /ranges, deferRanges, 단계 clip·subs·fx)
-const API_LEVEL = 12;   // 12 = 한 구간·하이라이트 길이 최대 3분(30초·1분·2분·3분), 쇼츠 최대 3분 · 11 = 하이라이트 '지난 작업' 초기화(/hl/reset, 돌고 있으면 멈추고 휴지통 한 폴더로) · 10 = AI 편집 단계(aicut·aistyle·aisubs, 맥의 Claude Code) · 9 = 유튜브 초기화(/reset, 에피소드·하이라이트 전부 휴지통 한 폴더로) · 8 = 미리보기 견본(/preview, 고른 룩·이펙트를 실제 영상 4초로) · 7 = 에피소드 완전히 지우기(/episode/delete, 휴지통으로) · 6 = 하이라이트 찾기(/hl/*) ·  4 = 7칸 순서 (/edit 1차·2차 편집, /draft, /feedback, 슬로우 구간 x0.5, 매트 스토리 룩) · 5 = 최종 결과물 레퍼런스(이펙트 팩: /fxpack, status.fxPacks)
+const API_LEVEL = 13;   // 13 = 레퍼런스 쇼츠 룩 (look ref-<영상ID>, view.refStyle) · 12 = 한 구간·하이라이트 길이 최대 3분(30초·1분·2분·3분), 쇼츠 최대 3분 · 11 = 하이라이트 '지난 작업' 초기화(/hl/reset, 돌고 있으면 멈추고 휴지통 한 폴더로) · 10 = AI 편집 단계(aicut·aistyle·aisubs, 맥의 Claude Code) · 9 = 유튜브 초기화(/reset, 에피소드·하이라이트 전부 휴지통 한 폴더로) · 8 = 미리보기 견본(/preview, 고른 룩·이펙트를 실제 영상 4초로) · 7 = 에피소드 완전히 지우기(/episode/delete, 휴지통으로) · 6 = 하이라이트 찾기(/hl/*) ·  4 = 7칸 순서 (/edit 1차·2차 편집, /draft, /feedback, 슬로우 구간 x0.5, 매트 스토리 룩) · 5 = 최종 결과물 레퍼런스(이펙트 팩: /fxpack, status.fxPacks)
 let VERSION = 'dev';
 try { VERSION = fs.readFileSync(path.join(HERE, 'version.txt'), 'utf8').trim() || 'dev'; } catch {}
 const PORT = +(process.env.FIELDNOTE_RUNNER_PORT || 4777);
@@ -58,7 +58,7 @@ function loadAll() {
 function view(E) {
   return {
     ep: E.s.ep, title: E.s.title, note: E.s.note || '', ideaId: E.s.ideaId || '', format: E.s.format, channel: E.s.channel || '',
-    look: E.s.look || '', lookUsed: lookKeyOf(E), vtype: E.s.vtype || '',
+    look: E.s.look || '', lookUsed: lookKeyOf(E), vtype: E.s.vtype || '', refStyle: E.s.refStyle && E.s.refStyle.look === E.s.look ? { name: E.s.refStyle.name, desc: E.s.refStyle.desc, base: E.s.refStyle.base } : null,
     fxPack: E.s.fxPack || '', fxPackUsed: fxPackOf(E).id, fxTimes: E.s.fxTimes || '', fxLabels: E.s.fxLabels || [],
     sources: E.s.sources.map(x => ({ url: x.url, ranges: x.ranges })),
     steps: STEP_DEFS.map(d => {
@@ -395,8 +395,8 @@ const routes = {
   // ② 편집 레퍼런스(룩) 고르기. 룩이 바뀌면 영상 모양에 영향을 받는 단계(구간 자르기부터 업로드까지)를 다시 돌려야 해요. 대본·소스는 그대로.
   'POST /look': ({ body }) => {
     const E = getEp(body.ep); mustIdle(E);
-    const look = String(body.look || ''); if (!CHANNEL_PROFILES[look] && !AI_STYLES[look]) throw new HttpError(400, '모르는 편집 룩이에요: ' + look);
-    const was = AI_STYLES[E.s.look] ? E.s.look : lookKeyOf(E);
+    const look = String(body.look || ''); if (!CHANNEL_PROFILES[look] && !AI_STYLES[look] && !isRefLook(look)) throw new HttpError(400, '모르는 편집 룩이에요: ' + look);
+    const was = AI_STYLES[E.s.look] || isRefLook(E.s.look) ? E.s.look : lookKeyOf(E);
     E.s.look = look;
     if (look !== was) for (const id of ['clip', 'plan', 'rough', 'subs', 'fx', 'mix', 'upload', 'aistyle', 'aisubs', 'aibrand']) { const st = E.s.steps[id]; if (st.status !== 'todo') { st.status = 'todo'; delete st.error; } }
     if (look !== was) delete E.s.legacyBurn;

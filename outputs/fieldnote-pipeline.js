@@ -879,7 +879,11 @@
     { id: 'yt-post', name: '게시물 룩', desc: '흰 바탕 + 로고·채널명 + 검은 굵은 제목 2줄 + 가운데 영상(노란 자막) + 아래 채널 한마디 카드 · 참고: 격랭커 심권호 쇼츠 38만 회', ref: 'https://www.youtube.com/shorts/09-OQisO3Hw' },
   ];
   const AI_LOOKS = [...Object.values(AI_CH), ...YT_AI_LOOKS.map(l => l.id)];
-  const aiLookName = id => (YT_AI_LOOKS.find(l => l.id === id) || ytLooks().find(l => l.id === id) || { name: id }).name;
+  const isRef = id => /^ref-[\w-]{11}$/.test(id || '');
+  const aiLookOk = id => AI_LOOKS.includes(id) || isRef(id);
+  const aiLookName = id => isRef(id) ? '레퍼런스 쇼츠 스타일' : (YT_AI_LOOKS.find(l => l.id === id) || ytLooks().find(l => l.id === id) || { name: id }).name;
+  // #ytRefs 탭의 쇼츠 (이미 위 스타일의 참고 영상인 것은 빼요)
+  const ytRefLooks = ch => (typeof window.ytRefShorts === 'function' ? window.ytRefShorts(ch) : []).filter(r => !YT_AI_LOOKS.some(l => l.ref.includes(r.id))).map(r => ({ id: 'ref-' + r.id, vid: r.id, title: r.title, from: r.from }));
   function ytAiCards(it, ep, off) {
     const names = ['1차 컷 (영상 종류)', '스타일 선택', '스타일 입히기', '자막', '인트로·아웃트로', '썸네일', '다운로드'];
     const chId = it.idea ? ytCh(it.idea) : ytTab(), sport = chId === 'yt-wrestling', myLook = AI_CH[chId] || 'yt-mat';
@@ -896,7 +900,7 @@
       return `<b>${pct != null ? pct + '%' : '실행 중…'}</b> · ${esc(st(ep.running).name || ep.running)} 하는 중. Claude 가 영상을 보는 단계는 몇 분 걸려요 (%는 지난번 걸린 시간으로 어림). 끝나면 자동으로 바뀌어요.${pct != null ? `<div style="height:8px;border-radius:99px;background:var(--line);margin-top:6px;overflow:hidden"><div style="height:100%;width:${pct}%;background:var(--accent,#ff5b5b);transition:width .6s"></div></div>` : ''}`; };
     const stopOr = (ids, attrs) => () => runIn(ids) ? 'data-ya-act="stop"' : attrs;
     const card = (i, o) => ({ id: 'ai' + i, name: names[i], title: names[i], run: () => {}, ...o });
-    const CUT = ['research', 'download', 'aicut'], cutDone = ok('aicut'), lookOk = !!ep && AI_LOOKS.includes(ep.look);
+    const CUT = ['research', 'download', 'aicut'], cutDone = ok('aicut'), lookOk = !!ep && aiLookOk(ep.look);
     // 영상 종류 (레슬링만): 1차 컷을 만들기 전에 고르고, 1차 컷·자막·라벨이 그 틀로 짜여요
     const VT = [
       { id: 'highlight', name: '하이라이트 중심', desc: '결정적 기술 하나 · 원속도 → 단계별 슬로우 → 원속도 (지금까지 만든 것)' },
@@ -917,7 +921,7 @@
       result: () => ep ? errOf(CUT) + (cutDone ? `<p><b>1차 컷이 나왔어요.</b> 인트로·아웃트로가 후크인지 보고, 아니면 "AI 가 다시 자르기"를 누르세요.</p>` + vid('aicut', '편집/AI1차컷.mp4', '1차 컷') : '') + logs(CUT) : '',
       body: () => (off ? '<p class="pl-error" role="alert"><b>실행기가 꺼져 있어요.</b></p>' : old ? oldMsg : '') + (it.idea ? vtChips() : ''),
     });
-    const choices = sport ? [myLook, ...YT_AI_LOOKS.map(l => l.id)] : [myLook];
+    const refLooks = sport ? ytRefLooks(chId) : [], choices = sport ? [myLook, ...YT_AI_LOOKS.map(l => l.id), ...refLooks.map(r => r.id)] : [myLook];
     const picked = it.idea && ytPipe.lookIdea === it.idea.id && choices.includes(ytPipe.look) ? ytPipe.look : '';
     const pick = picked || (lookOk && choices.includes(ep.look) ? ep.look : myLook), same = lookOk && ep.look === pick;
     const c2 = card(1, {
@@ -927,8 +931,8 @@
       attrs: () => `data-ya-act="look" data-ya-look="${esc(pick)}"${lookOk && !same && ok('aistyle') ? ' data-ya-confirm="스타일을 바꾸면 스타일 입히기·자막·인트로·아웃트로를 다시 해야 해요. 1차 컷은 그대로예요. 계속할까요?"' : ''}`,
       disabled: () => off || !cutDone || same || !!ep.running,
       isDone: () => cutDone && lookOk,
-      result: () => lookOk ? `<b>${esc(aiLookName(ep.look))}</b>로 정했어요.${choices.length > 1 ? ' <span class="small">다른 스타일을 고르면 바꿀 수 있어요.</span>' : ''}` : '',
-      body: () => (cutDone || (sport && it.idea)) ? `<div class="pl-looks" role="radiogroup" aria-label="편집 스타일">${choices.map(id => { const l = YT_AI_LOOKS.find(x => x.id === id) || ytLooks().find(x => x.id === id) || { name: id, desc: '' }; return `<button type="button" role="radio" aria-checked="${pick === id}" class="pl-topic ${pick === id ? 'on' : ''}"${choices.length > 1 ? ` data-ya-lookpick="${esc(id)}"` : ''}>${ytLookMock(id)}<span class="pl-lk-txt"><b>${esc(l.name)}${id === myLook && choices.length > 1 ? ' · 기본' : ''}</b><span class="small">${esc(l.desc)}</span></span></button>`; }).join('')}</div>${choices.length > 1 ? `<p class="small">레퍼런스 쇼츠: ${YT_AI_LOOKS.map(l => `<a href="${esc(l.ref)}" target="_blank" rel="noopener">${esc(l.name)}</a>`).join(' · ')}</p>` : ''}` : '',
+      result: () => lookOk ? `<b>${esc(isRef(ep.look) && ep.refStyle ? ep.refStyle.name + ' (레퍼런스)' : aiLookName(ep.look))}</b>로 정했어요.${isRef(ep.look) && !ep.refStyle ? ' <span class="small">스타일 입히기 때 이 쇼츠를 받아 보고 스타일을 정해요.</span>' : ''}${choices.length > 1 ? ' <span class="small">다른 스타일을 고르면 바꿀 수 있어요.</span>' : ''}` : '',
+      body: () => (cutDone || (sport && it.idea)) ? `<div class="pl-looks" role="radiogroup" aria-label="편집 스타일">${choices.filter(id => !isRef(id)).map(id => { const l = YT_AI_LOOKS.find(x => x.id === id) || ytLooks().find(x => x.id === id) || { name: id, desc: '' }; return `<button type="button" role="radio" aria-checked="${pick === id}" class="pl-topic ${pick === id ? 'on' : ''}"${choices.length > 1 ? ` data-ya-lookpick="${esc(id)}"` : ''}>${ytLookMock(id)}<span class="pl-lk-txt"><b>${esc(l.name)}${id === myLook && choices.length > 1 ? ' · 기본' : ''}</b><span class="small">${esc(l.desc)}</span></span></button>`; }).join('')}</div>${choices.length > 1 ? `<p class="small">레퍼런스 쇼츠: ${YT_AI_LOOKS.map(l => `<a href="${esc(l.ref)}" target="_blank" rel="noopener">${esc(l.name)}</a>`).join(' · ')}</p>` : ''}${refLooks.length ? `<p class="small" style="margin-top:12px"><b>썸네일·편집 레퍼런스 탭의 쇼츠</b> · 고르면 스타일 입히기 때 Claude 가 그 쇼츠를 받아 보고, 가장 가까운 화면 틀에 색·제목·이펙트·자막 방식을 맞춰요. <a href="#ytRefs">레퍼런스 추가하기</a></p><div class="pl-looks" role="radiogroup" aria-label="레퍼런스 쇼츠 스타일">${refLooks.map(r => { const mine = ep && ep.look === r.id && ep.refStyle; return `<div style="display:grid;gap:4px"><button type="button" role="radio" aria-checked="${pick === r.id}" class="pl-topic ${pick === r.id ? 'on' : ''}" data-ya-lookpick="${esc(r.id)}"><span class="lm" aria-hidden="true"><img src="https://i.ytimg.com/vi/${esc(r.vid)}/oar2.jpg" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover"></span><span class="pl-lk-txt"><b>${esc(mine ? ep.refStyle.name : r.title ? r.title.slice(0, 40) : '레퍼런스 쇼츠')}</b><span class="small">${esc(mine ? ep.refStyle.desc : r.from + ' · 아직 분석 전')}</span></span></button><a class="small" href="https://www.youtube.com/shorts/${esc(r.vid)}" target="_blank" rel="noopener">쇼츠 보기 ↗</a></div>`; }).join('')}</div>` : ''}` : '',
     });
     const ST = ['aistyle'], styDone = ok('aistyle');
     const c3 = card(2, {
@@ -1073,7 +1077,7 @@
     if (ep) {
       const ok = id => (ep.steps || []).some(x => x.id === id && x.status === 'done'), r = ep.round || 0, fb = (ep.feedbackAt || 0) > (ep.editAt || 0);
       if (AI_CH[ytCh(i)]) {   // AI 작업판 8칸
-        const af = [true, ok('aicut'), ok('aicut') && AI_LOOKS.includes(ep.look), ok('aistyle'), ok('aisubs'), ok('aibrand'), ok('aithumb'), ok('aibrand') && ok('aithumb')], an = af.filter(Boolean).length, ak = af.findIndex(x => !x);
+        const af = [true, ok('aicut'), ok('aicut') && aiLookOk(ep.look), ok('aistyle'), ok('aisubs'), ok('aibrand'), ok('aithumb'), ok('aibrand') && ok('aithumb')], an = af.filter(Boolean).length, ak = af.findIndex(x => !x);
         const AN = ['원본 링크', '1차 컷', '스타일 선택', '스타일 입히기', '자막', '인트로·아웃트로', '썸네일', '다운로드'], ab = [];
         if (ep.running) ab.push('<i class="b run">실행 중</i>');
         if ((ep.steps || []).some(x => ['research', 'download', 'aicut', 'aistyle', 'aisubs', 'aibrand', 'aithumb'].includes(x.id) && x.status === 'failed')) ab.push('<i class="b fail">실패</i>');

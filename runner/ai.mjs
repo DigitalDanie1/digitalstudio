@@ -3,7 +3,7 @@
 // 인트로·아웃트로는 모든 단계에서 후크로 다뤄요: 컷(첫 컷 intro, 마지막 컷 outro) / 스타일(위 제목) / 자막(0초 후크, 마지막 줄 후크).
 import fs from 'node:fs';
 import path from 'node:path';
-import { HOME, FFMPEG, FONT_DIR, FONT_NAME, StepError, StopError, run, ff, probe, lastLines, exists } from './util.mjs';
+import { HOME, FFMPEG, YTDLP, FONT_DIR, FONT_NAME, StepError, StopError, run, ff, probe, lastLines, exists } from './util.mjs';
 
 // 자동실행(launchd)은 PATH 가 짧아서 Claude Code 가 깔리는 곳을 직접 찾아요
 const CLAUDE = process.env.FIELDNOTE_CLAUDE || [path.join(HOME, '.local/bin/claude'), path.join(HOME, '.claude/local/claude'), '/opt/homebrew/bin/claude', '/usr/local/bin/claude'].find(exists) || 'claude';
@@ -127,7 +127,12 @@ export const VTYPES = {
     fx: '라벨 하나 (type label, k=주제 이름, s=한 줄 설명). 팝업 없음.',
     caps: '- 정보 하나만. 질문 → 이유 → 답 순서. 문장은 짧게.' },
 };
-const styleOf = E => { const st = AI_STYLES[E.s.look || ''] || AI_STYLES[CH_STYLE[E.s.channel] || 'yt-mat']; const v = st.kind === 'sport' && VTYPES[E.s.vtype]; return v ? { ...st, ...v } : st; };
+// 레퍼런스 쇼츠 룩 (look = "ref-<영상ID>"): 스타일 입히기 때 그 쇼츠를 받아 Claude 가 보고 가장 가까운 틀 + 색·제목·이펙트·자막 규칙을 정해요 (E.s.refStyle)
+export const isRefLook = l => /^ref-[\w-]{11}$/.test(l || '');
+const REF_BASES = { 'yt-mat': '검은 바탕, 위에 큰 2줄 제목(노랑/빨강), 가운데 경기 화면, 아래 자막, 선수 라벨·점수 팝업', 'yt-replay': '꽉 찬 경기 화면, 짧은 말자막, 결정적 순간 링, 위 제목 없음', 'yt-breakdown': '꽉 찬 화면, 핵심 부위 링·화살표, ①②③ 해설 자막, SLOW 표시', 'yt-top5': '위 "TOP N" + 키워드, 흐린 배경 위 경기 화면, 아래 순위 목록', 'yt-wordpop': '꽉 찬 화면, 가운데 한 단어씩 튀어나오는 자막, 화살표·링', 'yt-post': '흰 바탕 SNS 게시물 모양, 검은 굵은 제목 2줄, 가운데 영상, 아래 채널 한마디 카드' };
+const REF_FX = { 'yt-mat': 'label, pop, badge', 'yt-top5': '(없음, 빈 배열)', 'yt-post': '(없음, 빈 배열)' };
+const styleOf = E => { const rs = isRefLook(E.s.look) && E.s.refStyle && E.s.refStyle.look === E.s.look ? E.s.refStyle : null;
+  const st = rs ? { ...AI_STYLES[rs.base], ...rs.over } : AI_STYLES[E.s.look || ''] || AI_STYLES[CH_STYLE[E.s.channel] || 'yt-mat']; const v = st.kind === 'sport' && VTYPES[E.s.vtype]; return v ? { ...st, ...v } : st; };
 
 function source(E) {
   let info; try { info = readJson(E.p('소스.json'))[0]; } catch { info = null; }
@@ -323,7 +328,46 @@ ${transcript(E, info) ? '영어 중계 자막(원본 시각):\n' + transcript(E,
 ${(st.rules || []).map(r => '- ' + r).join('\n')}
 사실은 화면/중계 자막에서 확인된 것, 또는 조사 파일 ${E.p('조사/research.md')} 의 A·B 등급만 쓴다. 확인 못 한 숫자/기록/과장은 쓰지 않는다. 시각은 모두 완성 영상 기준 초.`;
 
+async function refStyle(E, ctx) {
+  if (!isRefLook(E.s.look) || (E.s.refStyle && E.s.refStyle.look === E.s.look)) return;
+  const id = E.s.look.slice(4), dir = path.join(HOME, 'Desktop/유투브/레퍼런스', id), cache = path.join(dir, 'style.json');
+  if (exists(cache)) { try { E.s.refStyle = readJson(cache); if (E.s.refStyle.look === E.s.look) { ctx.log(`레퍼런스 스타일: ${E.s.refStyle.name} (전에 분석한 것)`); return; } } catch {} }
+  fs.mkdirSync(dir, { recursive: true });
+  const vid = path.join(dir, 'ref.mp4');
+  ctx.log('레퍼런스 쇼츠를 받아요…');
+  let title = '';
+  try { const r = await run(YTDLP, ['--no-playlist', '--no-warnings', '--no-simulate', '-O', 'title', '-f', 'b[height<=720][ext=mp4]/bv*[height<=720]+ba/b', '--merge-output-format', 'mp4', '--force-overwrites', '-o', vid, 'https://www.youtube.com/shorts/' + id], ctx); title = r.out.trim().split('\n')[0] || ''; }
+  catch (e) { if (e instanceof StopError) throw e; throw new StepError('레퍼런스 쇼츠를 받지 못했어요: ' + (lastLines(e.err) || e.message)); }
+  const dur = (await probe(vid, ctx)).duration || 60, fps = Math.min(2, 40 / dur);
+  const out = E.p('분석'); fs.mkdirSync(out, { recursive: true });
+  for (const f of fs.readdirSync(out)) if (f.startsWith('ref_')) fs.rmSync(path.join(out, f));
+  await ff(['-i', vid, '-vf', `fps=${fps.toFixed(3)},scale=216:-2,tile=5x4`, '-q:v', '4', path.join(out, 'ref_%02d.jpg')], ctx);
+  const list = fs.readdirSync(out).filter(f => f.startsWith('ref_')).sort().map(f => '- ' + path.join(out, f)).join('\n');
+  ctx.log('Claude 가 레퍼런스 쇼츠의 편집 스타일을 봐요…');
+  const j = await askClaude(E, ctx, `너는 쇼츠 편집 스타일 분석가다. 아래는 레퍼런스 쇼츠 "${title}" (https://www.youtube.com/shorts/${id}, ${Math.round(dur)}초) 를 ${r1(1 / fps)}초 간격으로 뽑은 프레임 시트다 (5x4 타일, 왼쪽 위부터 가로로). Read 로 모두 본다:
+${list}
+이 쇼츠의 화면 구성, 제목·자막 위치와 색, 글자 크기, 강조 방식, 이펙트(링·화살표·라벨·숫자 팝업), 말투, 컷 리듬을 본다.
+우리 렌더러는 아래 틀 중 하나로만 그릴 수 있다. 가장 가까운 틀 하나를 base 로 고른다:
+${Object.entries(REF_BASES).map(([k, v]) => `- ${k}: ${v}`).join('\n')}
+그 틀 안에서 이 레퍼런스처럼 보이게 하는 규칙을 한국어로 쓴다 (레퍼런스의 문장을 베끼지 말고, 방식만 따른다):
+- yellow: 강조색 hex 6자리 (# 없이), red: 두 번째 색 hex 6자리
+- title: 위 제목 2줄(l1, l2)을 어떻게 쓰는지 (각 14자 이내). 레퍼런스에 위 제목이 없으면 짧은 후크로 쓰되 그렇게 적는다.
+- fx: 어떤 이펙트를 언제 몇 개 쓰는지. 쓸 수 있는 type: ${'mat 은 ' + REF_FX['yt-mat'] + ', top5·post 는 없음, 나머지는 ring, arrow, label, pop'}. ring·arrow 는 x, y (원본 프레임 0~1).
+- caps: 자막 규칙 (위치는 틀이 정함. 길이, 말투, 강조, 리듬).
+- tone: 말투 한 줄.
+- name: 이 스타일 이름 (12자 이내, 예: "스토리텔링 룩"), desc: 한 줄 설명 (40자 이내).
+JSON 하나만 답해라: {"base":"yt-mat","name":"","desc":"","yellow":"FFD600","red":"FF3B30","title":"","fx":"","caps":"","tone":""}`,
+    x => !REF_BASES[x.base] ? 'base 는 ' + Object.keys(REF_BASES).join(', ') + ' 중 하나여야 해요.' : !/^[0-9A-Fa-f]{6}$/.test(x.yellow || '') || !/^[0-9A-Fa-f]{6}$/.test(x.red || '') ? 'yellow, red 는 hex 6자리여야 해요.' : !x.name || !x.caps ? 'name, caps 가 있어야 해요.' : '');
+  const base = AI_STYLES[j.base], over = { yellow: j.yellow.toUpperCase(), red: j.red.toUpperCase(), caps: '- ' + j.caps, tone: base.tone + ' ' + (j.tone || '') };
+  if (j.title && j.base !== 'yt-top5') over.title = '위 제목: ' + j.title + ' l1, l2 각 14자 이내. 이것이 인트로 후크다.';
+  if (j.fx && !['yt-top5', 'yt-post'].includes(j.base)) over.fx = j.fx + (j.base === 'yt-mat' ? '' : ' ' + PT);
+  E.s.refStyle = { look: E.s.look, id, title, base: j.base, name: String(j.name).slice(0, 20), desc: String(j.desc || '').slice(0, 60), over };
+  writeJson(cache, E.s.refStyle);
+  ctx.log(`레퍼런스 스타일: ${E.s.refStyle.name} (틀: ${j.base})`);
+}
+
 async function aistyle(E, ctx) {
+  await refStyle(E, ctx);
   const st = styleOf(E), info = source(E), plan = readJson(E.p('편집/AI컷.json'));
   ctx.log('Claude 가 사실을 조사하고(source-check-research) 위 제목·선수 라벨·점수 팝업을 정해요…');
   fs.mkdirSync(E.p('조사'), { recursive: true });

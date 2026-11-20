@@ -72,6 +72,13 @@ function userRefs(ch){
  if(!a.length)return BUILTIN[ch]?'':`<div class="empty" style="border:1px dashed var(--line);border-radius:10px">아직 레퍼런스가 없어요.<br><span class="small">위 칸에 유튜브 링크를 붙여 넣으면 여기에 모여요.</span></div>`;
  return `<section class="yr-card"><div class="yr-top"><h2>내가 추가한 레퍼런스</h2><span class="small">${a.length}개</span></div>${chans.length?`<div class="yr-others" style="margin-bottom:${vids.length?14:0}px">${chans.map(r=>{if(!r.top&&!topBusy[r.id])setTimeout(()=>fetchTop(ch,r),0);const f=String(topBusy[r.id]||'');return `<div class="yr-chan"><div style="display:flex;gap:12px;align-items:flex-start">${r.top?`<div style="width:120px;flex:none">${videoCard(r.top.videoId,'https://www.youtube.com/shorts/'+r.top.videoId,r.top.title,r.top.views)}</div>`:''}<div><b>${esc(r.handle||r.url)}</b><div class="yr-meta">${r.top?'대표 영상 (최근 50개 중 조회수 1위)':f.startsWith('fail:')?'대표 영상을 못 찾았어요: '+esc(f.slice(5)||'실행기를 켜 주세요'):'대표 영상 찾는 중… (실행기 필요)'}</div>${r.memo?`<div class="yr-memo">${esc(r.memo)}</div>`:''}</div></div><div class="yr-actions"><a class="btn ghost" href="${esc(r.url)}" target="_blank" rel="noopener">채널 열기 ↗</a><button type="button" class="btn ghost" data-yr-del="${esc(r.id)}">삭제</button></div></div>`}).join('')}</div>`:''}${vids.length?`<div class="yr-list">${vids.map(r=>videoCard(r.videoId,r.url||'https://www.youtube.com/shorts/'+r.videoId,'',null,r.memo,r.id)).join('')}</div>`:''}</section>`;
 }
+// 편집 스타일 선택 단계에서 쓰는 레퍼런스 쇼츠 목록: 기본 채널 대표 영상 + 내가 추가한 쇼츠 + 추가한 채널의 대표 영상
+window.ytRefShorts=function(ch){
+ const out=[],seen=new Set(),push=(id,title,from)=>{if(id&&!seen.has(id)){seen.add(id);out.push({id,title:title||'',from})}};
+ const b=BUILTIN[ch];if(b){const top=b.shorts.slice().sort((x,y)=>y.views-x.views)[0];if(top)push(top.id,top.title,b.name)}
+ for(const r of list(ch)){if(r.kind==='video')push(r.videoId,r.memo,'내 레퍼런스');else if(r.top)push(r.top.videoId,r.top.title,r.handle||'채널')}
+ return out;
+};
 window.ytRefsPage=function(){
  const ch=chId();
  return head('유투브 썸네일 / 편집 레퍼런스','참고할 채널·영상 링크를 모아 두고, 썸네일과 편집 스타일을 비교하세요.',false)
