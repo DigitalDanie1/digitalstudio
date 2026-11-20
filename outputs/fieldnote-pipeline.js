@@ -920,13 +920,14 @@
     const picked = it.idea && ytPipe.lookIdea === it.idea.id && choices.includes(ytPipe.look) ? ytPipe.look : '';
     const pick = picked || (lookOk && choices.includes(ep.look) ? ep.look : myLook), same = lookOk && ep.look === pick;
     const c2 = card(1, {
-      desc: !cutDone ? '1차 컷이 끝나면 열려요.' : sport ? '이 쇼츠에 입힐 편집 스타일을 고르세요. 바꾸면 스타일 입히기부터 다시 해요 (1차 컷은 그대로).' : '이 쇼츠에 입힐 편집 스타일을 고르세요. AI 편집은 채널마다 스타일 하나씩 있어요.',
+      peek: sport,   // 레슬링: 1차 컷 전에도 눌러서 스타일을 미리 볼 수 있어요
+      desc: sport ? (cutDone ? '이 쇼츠에 입힐 편집 스타일을 고르세요. 바꾸면 스타일 입히기부터 다시 해요 (1차 컷은 그대로).' : '미리 골라 두세요. 1차 컷이 끝나면 "이 스타일로 정하기"가 열려요.') : !cutDone ? '1차 컷이 끝나면 열려요.' : '이 쇼츠에 입힐 편집 스타일을 고르세요. AI 편집은 채널마다 스타일 하나씩 있어요.',
       btn: same ? '이 스타일로 정했어요' : lookOk ? '이 스타일로 바꾸기' : '이 스타일로 정하기',
       attrs: () => `data-ya-act="look" data-ya-look="${esc(pick)}"${lookOk && !same && ok('aistyle') ? ' data-ya-confirm="스타일을 바꾸면 스타일 입히기·자막·인트로·아웃트로를 다시 해야 해요. 1차 컷은 그대로예요. 계속할까요?"' : ''}`,
       disabled: () => off || !cutDone || same || !!ep.running,
       isDone: () => cutDone && lookOk,
       result: () => lookOk ? `<b>${esc(aiLookName(ep.look))}</b>로 정했어요.${choices.length > 1 ? ' <span class="small">다른 스타일을 고르면 바꿀 수 있어요.</span>' : ''}` : '',
-      body: () => cutDone ? `<div class="pl-looks" role="radiogroup" aria-label="편집 스타일">${choices.map(id => { const l = YT_AI_LOOKS.find(x => x.id === id) || ytLooks().find(x => x.id === id) || { name: id, desc: '' }; return `<button type="button" role="radio" aria-checked="${pick === id}" class="pl-topic ${pick === id ? 'on' : ''}"${choices.length > 1 ? ` data-ya-lookpick="${esc(id)}"` : ''}>${ytLookMock(id)}<span class="pl-lk-txt"><b>${esc(l.name)}${id === myLook && choices.length > 1 ? ' · 기본' : ''}</b><span class="small">${esc(l.desc)}</span></span></button>`; }).join('')}</div>${choices.length > 1 ? `<p class="small">레퍼런스 쇼츠: ${YT_AI_LOOKS.map(l => `<a href="${esc(l.ref)}" target="_blank" rel="noopener">${esc(l.name)}</a>`).join(' · ')}</p>` : ''}` : '',
+      body: () => (cutDone || (sport && it.idea)) ? `<div class="pl-looks" role="radiogroup" aria-label="편집 스타일">${choices.map(id => { const l = YT_AI_LOOKS.find(x => x.id === id) || ytLooks().find(x => x.id === id) || { name: id, desc: '' }; return `<button type="button" role="radio" aria-checked="${pick === id}" class="pl-topic ${pick === id ? 'on' : ''}"${choices.length > 1 ? ` data-ya-lookpick="${esc(id)}"` : ''}>${ytLookMock(id)}<span class="pl-lk-txt"><b>${esc(l.name)}${id === myLook && choices.length > 1 ? ' · 기본' : ''}</b><span class="small">${esc(l.desc)}</span></span></button>`; }).join('')}</div>${choices.length > 1 ? `<p class="small">레퍼런스 쇼츠: ${YT_AI_LOOKS.map(l => `<a href="${esc(l.ref)}" target="_blank" rel="noopener">${esc(l.name)}</a>`).join(' · ')}</p>` : ''}` : '',
     });
     const ST = ['aistyle'], styDone = ok('aistyle');
     const c3 = card(2, {
@@ -1328,12 +1329,12 @@
     const { A, it, steps, done, now, lastIdx } = evalSteps(c);
     const allDone = now >= steps.length;
     let v = T.view[c]; const maxV = Math.min(now, lastIdx);
-    if (v == null || v > maxV || v < 0) v = maxV;
+    if (v == null || (v > maxV && !(steps[v] && steps[v].peek)) || v < 0) v = maxV;
     const s = steps[v], N = steps.length;
     const pc = platformColor(PF_NAME[c]);
     const list = A.list(it), cur = it.key;
     const bar = `<ol class="pl-bar" aria-label="작업 단계">${steps.map((st, k) => {
-      const st8 = done[k] ? 'done' : k === now ? 'now' : 'todo', can = k <= now;
+      const st8 = done[k] ? 'done' : k === now ? 'now' : 'todo', can = k <= now || !!st.peek;
       return `<li class="${st8} ${k === v ? 'view' : ''}"><button type="button" ${can ? `data-pl-go="${k}"` : 'disabled'} ${k === v ? 'aria-current="step"' : ''}><span class="pl-n" aria-hidden="true">${done[k] ? '✓' : k + 1}</span><span class="pl-nm">${esc(st.name)}</span></button></li>`;
     }).join('')}</ol>`;
     const items = c === 'youtube' ? ytWipHtml(it.idea ? it.idea.id : '') : `<div class="pl-items"><label><span>작업 중</span><select data-pl-item aria-label="작업 중인 글">${list.length ? '' : '<option value="">작업 없음</option>'}${list.map(o => `<option value="${esc(o.key)}" ${o.key === cur ? 'selected' : ''}>${esc(o.label.length > 36 ? o.label.slice(0, 36) + '…' : o.label)}</option>`).join('')}</select></label><button type="button" class="pl-newbtn" data-pl-new>＋ 새 작업</button></div>`;
