@@ -468,6 +468,11 @@
   YT_LOOK_MOCKS['yt-steps'] = '<i class="lm-v"></i><i class="lm-a" style="top:6%;left:16%;right:16%;padding:2px 0;background:#000;color:#fff;font-size:5px;font-weight:800">1. 낮추기</i><i class="lm-a lm-sub" style="top:80%;left:0;right:0">낮게 시작해요</i>';
   YT_LOOK_MOCKS['yt-words'] = '<i class="lm-v"></i><i class="lm-a lm-wd" style="top:58%;left:0;right:0">머리를 <u style="color:#3EE6FF">낮추고</u></i>';
   YT_LOOK_MOCKS['yt-tags'] = '<i class="lm-v"></i><i class="lm-a" style="top:70%;left:12%;right:12%;padding:3px 0;border-radius:99px;background:#1E88FF;color:#fff;font-size:5.5px;font-weight:800">이 기술 보세요</i>';
+  YT_LOOK_MOCKS['yt-replay'] = '<i class="lm-v"></i><i class="lm-a" style="top:44%;left:42%;width:16px;height:16px;border:1.5px solid #fff;border-radius:50%;box-shadow:0 0 4px #fff"></i><i class="lm-a" style="top:64%;left:0;right:0;font-size:5.5px;font-weight:900;color:#FFD400;text-shadow:-1px 0 #000,1px 0 #000,0 1px #000,0 -1px #000">준비됐어?</i><i class="lm-a" style="top:76%;left:0;right:0;font-size:3.5px;font-weight:800;opacity:.6">MAT STORY</i>';
+  YT_LOOK_MOCKS['yt-breakdown'] = '<i class="lm-v"></i><i class="lm-a" style="top:36%;left:30%;width:22px;height:22px;border:1.5px solid #fff;border-radius:50%;box-shadow:0 0 6px #fff"></i><i class="lm-a" style="top:5%;right:4%;padding:1px 2px;background:#FFD600;color:#000;font-size:3.5px;font-weight:800">SLOW</i><i class="lm-a lm-sub" style="top:80%;left:0;right:0">① 낮추기</i>';
+  YT_LOOK_MOCKS['yt-top5'] = '<i class="lm-a" style="inset:0;background:#3a3f4a"></i><i class="lm-a" style="top:4%;left:0;right:0;font-size:8px;font-weight:900">TOP 3</i><i class="lm-a" style="top:12%;left:0;right:0;font-size:6px;font-weight:900;color:#FF3B30">"들어 던지기"</i><i class="lm-v" style="top:22%;bottom:46%"></i><i class="lm-a" style="top:58%;left:12%;font-size:5px;font-weight:800;text-align:left;line-height:1.5">1.<br>2. 허리 감기<br>3. 낮추기</i>';
+  YT_LOOK_MOCKS['yt-wordpop'] = '<i class="lm-v"></i><i class="lm-a" style="top:28%;left:30%;font-size:12px;color:#FF2B2B;transform:rotate(-35deg)">⬇</i><i class="lm-a" style="top:58%;left:0;right:0;font-size:9px;font-weight:900;color:#fff;text-shadow:-1px 0 #1E6BFF,1px 0 #1E6BFF,0 1px #1E6BFF,0 -1px #1E6BFF">펀치</i>';
+  YT_LOOK_MOCKS['yt-post'] = '<i class="lm-a" style="inset:0;background:#fff"></i><i class="lm-a" style="top:5%;left:6%;width:9px;height:9px;border-radius:50%;background:#FF7A1A"></i><i class="lm-a" style="top:5.5%;left:22%;font-size:3.5px;font-weight:800;color:#000;text-align:left">MAT STORY</i><i class="lm-a" style="top:15%;left:0;right:0;font-size:5.5px;font-weight:900;color:#000;line-height:1.3">충격받는<br>레전드 기술</i><i class="lm-v" style="top:26%;bottom:29%"></i><i class="lm-a" style="top:62%;left:0;right:0;font-size:4.5px;font-weight:800;color:#FFD400;text-shadow:-1px 0 #000,1px 0 #000">(순식간에)</i><i class="lm-a" style="top:76%;left:8%;right:8%;font-size:4px;color:#222;text-align:left">● 이 속도가 말이 안 됨</i>';
   const ytLookMock = id => (YT_LOOK_MOCKS[id] ? `<span class="lm" aria-hidden="true">${YT_LOOK_MOCKS[id]}</span>` : '');
   const ytLooks = () => (runnerData && runnerData.looks && runnerData.looks.length ? runnerData.looks : YT_LOOKS);
   const ytLookDefault = ch => (ch === 'yt-wrestling' || !ch ? 'yt-mat' : YT_LOOKS.some(l => l.id === ch) ? ch : 'yt-mat');
@@ -865,7 +870,16 @@
   // 인트로·아웃트로는 모든 단계에서 후크: 1차 컷(첫 컷 intro·마지막 컷 outro) / 스타일(위 제목) / 자막(0초 후크·마지막 줄 후크)
   // AI 편집 작업판을 쓰는 채널 → 그 채널의 AI 편집 스타일(룩). 실행기 runner/ai.mjs 의 CH_STYLE 과 같아요.
   const AI_CH = { 'yt-wrestling': 'yt-mat', 'yt-christian': 'yt-christian', 'yt-politics': 'yt-politics' };
-  const AI_LOOKS = Object.values(AI_CH);
+  // 레슬링 AI 편집에서 더 고를 수 있는 쇼츠 스타일 (레퍼런스 쇼츠를 본뜬 틀). 실행기 runner/ai.mjs 의 AI_STYLES 와 같아요.
+  const YT_AI_LOOKS = [
+    { id: 'yt-replay', name: '리플레이 룩', desc: '꽉 찬 경기 화면 + 짧은 노란 말자막 + 결정적 순간 링 + 제목 없음 · 참고: TAKEDOWN 쇼츠 1,310만 회', ref: 'https://www.youtube.com/shorts/OEZ-90bZ_cI' },
+    { id: 'yt-breakdown', name: '기술 분석 룩', desc: '꽉 찬 화면 + 핵심 부위에 빛나는 링·화살표 + ①②③ 해설 자막 + SLOW 표시 · 참고: Fight Lab 브레이크다운 150만 회', ref: 'https://www.youtube.com/shorts/J2pl5sWroxA' },
+    { id: 'yt-top5', name: '랭킹 룩', desc: '위 "TOP 3" + 빨간 키워드 + 흐린 배경 위 경기 화면 + 아래 순위 목록이 하나씩 채워짐 · 참고: MMA Hub Top 5 146만 회', ref: 'https://www.youtube.com/shorts/sShsZ2ZUUZM' },
+    { id: 'yt-wordpop', name: '한 단어 자막 룩', desc: '꽉 찬 화면 + 가운데 한 단어씩 튀어나오는 흰 자막(파란 테두리) + 빨간 화살표·노란 링 · 참고: USAFightv KO 쇼츠', ref: 'https://www.youtube.com/shorts/VpVzuEsavCQ' },
+    { id: 'yt-post', name: '게시물 룩', desc: '흰 바탕 + 로고·채널명 + 검은 굵은 제목 2줄 + 가운데 영상(노란 자막) + 아래 채널 한마디 카드 · 참고: 격랭커 심권호 쇼츠 38만 회', ref: 'https://www.youtube.com/shorts/09-OQisO3Hw' },
+  ];
+  const AI_LOOKS = [...Object.values(AI_CH), ...YT_AI_LOOKS.map(l => l.id)];
+  const aiLookName = id => (YT_AI_LOOKS.find(l => l.id === id) || ytLooks().find(l => l.id === id) || { name: id }).name;
   function ytAiCards(it, ep, off) {
     const names = ['하이라이트 1차 컷', '스타일 선택', '스타일 입히기', '자막', '인트로·아웃트로', '썸네일', '다운로드'];
     const chId = it.idea ? ytCh(it.idea) : ytTab(), sport = chId === 'yt-wrestling', myLook = AI_CH[chId] || 'yt-mat';
@@ -893,15 +907,17 @@
       result: () => ep ? errOf(CUT) + (cutDone ? `<p><b>1차 컷이 나왔어요.</b> 인트로·아웃트로가 후크인지 보고, 아니면 "AI 가 다시 자르기"를 누르세요.</p>` + vid('aicut', '편집/AI1차컷.mp4', '1차 컷') : '') + logs(CUT) : '',
       body: () => (off ? '<p class="pl-error" role="alert"><b>실행기가 꺼져 있어요.</b></p>' : old ? oldMsg : ''),
     });
-    const pick = myLook;
+    const choices = sport ? [myLook, ...YT_AI_LOOKS.map(l => l.id)] : [myLook];
+    const picked = it.idea && ytPipe.lookIdea === it.idea.id && choices.includes(ytPipe.look) ? ytPipe.look : '';
+    const pick = picked || (lookOk && choices.includes(ep.look) ? ep.look : myLook), same = lookOk && ep.look === pick;
     const c2 = card(1, {
-      desc: !cutDone ? '1차 컷이 끝나면 열려요.' : '이 쇼츠에 입힐 편집 스타일을 고르세요. AI 편집은 채널마다 스타일 하나씩 있어요.',
-      btn: lookOk ? '이 스타일로 정했어요' : '이 스타일로 정하기',
-      attrs: () => `data-ya-act="look" data-ya-look="${esc(pick)}"`,
-      disabled: () => off || !cutDone || lookOk || !!ep.running,
+      desc: !cutDone ? '1차 컷이 끝나면 열려요.' : sport ? '이 쇼츠에 입힐 편집 스타일을 고르세요. 바꾸면 스타일 입히기부터 다시 해요 (1차 컷은 그대로).' : '이 쇼츠에 입힐 편집 스타일을 고르세요. AI 편집은 채널마다 스타일 하나씩 있어요.',
+      btn: same ? '이 스타일로 정했어요' : lookOk ? '이 스타일로 바꾸기' : '이 스타일로 정하기',
+      attrs: () => `data-ya-act="look" data-ya-look="${esc(pick)}"${lookOk && !same && ok('aistyle') ? ' data-ya-confirm="스타일을 바꾸면 스타일 입히기·자막·인트로·아웃트로를 다시 해야 해요. 1차 컷은 그대로예요. 계속할까요?"' : ''}`,
+      disabled: () => off || !cutDone || same || !!ep.running,
       isDone: () => cutDone && lookOk,
-      result: () => lookOk ? `<b>${esc((ytLooks().find(l => l.id === ep.look) || { name: ep.look }).name)}</b>로 정했어요.` : '',
-      body: () => cutDone ? `<div class="pl-looks" role="radiogroup" aria-label="편집 스타일">${[myLook].map(id => { const l = ytLooks().find(x => x.id === id) || { name: id, desc: '' }; return `<button type="button" role="radio" aria-checked="${pick === id}" class="pl-topic on">${ytLookMock(id)}<span class="pl-lk-txt"><b>${esc(l.name)}</b><span class="small">${esc(l.desc)}</span></span></button>`; }).join('')}</div>` : '',
+      result: () => lookOk ? `<b>${esc(aiLookName(ep.look))}</b>로 정했어요.${choices.length > 1 ? ' <span class="small">다른 스타일을 고르면 바꿀 수 있어요.</span>' : ''}` : '',
+      body: () => cutDone ? `<div class="pl-looks" role="radiogroup" aria-label="편집 스타일">${choices.map(id => { const l = YT_AI_LOOKS.find(x => x.id === id) || ytLooks().find(x => x.id === id) || { name: id, desc: '' }; return `<button type="button" role="radio" aria-checked="${pick === id}" class="pl-topic ${pick === id ? 'on' : ''}"${choices.length > 1 ? ` data-ya-lookpick="${esc(id)}"` : ''}>${ytLookMock(id)}<span class="pl-lk-txt"><b>${esc(l.name)}${id === myLook && choices.length > 1 ? ' · 기본' : ''}</b><span class="small">${esc(l.desc)}</span></span></button>`; }).join('')}</div>${choices.length > 1 ? `<p class="small">레퍼런스 쇼츠: ${YT_AI_LOOKS.map(l => `<a href="${esc(l.ref)}" target="_blank" rel="noopener">${esc(l.name)}</a>`).join(' · ')}</p>` : ''}` : '',
     });
     const ST = ['aistyle'], styDone = ok('aistyle');
     const c3 = card(2, {
@@ -1046,7 +1062,7 @@
     if (ep) {
       const ok = id => (ep.steps || []).some(x => x.id === id && x.status === 'done'), r = ep.round || 0, fb = (ep.feedbackAt || 0) > (ep.editAt || 0);
       if (AI_CH[ytCh(i)]) {   // AI 작업판 8칸
-        const af = [true, ok('aicut'), ok('aicut') && ep.look === AI_CH[ytCh(i)], ok('aistyle'), ok('aisubs'), ok('aibrand'), ok('aithumb'), ok('aibrand') && ok('aithumb')], an = af.filter(Boolean).length, ak = af.findIndex(x => !x);
+        const af = [true, ok('aicut'), ok('aicut') && AI_LOOKS.includes(ep.look), ok('aistyle'), ok('aisubs'), ok('aibrand'), ok('aithumb'), ok('aibrand') && ok('aithumb')], an = af.filter(Boolean).length, ak = af.findIndex(x => !x);
         const AN = ['원본 링크', '하이라이트 1차 컷', '스타일 선택', '스타일 입히기', '자막', '인트로·아웃트로', '썸네일', '다운로드'], ab = [];
         if (ep.running) ab.push('<i class="b run">실행 중</i>');
         if ((ep.steps || []).some(x => ['research', 'download', 'aicut', 'aistyle', 'aisubs', 'aibrand', 'aithumb'].includes(x.id) && x.status === 'failed')) ab.push('<i class="b fail">실패</i>');
