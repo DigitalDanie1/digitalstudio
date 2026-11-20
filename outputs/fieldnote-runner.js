@@ -4,6 +4,7 @@ const RUNNER = 'http://127.0.0.1:4777';
 const RUNNER_API_NEEDED = 4;  // 4 = 7칸 순서(1차 편집·자막 넣기·2차 편집)  // 실행기 /health 의 api 가 이 숫자보다 작으면 예전 버전 안내
 const RUNNER_OLD_MSG = '<div class="ya-off pl-error" role="alert"><b>이 맥의 실행기가 예전 버전이에요.</b> 저장소를 <code>git pull</code> 한 뒤 <code>runner/설치·업데이트.command</code> 를 더블클릭하세요.</div>';
 let runnerApi = null;  // 실행기 /health 의 api (모르면 null). 5 = 최종 결과물 레퍼런스(/fxpack)
+let runnerStale = null;  // 맥에 새 실행기 파일이 있는데 아직 예전 버전으로 켜져 있음 (health.version != health.disk)
 let runnerData = null, runnerOnline = null, runnerOld = false, runnerBusy = false, runnerTimer = null, runnerOpenLog = null, runnerSelectedStep = null;
 // 주제 = 에피소드: 작업판에서 고른 주제(idea)에 연결된 에피소드만 보여 준다
 function runnerIdea() { return typeof ytPipeIdea === 'function' ? ytPipeIdea() : null; }
@@ -47,8 +48,8 @@ async function runnerFetch(p, body) {
 }
 async function runnerRefresh() {
   // 켜져는 있는데 예전 버전인지 확인 (api 숫자가 없거나 RUNNER_API_NEEDED 보다 작으면 예전 버전)
-  try { const h = await runnerFetch('/health'); runnerApi = Number.isInteger(h.api) ? h.api : 0; runnerOld = !(Number.isInteger(h.api) && h.api >= RUNNER_API_NEEDED); }
-  catch (_) { runnerOld = false; }
+  try { const h = await runnerFetch('/health'); runnerApi = Number.isInteger(h.api) ? h.api : 0; runnerOld = !(Number.isInteger(h.api) && h.api >= RUNNER_API_NEEDED); runnerStale = h.disk && h.version !== h.disk ? h : null; }
+  catch (_) { runnerOld = false; runnerStale = null; }
   try { runnerData = await runnerFetch('/status'); runnerOnline = true; runnerSyncIdeas(); }
   catch (_) { runnerOnline = false; }
   const live = document.getElementById('ytAutoLive');

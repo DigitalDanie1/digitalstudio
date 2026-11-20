@@ -1124,7 +1124,8 @@
       return `<div class="pl-wc ${i.id === curId ? 'on' : ''}"><button type="button" class="pl-wc-main" data-pl-wip="${esc(i.id)}" ${i.id === curId ? 'aria-current="true"' : ''}>${th ? `<img src="${esc(th)}" alt="" loading="lazy">` : '<span class="pl-wc-ph" aria-hidden="true">🎬</span>'}<span class="pl-wc-t">${esc(i.title)}</span><span class="pl-wc-s">${ytWipStatus(i)}</span></button><button type="button" class="pl-wc-x" data-pl-wiphide="${esc(i.id)}" aria-label="완전히 지우기" title="완전히 지우기">×</button></div>`; };
     const pubs = db.ideas.filter(i => ideaPlatform(i) === 'YouTube' && ytCh(i) === ytTab() && i.publicationCheck);
     const pubHtml = pubs.length ? `<details class="pl-wpub"><summary>올린 영상 ${pubs.length}개</summary><ul>${pubs.map(i => { const u = typeof i.publicationCheck === 'string' ? i.publicationCheck : (i.publicationCheck && i.publicationCheck.url) || ''; return `<li>${/^https?:/.test(u) ? `<a class="pl-link" href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(i.title)} ↗</a>` : esc(i.title)}</li>`; }).join('')}</ul></details>` : '';
-    return `<div class="pl-wip" aria-label="작업 중인 영상"><div class="pl-wip-h"><b>작업 중 ${list.length}개</b><button type="button" class="pl-wip-reset" data-pl-ytreset title="유튜브 작업 기록을 모두 지워요 (영상 파일은 휴지통으로)">유튜브 초기화</button>${list.length ? '' : '<span class="small">작업 중인 영상이 없어요. 링크를 넣어 시작하세요.</span>'}</div><div class="pl-wip-row"><button type="button" class="pl-wc pl-wc-new" data-pl-ytchange>＋ 새 링크로 시작</button>${list.map(card).join('')}</div>${pubHtml}</div>`;
+    const stale = typeof runnerStale !== 'undefined' && runnerStale ? `<p class="pl-error" role="alert"><b>맥 실행기에 새 버전이 들어와 있어요.</b> 다시 켜야 새 기능(내 영상 올리기 등)이 돼요. ${runnerStale.api >= 15 ? '<button type="button" class="pl-link" data-pl-ytrestart>실행기 다시 켜기</button>' : '이번 한 번만 맥에서 <code>~/Desktop/유투브/실행기/자동실행 켜기.command</code> 를 더블클릭하세요. 다음부터는 여기 버튼으로 돼요.'}</p>` : '';
+    return stale + `<div class="pl-wip" aria-label="작업 중인 영상"><div class="pl-wip-h"><b>작업 중 ${list.length}개</b><button type="button" class="pl-wip-reset" data-pl-ytreset title="유튜브 작업 기록을 모두 지워요 (영상 파일은 휴지통으로)">유튜브 초기화</button>${list.length ? '' : '<span class="small">작업 중인 영상이 없어요. 링크를 넣어 시작하세요.</span>'}</div><div class="pl-wip-row"><button type="button" class="pl-wc pl-wc-new" data-pl-ytchange>＋ 새 링크로 시작</button>${list.map(card).join('')}</div>${pubHtml}</div>`;
   }
   // 이 브라우저의 기록 지우기 (× 와 '유튜브 초기화'가 같이 써요): 주제 + 그 주제의 YouTube 글·초안 + 선택·열림·단계 기록
   function ytCleanLocal(ids) {
@@ -1509,6 +1510,7 @@
     if (t.dataset.plPick) { T.pick[c] = t.dataset.plPick; T.custom[c] = ''; repaint(c, true); return; }
     if (t.hasAttribute('data-pl-more')) { T.page[c] = (T.page[c] || 0) + 1; repaint(c, true); return; }
     if (t.dataset.plWip) { selectYt(t.dataset.plWip); T.view.youtube = null; T.err.youtube = ''; render(); return; }
+    if (t.hasAttribute('data-pl-ytrestart')) { t.disabled = true; runnerFetch('/restart', {}).then(() => { toast('실행기를 다시 켜는 중이에요…'); setTimeout(() => runnerRefresh().then(() => repaint('youtube', true)), 4000); }).catch(e => { t.disabled = false; toast(e.message); }); return; }
     if (t.hasAttribute('data-pl-ytreset')) { ytResetAll(); return; }
     if (t.dataset.plWiphide) { ytWipPurge(t.dataset.plWiphide); return; }
     if (t.dataset.plYtpick) { selectYt(t.dataset.plYtpick); T.view.youtube = null; repaint('youtube', true); return; }
