@@ -404,6 +404,8 @@ async function aithumb(E, ctx) {
 - 중앙 2분할: 왼쪽 = ${st.thumbL}, 오른쪽 = ${st.thumbR}.
 - 하단 카피(흰 글씨, 빨강 또는 파랑 띠): 반전/궁금증. 공백 빼고 16자 이하.
 - 내용 설명형 문장 금지 (그리고/그래서/했는데/하면서 금지). 파스텔·분홍 금지.
+- 띄어쓰기는 맞춤법대로 한다 (글자 수는 공백을 빼고 센다).
+- 오른쪽 리액션 컷은 경기 장면 말고, 사람 얼굴(관중·코치·상대·화자)이 크게 보이는 프레임을 골라라.
 원본: "${info.title}" (${info.channel}), 길이 ${Math.round(dur)}초.
 본편 제목·자막: ${JSON.stringify({ frame: fin.frame, captions: fin.captions })}
 장면 정보: ${JSON.stringify({ moments: plan.moments, who: plan.who })}
@@ -414,7 +416,7 @@ ${fine.map(f => '  ' + f).join('\n')}
 x 는 그 프레임에서 인물이 있는 가로 위치(0=왼쪽 끝, 0.5=가운데, 1=오른쪽 끝). 썸네일 칸은 세로로 길어서 x 기준으로 잘라낸다.
 JSON 하나만 답해라: {"top":"","bot":"","color":"red|blue","left":{"t":원본초,"x":0.5,"why":""},"right":{"t":원본초,"x":0.5,"why":""}}`,
     x => !x.top || !x.bot ? 'top, bot 이 있어야 해요.' : nos(x.top) > 12 ? `상단 카피가 ${nos(x.top)}자예요 (12자 이하).` : nos(x.bot) > 16 ? `하단 카피가 ${nos(x.bot)}자예요 (16자 이하).`
-      : /(그리고|그래서|했는데|하면서)/.test(x.top + x.bot) ? '내용 설명형 단어가 있어요.' : !['red', 'blue'].includes(x.color) ? 'color 는 red 또는 blue.'
+      : /(그리고|그래서|했는데|하면서)/.test(x.top + x.bot) ? '내용 설명형 단어가 있어요.' : [x.top, x.bot].some(t => nos(t) >= 7 && !/\s/.test(t)) ? '띄어쓰기가 없어요. 맞춤법대로 띄어 써라.' : !['red', 'blue'].includes(x.color) ? 'color 는 red 또는 blue.'
       : ![x.left, x.right].every(f => f && f.t >= 0 && f.t <= dur && f.x >= 0 && f.x <= 1) ? `left/right 의 t 는 0~${Math.round(dur)}, x 는 0~1.` : Math.abs(x.left.t - x.right.t) < 0.5 ? '왼쪽과 오른쪽은 다른 장면이어야 해요.' : '');
   writeJson(E.p('편집/AI썸네일.json'), j);
   const fitT = (t, base, w) => { const n = [...String(t)].reduce((a, c) => a + (c === ' ' ? 0.35 : /[ -~]/.test(c) ? 0.6 : 1), 0); return Math.min(base, Math.floor(w / Math.max(1, n))); };
