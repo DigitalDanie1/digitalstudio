@@ -7,13 +7,13 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { HOME, StepError, StopError, sanitize, exists, parseRanges, isLocalSource, localPath, run, probe, FFMPEG, YTDLP, lastLines, fmtTime, MAX_RANGE } from './util.mjs';
 import { createHighlights, LEN_MIN, LEN_MAX } from './highlights.mjs';
-import { AI_STYLES, isRefLook, parseMine } from './ai.mjs';
+import { AI_STYLES, isRefLook, parseMine, analyzeRef, readRefAnalysis, refDir, refKind } from './ai.mjs';
 import { listStyles, saveStyle, enqueue, cancelJob, listJobs, resolveReadable, thumbOf, shutdownImages, ImgError } from './images.mjs';
 import { STEP_DEFS, STEP_FN, outputsFor, listAssets, checkScript, cleanPasted, parseScript, parseBanner, parseHook, PLACEHOLDER, SCRIPT_MAX_LINES, CHANNEL_PROFILES, LOOK_CHOICES, lookKeyOf, FX_PACKS, fxPackOf, parseFxTimes, migrateState, layoutLines, draftText, draftTranscript, splitAnswer, feedbackPrompt, callClaude, parseCredit, previewPlan, renderPreview } from './steps.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // 작업판이 쓰는 기능 수준. 3 = 새 9칸 순서 (/look, /ranges, deferRanges, 단계 clip·subs·fx)
-const API_LEVEL = 16;   // 16 = 자막 원문·번역·해설·내 자막 나눠 켜기 (run body.subs), 썸네일 내 카피 (run body.thumb) · 15 = 실행기 다시 켜기 (POST /restart, health.disk) · 14 = 내 영상 올리기 (POST /upload) · 13 = 레퍼런스 쇼츠 룩 (look ref-<영상ID>, view.refStyle) · 12 = 한 구간·하이라이트 길이 최대 3분(30초·1분·2분·3분), 쇼츠 최대 3분 · 11 = 하이라이트 '지난 작업' 초기화(/hl/reset, 돌고 있으면 멈추고 휴지통 한 폴더로) · 10 = AI 편집 단계(aicut·aistyle·aisubs, 맥의 Claude Code) · 9 = 유튜브 초기화(/reset, 에피소드·하이라이트 전부 휴지통 한 폴더로) · 8 = 미리보기 견본(/preview, 고른 룩·이펙트를 실제 영상 4초로) · 7 = 에피소드 완전히 지우기(/episode/delete, 휴지통으로) · 6 = 하이라이트 찾기(/hl/*) ·  4 = 7칸 순서 (/edit 1차·2차 편집, /draft, /feedback, 슬로우 구간 x0.5, 매트 스토리 룩) · 5 = 최종 결과물 레퍼런스(이펙트 팩: /fxpack, status.fxPacks)
+const API_LEVEL = 17;   // 17 = 레퍼런스 쇼츠 분석 (POST /ref/analyze, GET /ref/status, GET /ref/<id>: 컷·후크·이펙트·이목 장치를 먼저 보여 주고 고르면 그대로 적용) · 16 = 자막 원문·번역·해설·내 자막 나눠 켜기 (run body.subs), 썸네일 내 카피 (run body.thumb) · 15 = 실행기 다시 켜기 (POST /restart, health.disk) · 14 = 내 영상 올리기 (POST /upload) · 13 = 레퍼런스 쇼츠 룩 (look ref-<영상ID>, view.refStyle) · 12 = 한 구간·하이라이트 길이 최대 3분(30초·1분·2분·3분), 쇼츠 최대 3분 · 11 = 하이라이트 '지난 작업' 초기화(/hl/reset, 돌고 있으면 멈추고 휴지통 한 폴더로) · 10 = AI 편집 단계(aicut·aistyle·aisubs, 맥의 Claude Code) · 9 = 유튜브 초기화(/reset, 에피소드·하이라이트 전부 휴지통 한 폴더로) · 8 = 미리보기 견본(/preview, 고른 룩·이펙트를 실제 영상 4초로) · 7 = 에피소드 완전히 지우기(/episode/delete, 휴지통으로) · 6 = 하이라이트 찾기(/hl/*) ·  4 = 7칸 순서 (/edit 1차·2차 편집, /draft, /feedback, 슬로우 구간 x0.5, 매트 스토리 룩) · 5 = 최종 결과물 레퍼런스(이펙트 팩: /fxpack, status.fxPacks)
 let VERSION = 'dev';
 try { VERSION = fs.readFileSync(path.join(HERE, 'version.txt'), 'utf8').trim() || 'dev'; } catch {}
 const PORT = +(process.env.FIELDNOTE_RUNNER_PORT || 4777);
@@ -236,6 +236,7 @@ function createEpisode(body, nameBase = '') {
 
 // ---------- 하이라이트 찾기 ----------
 const HL = createHighlights({ dataDir: HL_DATA });
+const refJobs = new Map();   // 레퍼런스 분석 작업: id -> {status, stage, error, kind}
 const readJsonSafe = (f, d = null) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return d; } };
 const getHL = id => { const J = HL.get(id); if (!J) throw new HttpError(404, '이 하이라이트 작업을 찾을 수 없어요.'); return J; };
 const hlErr = e => { if (e instanceof StepError) throw new HttpError(400, e.message); throw e; };
@@ -351,6 +352,26 @@ const routes = {
   'POST /img/generate': imgWrap(({ body }) => ({ json: { ok: true, job: enqueue(body) } })),
   'GET /img/jobs': ({ q }) => ({ json: { jobs: listJobs(q.get('projectId') || '') } }),
   'POST /img/cancel': imgWrap(({ body }) => ({ json: { ok: true, job: cancelJob(body.id) } })),
+  // 레퍼런스 쇼츠 분석: 한 번에 하나. 끝나면 ~/Desktop/유투브/레퍼런스/<id>/analysis-<kind>.json
+  'POST /ref/analyze': ({ body }) => {
+    const id = String(body.id || ''), ch = String(body.channel || 'yt-wrestling');
+    if (!/^[\w-]{11}$/.test(id)) throw new HttpError(400, '쇼츠 ID 가 이상해요.');
+    const busy = [...refJobs.entries()].find(([, J]) => J.status === 'running');
+    if (busy) throw new HttpError(409, busy[0] === id ? '이 레퍼런스를 분석하는 중이에요.' : '다른 레퍼런스를 분석하는 중이에요. 끝난 뒤에 눌러 주세요.');
+    const J = { status: 'running', stage: '시작', error: '', kind: refKind(ch), aborted: false, child: null };
+    refJobs.set(id, J);
+    const ctx = { log: l => { if (l) J.stage = String(l).trim().slice(0, 120); }, aborted: () => J.aborted, setChild: c => { J.child = c; } };
+    analyzeRef(id, ch, ctx).then(() => { J.status = 'done'; }, e => { J.status = 'failed'; J.error = e instanceof StepError || e instanceof StopError ? e.message : '예상 못 한 오류: ' + e.message; if (!(e instanceof StepError || e instanceof StopError)) console.error(e); });
+    return { json: { ok: true } };
+  },
+  'GET /ref/status': ({ q }) => {
+    const kind = refKind(String(q.get('channel') || 'yt-wrestling')), out = {};
+    for (const id of String(q.get('ids') || '').split(',').filter(x => /^[\w-]{11}$/.test(x)).slice(0, 60)) {
+      const J = refJobs.get(id), a = readRefAnalysis(id, kind);
+      out[id] = J && J.status === 'running' ? { status: 'running', stage: J.stage } : a ? { status: 'done', name: a.name, desc: a.desc } : J && J.status === 'failed' && J.kind === kind ? { status: 'failed', error: J.error } : { status: 'none' };
+    }
+    return { json: { refs: out } };
+  },
   'GET /hl/list': () => ({ json: { jobs: HL.list(), dir: HL.dir, limits: { lenMin: LEN_MIN, lenMax: LEN_MAX } } }),
   'POST /hl/start': async ({ body }) => { const J = await hlStart(body); return { json: { ok: true, id: J.id } }; },
   // 하이라이트 '지난 작업' 초기화: 돌고 있으면 멈추고, 작업 폴더를 전부 휴지통 '하이라이트 초기화 <시각>' 한 폴더로. 에피소드는 그대로
@@ -682,6 +703,13 @@ const server = http.createServer(async (req, res) => {
       return send(200, JSON.stringify({ ok: true, path: dest, name: path.basename(dest), duration: pr.duration || null, bytes: n }));
     }
     if (key === 'POST /voice') { const r = await saveVoice(getEp(url.searchParams.get('ep')), url.searchParams, req); return send(200, JSON.stringify(r.json)); }
+    const rm = /^\/ref\/([\w-]{11})(\/file)?$/.exec(url.pathname);
+    if (rm && req.method !== 'POST') {
+      if (rm[2]) return serveFile(req, res, { dir: refDir(rm[1]) }, url.searchParams.get('path'));
+      const a = readRefAnalysis(rm[1], refKind(String(url.searchParams.get('channel') || 'yt-wrestling')));
+      if (!a) throw new HttpError(404, '아직 분석하지 않았어요.');
+      return send(200, JSON.stringify({ ok: true, analysis: a }));
+    }
     const hm = /^\/hl\/([^/]+)\/file$/.exec(url.pathname);
     if (hm && key === 'GET /hl/' + hm[1] + '/file') { let id; try { id = decodeURIComponent(hm[1]); } catch { throw new HttpError(400, '주소가 이상해요.'); } return serveFile(req, res, { dir: getHL(id).dir }, url.searchParams.get('path')); }
     let fn = routes[key];

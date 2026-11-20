@@ -232,6 +232,7 @@ async function sheets(E, ctx, src, name, a, dur, fps, cols, rows, width) {
 
 // ---------- 2. 하이라이트 1차 컷 ----------
 async function aicut(E, ctx) {
+  if (isRefLook(E.s.look) && readRefAnalysis(E.s.look.slice(4), refKind(E.s.channel))) await refStyle(E, ctx);   // 분석한 레퍼런스를 골랐으면 컷 리듬도 따라요
   const st = styleOf(E);
   const info = source(E), dur = (await probe(info.file, ctx)).duration;
   if (!dur) throw new StepError('영상 길이를 못 읽었어요.');
@@ -368,49 +369,97 @@ ${!noTr && transcript(E, info) ? '영어 중계 자막(원본 시각):\n' + tran
 ${(st.rules || []).map(r => '- ' + r).join('\n')}
 사실은 화면/중계 자막에서 확인된 것, 또는 조사 파일 ${E.p('조사/research.md')} 의 A·B 등급만 쓴다. 확인 못 한 숫자/기록/과장은 쓰지 않는다. 시각은 모두 완성 영상 기준 초.`;
 
-async function refStyle(E, ctx) {
-  if (!isRefLook(E.s.look) || (E.s.refStyle && E.s.refStyle.look === E.s.look)) return;
-  const id = E.s.look.slice(4), dir = path.join(HOME, 'Desktop/유투브/레퍼런스', id), cache = path.join(dir, 'style.json');
-  if (exists(cache)) { try { E.s.refStyle = readJson(cache); if (E.s.refStyle.look === E.s.look) { ctx.log(`레퍼런스 스타일: ${E.s.refStyle.name} (전에 분석한 것)`); return; } } catch {} }
+// ---------- 레퍼런스 쇼츠 분석 (작업판에 먼저 보여 주고, 고르면 그대로 적용) ----------
+// ~/Desktop/유투브/레퍼런스/<영상ID>/ 에 ref.mp4, 시트/, 장면/, analysis-sport.json|analysis-talk.json
+export const refDir = id => path.join(HOME, 'Desktop/유투브/레퍼런스', id);
+export const refKind = ch => AI_STYLES[CH_STYLE[ch] || 'yt-mat'].kind !== 'sport' ? 'talk' : 'sport';
+export const readRefAnalysis = (id, kind) => { try { const a = readJson(path.join(refDir(id), `analysis-${kind}.json`)); return a.id === id && a.v === 2 ? a : null; } catch { return null; } };
+const KINDS = ['hook', 'cut', 'zoom', 'slow', 'text', 'effect', 'reveal', 'loop'];
+export async function analyzeRef(id, channel, ctx) {
+  const dir = refDir(id), vid = path.join(dir, 'ref.mp4'), kind = refKind(channel);
   fs.mkdirSync(dir, { recursive: true });
-  const vid = path.join(dir, 'ref.mp4');
-  ctx.log('레퍼런스 쇼츠를 받아요…');
   let title = '';
-  try { const r = await run(YTDLP, ['--no-playlist', '--no-warnings', '--no-simulate', '-O', 'title', '-f', 'b[height<=720][ext=mp4]/bv*[height<=720]+ba/b', '--merge-output-format', 'mp4', '--force-overwrites', '-o', vid, 'https://www.youtube.com/shorts/' + id], ctx); title = r.out.trim().split('\n')[0] || ''; }
-  catch (e) { if (e instanceof StopError) throw e; throw new StepError('레퍼런스 쇼츠를 받지 못했어요: ' + (lastLines(e.err) || e.message)); }
-  const dur = (await probe(vid, ctx)).duration || 60, fps = Math.min(2, 40 / dur);
-  const out = E.p('분석'); fs.mkdirSync(out, { recursive: true });
-  for (const f of fs.readdirSync(out)) if (f.startsWith('ref_')) fs.rmSync(path.join(out, f));
-  await ff(['-i', vid, '-vf', `fps=${fps.toFixed(3)},scale=216:-2,tile=5x4`, '-q:v', '4', path.join(out, 'ref_%02d.jpg')], ctx);
-  const list = fs.readdirSync(out).filter(f => f.startsWith('ref_')).sort().map(f => '- ' + path.join(out, f)).join('\n');
-  // 말하는 채널(기독교·정치)은 채널 스타일(말투·규칙)은 그대로 두고 화면 틀만 고르게 해요
-  const chKey = CH_STYLE[E.s.channel] || 'yt-mat', talk = AI_STYLES[chKey].kind !== 'sport';
+  try { title = readJson(path.join(dir, 'meta.json')).title || ''; } catch {}
+  if (!exists(vid)) {
+    ctx.log('레퍼런스 쇼츠를 받아요…');
+    try { const r = await run(YTDLP, ['--no-playlist', '--no-warnings', '--no-simulate', '-O', 'title', '-f', 'b[height<=720][ext=mp4]/bv*[height<=720]+ba/b', '--merge-output-format', 'mp4', '--force-overwrites', '-o', vid, 'https://www.youtube.com/shorts/' + id], ctx); title = r.out.trim().split('\n')[0] || ''; writeJson(path.join(dir, 'meta.json'), { title }); }
+    catch (e) { if (e instanceof StopError) throw e; throw new StepError('레퍼런스 쇼츠를 받지 못했어요: ' + (lastLines(e.err) || e.message)); }
+  }
+  const dur = (await probe(vid, ctx)).duration || 60;
+  // 컷(장면 바뀜)은 ffmpeg 가 직접 세요: Claude 의 눈대중이 아니라 실제 시각
+  ctx.log('컷 위치를 찾아요…');
+  let cutT = [];
+  try { const r = await run(FFMPEG, ['-hide_banner', '-nostdin', '-i', vid, '-an', '-vf', "select='gt(scene,0.3)',showinfo", '-f', 'null', '-'], ctx); cutT = [...r.err.matchAll(/pts_time:([\d.]+)/g)].map(m => r1(+m[1])); }
+  catch (e) { if (e instanceof StopError) throw e; }
+  const cuts = { times: cutT, count: cutT.length + 1, avg: r1(dur / (cutT.length + 1)) };
+  ctx.log('프레임 시트를 만들어요…');
+  const sheets = path.join(dir, '시트'), step = r1(Math.max(0.5, dur / 80)); fs.rmSync(sheets, { recursive: true, force: true }); fs.mkdirSync(sheets, { recursive: true });
+  await ff(['-i', vid, '-vf', `fps=${(1 / step).toFixed(3)},scale=216:-2,tile=5x4`, '-q:v', '4', path.join(sheets, 's_%02d.jpg')], ctx);
+  const list = fs.readdirSync(sheets).sort().map((f, i) => `- ${path.join(sheets, f)} (${r1(i * 20 * step)}~${r1(Math.min(dur, (i * 20 + 19) * step))}초)`).join('\n');
+  const talk = kind === 'talk', chKey = CH_STYLE[channel] || 'yt-mat';
   const bases = talk ? { mat: '검은 바탕, 위 2줄 제목, 가운데 영상, 아래 자막, 화자 라벨·숫자 팝업', full: '꽉 찬 화면, 자막과 라벨을 영상 위에 얹기, 위 제목 작게', post: '흰 바탕 SNS 게시물 모양, 검은 굵은 제목 2줄, 가운데 영상, 아래 채널 한마디 카드' } : REF_BASES;
   const fxTypes = talk ? 'mat·full 은 label, pop. post 는 없음 (빈 배열)' : 'mat 은 ' + REF_FX['yt-mat'] + ', top5·post 는 없음, 나머지는 ring, arrow, label, pop';
-  ctx.log('Claude 가 레퍼런스 쇼츠의 편집 스타일을 봐요…');
-  const j = await askClaude(E, ctx, `너는 쇼츠 편집 스타일 분석가다. 아래는 레퍼런스 쇼츠 "${title}" (https://www.youtube.com/shorts/${id}, ${Math.round(dur)}초) 를 ${r1(1 / fps)}초 간격으로 뽑은 프레임 시트다 (5x4 타일, 왼쪽 위부터 가로로). Read 로 모두 본다:
+  ctx.log('Claude 가 레퍼런스의 편집·강조·이펙트·후크를 뜯어봐요…');
+  const j = await askClaude({ dir }, ctx, `너는 바이럴 쇼츠 편집 분석가다. 레퍼런스 쇼츠 "${title}" (https://www.youtube.com/shorts/${id}, ${r1(dur)}초) 를 뜯어봐서, 무엇이 사람들의 눈을 붙잡는지 편집자가 바로 따라할 수 있게 정리한다.
+프레임 시트 (Read 로 모두 본다. 5x4 타일, 왼쪽 위부터 가로로, 한 칸 = ${step}초. n번째 칸(0부터)의 시각 = 시트 시작초 + n x ${step}):
 ${list}
-이 쇼츠의 화면 구성, 제목·자막 위치와 색, 글자 크기, 강조 방식, 이펙트(링·화살표·라벨·숫자 팝업), 말투, 컷 리듬을 본다.
-우리 렌더러는 아래 틀 중 하나로만 그릴 수 있다. 가장 가까운 틀 하나를 base 로 고른다:
+ffmpeg 가 찾은 컷(장면 바뀜) 시각: ${cutT.length ? cutT.join(', ') : '(없음: 원테이크)'} → 컷 ${cuts.count}개, 평균 ${cuts.avg}초.
+본 것만 쓴다. 소리는 들을 수 없으니 소리는 추측하지 말고 화면에 보이는 것만 쓴다. 레퍼런스의 문장을 베끼지 말고 방식만 쓴다. 모두 한국어, 짧게.
+1) summary: 이 쇼츠가 왜 먹히는지 한 줄.
+2) hook: 첫 0~3초. t=[시작초,끝초], what=화면에 무엇이 보이는지, why=왜 스크롤을 멈추게 하는지.
+3) rhythm: 컷 리듬 한 줄 (빠른 컷/원테이크/슬로우 반복 등, 어디서 빨라지고 느려지는지).
+4) timeline: 이목을 끄는 순간 6~12개를 시간순으로. 각 {"t":초,"kind":"${KINDS.join('|')}","what":"보이는 것","why":"왜 눈이 가는지"}. t 는 프레임 시트의 칸 시각.
+5) emphasis: 글자·자막 강조 방식 2~5개 (위치, 색, 크기, 한 단어 강조, 등장 방식).
+6) effects: 이펙트 2~6개 (링·화살표·줌·흔들림·플래시·슬로우·정지 화면 등, 언제 얼마나).
+7) attention: 우리가 그대로 따라할 이목 장치 3~6개 (명령문, 예: "결정 장면 직전 0.5초 정지 + 빨간 링").
+8) apply: 우리 쇼츠에 적용할 규칙 3~5개 (명령문).
+그리고 우리 렌더러 틀 중 가장 가까운 하나를 base 로 고른다:
 ${Object.entries(bases).map(([k, v]) => `- ${k}: ${v}`).join('\n')}
-그 틀 안에서 이 레퍼런스처럼 보이게 하는 규칙을 한국어로 쓴다 (레퍼런스의 문장을 베끼지 말고, 방식만 따른다):
-- yellow: 강조색 hex 6자리 (# 없이), red: 두 번째 색 hex 6자리
-- title: 위 제목 2줄(l1, l2)을 어떻게 쓰는지 (각 14자 이내). 레퍼런스에 위 제목이 없으면 짧은 후크로 쓰되 그렇게 적는다.
-- fx: 어떤 이펙트를 언제 몇 개 쓰는지. 쓸 수 있는 type: ${fxTypes}. ring·arrow 는 x, y (원본 프레임 0~1).
-- caps: 자막 규칙 (위치는 틀이 정함. 길이, 말투, 강조, 리듬).
-- tone: 말투 한 줄.
-- name: 이 스타일 이름 (12자 이내, 예: "스토리텔링 룩"), desc: 한 줄 설명 (40자 이내).
-JSON 하나만 답해라: {"base":"${Object.keys(bases)[0]}","name":"","desc":"","yellow":"FFD600","red":"FF3B30","title":"","fx":"","caps":"","tone":""}`,
-    x => !bases[x.base] ? 'base 는 ' + Object.keys(bases).join(', ') + ' 중 하나여야 해요.' : !/^[0-9A-Fa-f]{6}$/.test(x.yellow || '') || !/^[0-9A-Fa-f]{6}$/.test(x.red || '') ? 'yellow, red 는 hex 6자리여야 해요.' : !x.name || !x.caps ? 'name, caps 가 있어야 해요.' : '');
-  const bk = talk ? chKey : j.base, base = AI_STYLES[bk], over = { yellow: j.yellow.toUpperCase(), red: j.red.toUpperCase(), caps: (talk ? base.caps + '\n' : '') + '- ' + j.caps, tone: base.tone + ' ' + (j.tone || '') };
+- yellow, red: 강조색 hex 6자리 (# 없이). title: 위 제목 2줄 쓰는 법 (각 14자 이내, 레퍼런스에 위 제목이 없으면 짧은 후크로 쓴다고 적는다).
+- fx: 어떤 이펙트를 언제 몇 개 (쓸 수 있는 type: ${fxTypes}). caps: 자막 규칙. tone: 말투 한 줄.
+- name: 스타일 이름 12자 이내, desc: 한 줄 설명 40자 이내.
+JSON 하나만 답해라: {"summary":"","hook":{"t":[0,2],"what":"","why":""},"rhythm":"","timeline":[{"t":0,"kind":"hook","what":"","why":""}],"emphasis":[""],"effects":[""],"attention":[""],"apply":[""],"base":"${Object.keys(bases)[0]}","name":"","desc":"","yellow":"FFD600","red":"FF3B30","title":"","fx":"","caps":"","tone":""}`,
+    x => !bases[x.base] ? 'base 는 ' + Object.keys(bases).join(', ') + ' 중 하나여야 해요.' : !/^[0-9A-Fa-f]{6}$/.test(x.yellow || '') || !/^[0-9A-Fa-f]{6}$/.test(x.red || '') ? 'yellow, red 는 hex 6자리여야 해요.' : !x.name || !x.caps ? 'name, caps 가 있어야 해요.'
+      : !x.hook || !Array.isArray(x.hook.t) ? 'hook.t 는 [시작초, 끝초] 여야 해요.' : !Array.isArray(x.timeline) || x.timeline.length < 3 || x.timeline.some(e => !(e.t >= 0 && e.t <= dur + 0.5) || !e.what) ? `timeline 은 3개 이상, t 는 0~${r1(dur)}초, what 이 있어야 해요.`
+      : !Array.isArray(x.attention) || !x.attention.length || !Array.isArray(x.apply) || !x.apply.length ? 'attention, apply 가 있어야 해요.' : '');
+  const arr = (v, n) => (Array.isArray(v) ? v : []).map(s => String(s).slice(0, 120)).filter(Boolean).slice(0, n);
+  const timeline = j.timeline.slice(0, 12).map(e => ({ t: r1(Math.min(dur - 0.05, Math.max(0, +e.t))), kind: KINDS.includes(e.kind) ? e.kind : 'effect', what: String(e.what).slice(0, 120), why: String(e.why || '').slice(0, 120) })).sort((a, b) => a.t - b.t);
+  // 화면에 보여 줄 장면 사진 (그 시각의 실제 프레임)
+  ctx.log('장면 사진을 뽑아요…');
+  const shots = path.join(dir, '장면'); fs.rmSync(shots, { recursive: true, force: true }); fs.mkdirSync(shots, { recursive: true });
+  const hookT = r1(Math.min(dur - 0.05, Math.max(0, (+j.hook.t[0] + +(j.hook.t[1] ?? j.hook.t[0])) / 2)));
+  for (const e of [{ t: hookT, hook: true }, ...timeline]) {
+    const f = `장면/t_${String(e.t).replace('.', '_')}.jpg`;
+    if (!exists(path.join(dir, f))) try { await ff(['-ss', String(e.t), '-i', vid, '-frames:v', '1', '-vf', 'scale=270:-2', '-q:v', '4', path.join(dir, f)], ctx); } catch (x) { if (x instanceof StopError) throw x; }
+    if (exists(path.join(dir, f))) { if (e.hook) j.hook.img = f; else e.img = f; }
+  }
+  const attention = arr(j.attention, 6), apply = arr(j.apply, 5), effects = arr(j.effects, 6), emphasis = arr(j.emphasis, 5);
+  // 적용: 분석 내용을 그대로 스타일 입히기·자막 단계의 규칙으로 넣어요
+  const bk = talk ? chKey : j.base, base = AI_STYLES[bk];
+  const over = { yellow: j.yellow.toUpperCase(), red: j.red.toUpperCase(), tone: base.tone + ' ' + (j.tone || ''),
+    cut: base.cut + `\n레퍼런스 컷 리듬을 따른다: ${String(j.rhythm || '')} (레퍼런스는 ${r1(dur)}초에 컷 ${cuts.count}개, 평균 ${cuts.avg}초). 첫 컷(intro)은 레퍼런스 후크처럼: ${j.hook.what}`,
+    caps: (talk ? base.caps + '\n' : '') + '- ' + j.caps + '\n- 레퍼런스 강조 방식: ' + emphasis.join(' / ') + '\n- 레퍼런스에서 따라할 이목 장치: ' + attention.join(' / ') + '\n- 적용 규칙: ' + apply.join(' / ') + '\n- 인트로 후크는 레퍼런스처럼: ' + j.hook.what + ' (' + (j.hook.why || '') + ')' };
   const flat = talk ? j.base === 'post' : ['yt-top5', 'yt-post'].includes(j.base);
   if (talk && j.base !== 'mat') { over.lay = j.base; if (j.base === 'post') { const P = AI_STYLES['yt-post']; Object.assign(over, { white: true, extra: P.extra, extraJson: P.extraJson }); } }
-  if (j.title && j.base !== 'yt-top5') over.title = '위 제목: ' + j.title + ' l1, l2 각 14자 이내. 이것이 인트로 후크다.';
+  if (j.title && j.base !== 'yt-top5') over.title = '위 제목: ' + j.title + ' l1, l2 각 14자 이내. 이것이 인트로 후크다. 레퍼런스 후크: ' + j.hook.what;
   if (flat) over.fx = '라벨·팝업은 쓰지 않는다. fx 는 빈 배열.';
-  else if (j.fx) over.fx = j.fx + (talk || j.base === 'yt-mat' ? '' : ' ' + PT);
-  E.s.refStyle = { look: E.s.look, id, title, base: bk, lay: j.base, name: String(j.name).slice(0, 20), desc: String(j.desc || '').slice(0, 60), over };
-  writeJson(cache, E.s.refStyle);
-  ctx.log(`레퍼런스 스타일: ${E.s.refStyle.name} (틀: ${j.base}${talk ? ', 말투·규칙은 ' + chKey : ''})`);
+  else over.fx = (j.fx || base.fx) + ' 레퍼런스 이펙트 타이밍: ' + effects.join(' / ') + '.' + (talk || j.base === 'yt-mat' ? '' : ' ' + PT);
+  const a = { v: 2, id, kind, title, dur: r1(dur), at: Date.now(), name: String(j.name).slice(0, 20), desc: String(j.desc || '').slice(0, 60), summary: String(j.summary || '').slice(0, 160),
+    hook: { t: j.hook.t.slice(0, 2).map(x => r1(+x)), what: String(j.hook.what || '').slice(0, 120), why: String(j.hook.why || '').slice(0, 120), img: j.hook.img || '' },
+    rhythm: String(j.rhythm || '').slice(0, 160), cuts, timeline, emphasis, effects, attention, apply,
+    style: { base: bk, lay: j.base, yellow: over.yellow, red: over.red, over } };
+  writeJson(path.join(dir, `analysis-${kind}.json`), a);
+  ctx.log(`레퍼런스 분석 끝: ${a.name}`);
+  return a;
+}
+
+async function refStyle(E, ctx) {
+  if (!isRefLook(E.s.look)) return;
+  const id = E.s.look.slice(4);
+  let a = readRefAnalysis(id, refKind(E.s.channel));
+  if (E.s.refStyle && E.s.refStyle.look === E.s.look && (!a || E.s.refStyle.at === a.at)) return;   // 다시 분석했으면 새 분석으로 바꿔요
+  if (a) ctx.log(`레퍼런스 분석을 그대로 적용해요: ${a.name} (작업판에 보여 준 것)`); else a = await analyzeRef(id, E.s.channel, ctx);
+  E.s.refStyle = { look: E.s.look, id, at: a.at, title: a.title, base: a.style.base, lay: a.style.lay, name: a.name, desc: a.desc, over: a.style.over };
 }
 
 async function aistyle(E, ctx) {
