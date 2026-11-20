@@ -218,7 +218,8 @@ async function renderCut(E, ctx, info, lay = LAY.mat, outRel = '편집/AI1차컷
     args.push('-ss', String(c.a), '-t', String(r1(c.b - c.a + 0.05)), '-i', info.file);
     fc.push(`[${i}:v]${crop}setpts=(PTS-STARTPTS)/${s},scale=${W}:${VH}:force_original_aspect_ratio=increase,crop=${W}:${VH},fps=30,setsar=1,format=yuv420p[v${i}]`);
     const at = []; let x = s; while (x < 0.5) { at.push('atempo=0.5'); x /= 0.5; } if (x < 0.999) at.push(`atempo=${+x.toFixed(3)}`);
-    fc.push(hasA ? `[${i}:a]asetpts=PTS-STARTPTS${at.length ? ',' + at.join(',') : ''},aresample=48000,aformat=channel_layouts=stereo[a${i}]`
+    // 슬로우 구간은 배경음 없이 (늘어진 현장음은 지저분해요)
+    fc.push(hasA && s >= 1 ? `[${i}:a]asetpts=PTS-STARTPTS${at.length ? ',' + at.join(',') : ''},aresample=48000,aformat=channel_layouts=stereo[a${i}]`
       : `anullsrc=r=48000:cl=stereo,atrim=0:${((c.b - c.a) / s).toFixed(3)}[a${i}]`);
   });
   fc.push(`${plan.cuts.map((_, i) => `[v${i}][a${i}]`).join('')}concat=n=${plan.cuts.length}:v=1:a=1[cv][ca]`, lay.bg === 'blur'
@@ -441,7 +442,9 @@ async function render(E, ctx, st, plan, fin, outRel) {
   const d = plan.duration, q = p => p.replace(/\\/g, '/').replace(/:/g, '\\:').replace(/'/g, "\\'");
   const sub = `subtitles=filename='${q(assF)}':fontsdir='${q(process.env.FIELDNOTE_AI_FONT_DIR || FONT_DIR)}'`, li = bgm ? 2 : 1;
   const vf = logo ? `[${li}:v]scale=110:-1,format=rgba[lg];[0:v][lg]overlay=x=70:y=118[vl];[vl]${sub}[vo]` : `[0:v]${sub}[vo]`;
-  const af = bgm ? `;[1:a]volume=0.22,atrim=0:${d},afade=t=out:st=${Math.max(0, d - 1.5)}:d=1.5[b];[0:a][b]amix=inputs=2:duration=first:normalize=0[ao]` : ';[0:a]anull[ao]';
+  // BGM 도 슬로우 구간에서는 꺼요
+  const slowOff = plan.cuts.filter(c => (+c.speed || 1) < 1 && c.out).map(c => `volume=0:enable='between(t,${c.out[0]},${c.out[1]})'`).join(',');
+  const af = bgm ? `;[1:a]volume=0.22,atrim=0:${d},${slowOff ? slowOff + ',' : ''}afade=t=out:st=${Math.max(0, d - 1.5)}:d=1.5[b];[0:a][b]amix=inputs=2:duration=first:normalize=0[ao]` : ';[0:a]anull[ao]';
   ctx.log(`그리는 중 (${st.name}${bgm ? ' · BGM ' + bgm : ' · BGM 없음: ~/Desktop/유투브/소리/BGM 에 넣으면 깔려요'})…`);
   try {
     await ff(['-i', E.p(base), ...(bgm ? ['-stream_loop', '-1', '-i', path.join(bgmDir, bgm)] : []), ...(logo ? ['-i', logoPath] : []), '-filter_complex', vf + af,
