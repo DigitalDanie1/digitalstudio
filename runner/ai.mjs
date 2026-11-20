@@ -527,7 +527,7 @@ async function aithumb(E, ctx) {
   ctx.log('Claude 가 썸네일 카피와 액션·리액션 장면을 골라요…');
   const nos = t => String(t || '').replace(/\s/g, '').length;
   const st = styleOf(E);
-  const j = await askClaude(E, ctx, `너는 ${st.genre} 쇼츠 썸네일 작가다. 규칙: 예쁘게 말고 3단 원색 대비.
+  const j = await askClaude(E, ctx, `${skills(ctx, ['thumbnail-3tier'])}너는 ${st.genre} 쇼츠 썸네일 작가다. 규칙: 예쁘게 말고 3단 원색 대비.
 - 상단 카피(노랑, 검정 띠): 결정적 순간 1개만. 공백 빼고 12자 이하.
 - 중앙 2분할: 왼쪽 = ${st.thumbL}, 오른쪽 = ${st.thumbR}.
 - 하단 카피(흰 글씨, 빨강 또는 파랑 띠): 반전/궁금증. 공백 빼고 16자 이하.
