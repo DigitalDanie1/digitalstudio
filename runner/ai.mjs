@@ -10,9 +10,9 @@ const CLAUDE = process.env.FIELDNOTE_CLAUDE || [path.join(HOME, '.local/bin/clau
 const FONT = process.env.FIELDNOTE_AI_FONT || FONT_NAME;
 const W = 1080, H = 1920, VY = 470, VH = 970;   // 화면 틀: 경기 화면은 y=470 부터 1080x970
 export const AI_STYLES = {
-  'yt-mat': { name: 'MAT STORY', watermark: ['MAT', 'STORY'], yellow: 'FFD600', red: 'FF3B30', tone: '반말, 짧고 세게. 레슬링을 모르는 사람도 알아듣게. 위 제목 2줄 끝에 "ㄷㄷ" 가능.' },
+  'yt-mat': { name: 'MAT STORY', handle: '@matstoryhq', logo: '브랜드/matstory_logo.png', watermark: ['MAT', 'STORY'], yellow: 'FFD600', red: 'FF3B30', tone: '반말, 짧고 세게. 레슬링을 모르는 사람도 알아듣게. 위 제목 2줄 끝에 "ㄷㄷ" 가능.' },
 };
-export const AI_OUT = { aicut: ['편집/AI컷.json', '편집/AI1차컷.mp4'], aistyle: ['조사/research.md', '편집/AI완성.json', '편집/AI스타일본.mp4'], aisubs: ['편집/AI완성.mp4'] };
+export const AI_OUT = { aicut: ['편집/AI컷.json', '편집/AI1차컷.mp4'], aistyle: ['조사/research.md', '편집/AI완성.json', '편집/AI스타일본.mp4'], aisubs: ['편집/AI완성.mp4'], aibrand: ['편집/AI인트로.mp4', '편집/AI아웃트로.mp4', '편집/AI최종.mp4'] };
 
 // 맥의 Claude Code 스킬(~/.claude/skills). 단계마다 해당 스킬 규칙을 먼저 읽고 따르게 해요. 없으면 건너뛰어요.
 const SKILL_DIR = path.join(HOME, '.claude/skills');
@@ -138,7 +138,7 @@ JSON 하나만 답해라:
     });
   writeJson(E.p('편집/AI컷.json'), { window: win, ...plan });
   for (const f of ['편집/AI완성.json', '편집/AI스타일본.mp4', '편집/AI완성.mp4']) fs.rmSync(E.p(f), { force: true });
-  for (const id of ['aistyle', 'aisubs']) if (E.s.steps[id]) E.s.steps[id] = { status: 'todo' };
+  for (const id of ['aistyle', 'aisubs', 'aibrand']) if (E.s.steps[id]) E.s.steps[id] = { status: 'todo' };
   await renderCut(E, ctx, info);
 }
 
@@ -209,7 +209,7 @@ JSON 하나만 답해라: {"frame":{"l1":"","l2":""},"fx":[[시작,끝,{"type":"
   j.captions = [];
   writeJson(E.p('편집/AI완성.json'), j);
   fs.rmSync(E.p('편집/AI완성.mp4'), { force: true });
-  if (E.s.steps.aisubs) E.s.steps.aisubs = { status: 'todo' };
+  for (const id of ['aisubs', 'aibrand']) if (E.s.steps[id]) E.s.steps[id] = { status: 'todo' };
   await render(E, ctx, st, plan, j, '편집/AI스타일본.mp4');
 }
 
@@ -228,6 +228,7 @@ async function aisubs(E, ctx) {
 - 한 자막 최대 2줄, 줄당 16자 이내, 줄바꿈은 \\n. 강조할 단어 하나만 [[단어]]. 자막끼리 겹치지 않게.
 JSON 하나만 답해라: {"frame":{...그대로},"fx":[...그대로],"credits":[...그대로],"captions":[[시작,끝,"텍스트"]],"facts":["쓴 사실과 근거 한 줄씩"]}`, checkFinal(plan, true));
   j.frame = base.frame; j.fx = base.fx; j.credits = base.credits;
+  if (E.s.steps.aibrand) E.s.steps.aibrand = { status: 'todo' };
   writeJson(E.p('편집/AI완성.json'), j);
   await render(E, ctx, st, plan, j, '편집/AI완성.mp4');
 }
@@ -285,4 +286,65 @@ async function render(E, ctx, st, plan, fin, outRel) {
   ctx.log('완성: ' + outRel);
 }
 
-export const AI_FN = { aicut, aistyle, aisubs };
+// ---------- 6. 인트로·아웃트로: 채널 로고가 들어간 후크 클립을 만들고 본편 앞뒤에 붙여요 ----------
+const IN_D = 2.2, OUT_D = 3.2;
+async function aibrand(E, ctx) {
+  const st = styleOf(E), info = source(E), plan = readJson(E.p('편집/AI컷.json'));
+  if (!exists(E.p('편집/AI완성.mp4'))) throw new StepError('자막까지 끝내고 해 주세요.');
+  const root = E.homeRoot || path.join(HOME, 'Desktop/유투브'), logo = path.join(root, st.logo);
+  if (!exists(logo)) throw new StepError(`채널 로고 파일이 없어요: ${logo}`);
+  const fin = readJson(E.p('편집/AI완성.json'));
+  ctx.log('Claude 가 인트로·아웃트로 후크 문장을 써요…');
+  const short = (t, n) => String(t || '').replace(/\[\[|\]\]/g, '').length <= n;
+  const j = await askClaude(E, ctx, `${skills(ctx, ['shorts-blueprint'])}너는 한국어 레슬링 쇼츠 채널 "${st.name}" (${st.handle}) 의 편집 작가다.
+본편 쇼츠 앞에 붙일 인트로(${IN_D}초)와 뒤에 붙일 아웃트로(${OUT_D}초) 문장을 쓴다. 둘 다 무조건 후크다.
+본편: 위 제목 ${JSON.stringify(fin.frame)}, 자막 ${JSON.stringify(fin.captions)}
+1차 컷 정보: ${JSON.stringify({ moments: plan.moments, who: plan.who })}
+사실은 조사 파일 ${E.p('조사/research.md')} 의 A·B 등급만 쓴다 (Read 로 확인). 선수 구분·승패는 조사 파일 기준.
+말투: ${st.tone}
+- 인트로: 0.1초 만에 스크롤을 멈추게 하는 한 방. 결과·숫자·반전·질문 중 하나. 인사·채널 소개·"오늘은" 금지. l1 은 짧은 도발(10자 이내), l2 는 핵심 한 방(12자 이내). 강조 단어 하나만 [[단어]].
+- 아웃트로: 끝까지 본 사람이 다시 보거나 구독하게 만드는 한 방. l1 은 여운/반전/질문(12자 이내), l2 는 다음 편 예고나 떡밥(12자 이내), cta 는 구독 유도 한 줄(14자 이내, 예: "구독하고 다음 기술 보기").
+JSON 하나만 답해라: {"intro":{"l1":"","l2":""},"outro":{"l1":"","l2":"","cta":""}}`,
+    x => !x.intro || !x.outro ? 'intro, outro 가 있어야 해요.' : !short(x.intro.l1, 12) || !short(x.intro.l2, 14) ? '인트로 문장이 너무 길어요.' : !short(x.outro.l1, 14) || !short(x.outro.l2, 14) || !short(x.outro.cta, 16) ? '아웃트로 문장이 너무 길어요.' : '');
+  writeJson(E.p('편집/AI인트로아웃트로.json'), j);
+  const Y = bgr(st.yellow), R = bgr(st.red), hi = t => esc(t).replace(/\[\[(.+?)\]\]/g, `{\\c${Y}}$1{\\c&HFFFFFF&}`);
+  const ass = (d, lines) => `[Script Info]\nScriptType: v4.00+\nPlayResX: ${W}\nPlayResY: ${H}\nWrapStyle: 2\nScaledBorderAndShadow: yes\n\n[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Big,${FONT},156,&H00FFFFFF&,&H000000FF&,&H00000000&,&H00000000&,-1,0,0,0,100,100,0,0,1,11,0,5,0,0,0,1
+Style: Mid,${FONT},100,&H00FFFFFF&,&H000000FF&,&H00000000&,&H00000000&,-1,0,0,0,100,100,0,0,1,9,0,5,0,0,0,1
+Style: Small,${FONT},56,&H00FFFFFF&,&H000000FF&,&H00000000&,&H00000000&,-1,0,0,0,100,100,0,0,1,4,0,5,0,0,0,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+${lines.map(([a, sty, txt]) => `Dialogue: 1,${ts(a)},${ts(d)},${sty},,0,0,0,,${txt}`).join('\n')}
+`;
+  const q = p => p.replace(/\\/g, '/').replace(/:/g, '\\:').replace(/'/g, "\\'"), fd = q(process.env.FIELDNOTE_AI_FONT_DIR || FONT_DIR);
+  const pop = (x, y) => `{\\an5\\pos(${x},${y})\\fscx135\\fscy135\\t(0,140,\\fscx100\\fscy100)}`;
+  const logoF = (size, at) => `scale=w='${size}*min(1\\,0.55+max(0\\,t-${at})*3)':h=-1:eval=frame,format=rgba,fade=in:st=${at}:d=0.15:alpha=1`;
+  // 인트로: 본편 인트로 장면을 꽉 채워 살짝 줌인 + 흰 섬광 + 후크 2줄 + 로고
+  const inAss = E.p('편집/AI인트로.ass');
+  fs.writeFileSync(inAss, ass(IN_D, [[0, 'Mid', pop(540, 460) + hi(j.intro.l1)], [0.12, 'Big', pop(540, 640) + `{\\c${Y}}` + hi(j.intro.l2)], [0.5, 'Small', `{\\an5\\pos(540,1570)}${esc(st.handle)}`]]));
+  ctx.log('인트로 그리는 중…');
+  await ff(['-ss', '0', '-t', String(IN_D), '-i', E.p('편집/AI1차컷.mp4'), '-loop', '1', '-t', String(IN_D), '-i', logo, '-filter_complex',
+    `[0:v]crop=${W}:${VH}:0:${VY},scale=w='${H}*16/9*(1+0.05*t)':h=-2:eval=frame,crop=${W}:${H},eq=brightness=-0.13:saturation=1.25,fade=in:st=0:d=0.18:color=white,fps=30,setsar=1[bg];` +
+    `[1:v]${logoF(470, 0.45)}[lg];[bg][lg]overlay=x='(W-w)/2':y='1290-h/2':eval=frame,subtitles=filename='${q(inAss)}':fontsdir='${fd}',format=yuv420p[v];` +
+    `[0:a]aresample=48000,aformat=channel_layouts=stereo,afade=t=out:st=${IN_D - 0.3}:d=0.3[a]`,
+    '-map', '[v]', '-map', '[a]', '-t', String(IN_D), '-c:v', 'libx264', '-crf', '19', '-preset', 'veryfast', '-c:a', 'aac', '-b:a', '160k', E.p('편집/AI인트로.mp4')], ctx);
+  // 아웃트로: 본편 마지막 장면을 흐리게 멈추고 후크 + 큰 로고 + 구독 유도
+  const outAss = E.p('편집/AI아웃트로.ass');
+  fs.writeFileSync(outAss, ass(OUT_D, [[0, 'Mid', pop(540, 360) + hi(j.outro.l1)], [0.15, 'Mid', pop(540, 470) + `{\\c${Y}}` + hi(j.outro.l2)],
+    [0.7, 'Mid', `{\\an5\\pos(540,1420)\\3c${R}\\bord10}` + esc(j.outro.cta)], [0.7, 'Small', `{\\an5\\pos(540,1540)}${esc(st.handle)}`]]));
+  ctx.log('아웃트로 그리는 중…');
+  await ff(['-sseof', '-0.2', '-i', E.p('편집/AI완성.mp4'), '-loop', '1', '-t', String(OUT_D), '-i', logo, '-f', 'lavfi', '-t', String(OUT_D), '-i', 'anullsrc=r=48000:cl=stereo', '-filter_complex',
+    `[0:v]trim=end_frame=1,loop=loop=-1:size=1,trim=duration=${OUT_D},setpts=PTS-STARTPTS,crop=${W}:${VH}:0:${VY},scale=-2:${H},crop=${W}:${H},boxblur=24:2,eq=brightness=-0.32,fps=30,setsar=1[bg];` +
+    `[1:v]${logoF(660, 0.3)}[lg];[bg][lg]overlay=x='(W-w)/2':y='930-h/2':eval=frame,subtitles=filename='${q(outAss)}':fontsdir='${fd}',fade=out:st=${OUT_D - 0.25}:d=0.25,format=yuv420p[v]`,
+    '-map', '[v]', '-map', '2:a', '-t', String(OUT_D), '-c:v', 'libx264', '-crf', '19', '-preset', 'veryfast', '-c:a', 'aac', '-b:a', '160k', E.p('편집/AI아웃트로.mp4')], ctx);
+  ctx.log('인트로 + 본편 + 아웃트로 붙이는 중…');
+  const norm = i => `[${i}:v]fps=30,scale=${W}:${H},setsar=1,format=yuv420p[v${i}];[${i}:a]aresample=48000,aformat=channel_layouts=stereo[a${i}]`;
+  await ff(['-i', E.p('편집/AI인트로.mp4'), '-i', E.p('편집/AI완성.mp4'), '-i', E.p('편집/AI아웃트로.mp4'), '-filter_complex',
+    `${norm(0)};${norm(1)};${norm(2)};[v0][a0][v1][a1][v2][a2]concat=n=3:v=1:a=1[v][a]`,
+    '-map', '[v]', '-map', '[a]', '-c:v', 'libx264', '-crf', '19', '-preset', 'veryfast', '-c:a', 'aac', '-b:a', '160k', '-movflags', '+faststart', E.p('편집/AI최종.mp4')], ctx);
+  ctx.log(`완성: 편집/AI최종.mp4 (인트로 ${IN_D}초 + 본편 ${plan.duration}초 + 아웃트로 ${OUT_D}초)`);
+}
+
+export const AI_FN = { aicut, aistyle, aisubs, aibrand };

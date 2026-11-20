@@ -367,7 +367,7 @@ const routes = {
     const look = String(body.look || ''); if (!CHANNEL_PROFILES[look]) throw new HttpError(400, '모르는 편집 룩이에요: ' + look);
     const was = lookKeyOf(E);
     E.s.look = look;
-    if (look !== was) for (const id of ['clip', 'plan', 'rough', 'subs', 'fx', 'mix', 'upload', 'aistyle', 'aisubs']) { const st = E.s.steps[id]; if (st.status !== 'todo') { st.status = 'todo'; delete st.error; } }
+    if (look !== was) for (const id of ['clip', 'plan', 'rough', 'subs', 'fx', 'mix', 'upload', 'aistyle', 'aisubs', 'aibrand']) { const st = E.s.steps[id]; if (st.status !== 'todo') { st.status = 'todo'; delete st.error; } }
     if (look !== was) delete E.s.legacyBurn;
     save(E); return { json: { ok: true, look, lookUsed: lookKeyOf(E), reset: look !== was } };
   },

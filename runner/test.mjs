@@ -208,7 +208,7 @@ try {
     const { r, d } = await J('/episodes', { title: '테스트: 그레코로만 던지기?', note: '허리 던지기 한 장면\n상대 균형을 먼저 무너뜨린다', url: src, ranges: '0:01-0:07, 0:03-0:08', ideaId: 'idea-1' });
     assert.equal(r.status, 200); E = d.ep; assert.ok(E);
     const e = await ep(); assert.equal(e.ideaId, 'idea-1'); assert.deepEqual(e.sources[0].ranges, ['0:01-0:07', '0:03-0:08']);
-    assert.deepEqual(e.steps.map(s => s.id), ['research', 'download', 'clip', 'plan', 'rough', 'subs', 'fx', 'script', 'mix', 'upload', 'aicut', 'aistyle', 'aisubs']);
+    assert.deepEqual(e.steps.map(s => s.id), ['research', 'download', 'clip', 'plan', 'rough', 'subs', 'fx', 'script', 'mix', 'upload', 'aicut', 'aistyle', 'aisubs', 'aibrand']);
     assert.equal(e.look, ''); assert.equal(e.lookUsed, 'yt-wrestling');
     assert.ok(step(e, 'script').gate); assert.equal(e.gate, false);
   });
