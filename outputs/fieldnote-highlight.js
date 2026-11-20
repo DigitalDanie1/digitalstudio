@@ -123,7 +123,7 @@ function startCard() {
 }
 function jobsCard() {
   if (!S.jobs.length) return '';
-  return `<section class="hl-card"><h2>지난 작업</h2><p class="hl-sub">누르면 바로 열려요. 이미 분석한 영상은 다시 분석하지 않아요.</p><div class="hl-jobs" data-hl-jobs>${S.jobs.map(j => `<div class="hl-job ${S.curId === j.id ? 'on' : ''}"><div style="min-width:0"><b title="${e_(j.title)}">${e_(j.title)}</b><span class="small">${j.duration ? fmt(j.duration) + ' · ' : ''}${new Date(j.created).toLocaleDateString('ko-KR')}</span></div><div class="hl-row" style="align-items:center">${statusTag(j)}<button type="button" class="btn ghost" data-hl-open="${e_(j.id)}">열기</button></div></div>`).join('')}</div></section>`;
+  return `<section class="hl-card"><div class="hl-row" style="justify-content:space-between;align-items:center"><h2>지난 작업</h2>${S.api >= 11 ? '<button type="button" class="btn ghost" data-hl-act="reset">초기화</button>' : ''}</div><p class="hl-sub">누르면 바로 열려요. 이미 분석한 영상은 다시 분석하지 않아요.</p><div class="hl-jobs" data-hl-jobs>${S.jobs.map(j => `<div class="hl-job ${S.curId === j.id ? 'on' : ''}"><div style="min-width:0"><b title="${e_(j.title)}">${e_(j.title)}</b><span class="small">${j.duration ? fmt(j.duration) + ' · ' : ''}${new Date(j.created).toLocaleDateString('ko-KR')}</span></div><div class="hl-row" style="align-items:center">${statusTag(j)}<button type="button" class="btn ghost" data-hl-open="${e_(j.id)}">열기</button></div></div>`).join('')}</div></section>`;
 }
 function progressCard() {
   const j = S.cur; if (!j || !running(j)) return '';
@@ -201,6 +201,13 @@ async function act(name, el) {
       }
       S.busy = false; if (S.cur) { S.cur.candidates = running(S.cur) ? [] : S.cur.candidates; } prepare(); paint(); schedule();
     } else if (name === 'stop') { if (j) { await rf(`/hl/${encodeURIComponent(j.id)}/stop`, {}); say('멈추는 중이에요.'); } }
+    else if (name === 'reset') {
+      if (!confirm(`하이라이트 '지난 작업' ${S.jobs.length}개를 모두 지울까요?\n돌고 있는 작업은 멈추고, 맥의 작업 폴더는 휴지통으로 가요. 이미 만든 에피소드는 그대로예요.`)) return;
+      S.busy = true; el && (el.disabled = true);
+      const r = await rf('/hl/reset', {});
+      window.ytHighlightReset(); S.busy = false; await loadAll(true); paint();
+      say(r.trashed ? `초기화했어요. 휴지통 '${r.trashed.split('/').pop()}' 폴더에 있어요.` : '초기화했어요.');
+    }
     else if (name === 'log') { S.showLog = !S.showLog; paint(); }
     else if (name === 'all' || name === 'none') { for (const c of j.candidates || []) S.checked[key(c)] = name === 'all'; paint(); }
     else if (name === 'each' || name === 'merge') {

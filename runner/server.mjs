@@ -13,7 +13,7 @@ import { STEP_DEFS, STEP_FN, outputsFor, listAssets, checkScript, cleanPasted, p
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // 작업판이 쓰는 기능 수준. 3 = 새 9칸 순서 (/look, /ranges, deferRanges, 단계 clip·subs·fx)
-const API_LEVEL = 10;   // 10 = AI 편집 단계(aicut·aistyle·aisubs, 맥의 Claude Code) · 9 = 유튜브 초기화(/reset, 에피소드·하이라이트 전부 휴지통 한 폴더로) · 8 = 미리보기 견본(/preview, 고른 룩·이펙트를 실제 영상 4초로) · 7 = 에피소드 완전히 지우기(/episode/delete, 휴지통으로) · 6 = 하이라이트 찾기(/hl/*) ·  4 = 7칸 순서 (/edit 1차·2차 편집, /draft, /feedback, 슬로우 구간 x0.5, 매트 스토리 룩) · 5 = 최종 결과물 레퍼런스(이펙트 팩: /fxpack, status.fxPacks)
+const API_LEVEL = 11;   // 11 = 하이라이트 '지난 작업' 초기화(/hl/reset, 돌고 있으면 멈추고 휴지통 한 폴더로) · 10 = AI 편집 단계(aicut·aistyle·aisubs, 맥의 Claude Code) · 9 = 유튜브 초기화(/reset, 에피소드·하이라이트 전부 휴지통 한 폴더로) · 8 = 미리보기 견본(/preview, 고른 룩·이펙트를 실제 영상 4초로) · 7 = 에피소드 완전히 지우기(/episode/delete, 휴지통으로) · 6 = 하이라이트 찾기(/hl/*) ·  4 = 7칸 순서 (/edit 1차·2차 편집, /draft, /feedback, 슬로우 구간 x0.5, 매트 스토리 룩) · 5 = 최종 결과물 레퍼런스(이펙트 팩: /fxpack, status.fxPacks)
 let VERSION = 'dev';
 try { VERSION = fs.readFileSync(path.join(HERE, 'version.txt'), 'utf8').trim() || 'dev'; } catch {}
 const PORT = +(process.env.FIELDNOTE_RUNNER_PORT || 4777);
@@ -353,6 +353,17 @@ const routes = {
   'POST /img/cancel': imgWrap(({ body }) => ({ json: { ok: true, job: cancelJob(body.id) } })),
   'GET /hl/list': () => ({ json: { jobs: HL.list(), dir: HL.dir, limits: { lenMin: LEN_MIN, lenMax: LEN_MAX } } }),
   'POST /hl/start': async ({ body }) => { const J = await hlStart(body); return { json: { ok: true, id: J.id } }; },
+  // 하이라이트 '지난 작업' 초기화: 돌고 있으면 멈추고, 작업 폴더를 전부 휴지통 '하이라이트 초기화 <시각>' 한 폴더로. 에피소드는 그대로
+  'POST /hl/reset': async () => {
+    for (const J of HL.jobs.values()) if (J.running) HL.stop(J);
+    for (let i = 0; i < 50 && HL.anyRunning(); i++) await new Promise(r => setTimeout(r, 100));
+    if (HL.anyRunning()) throw new HttpError(409, '아직 멈추는 중이에요. 잠시 뒤에 다시 눌러 주세요.');
+    const dest = path.join(trashRoot(), `하이라이트 초기화 ${tsNow()}`);
+    let n = 0;
+    try { n = HL.resetAll((dir, name) => { if (exists(dir)) moveToTrash(dir, dest, name); }); }
+    catch (e) { if (e instanceof StepError) throw new HttpError(409, e.message); throw e; }
+    return { json: { ok: true, trashed: exists(dest) ? dest : '', highlights: n } };
+  },
   'GET /': () => ({ text: '실행기가 켜져 있어요.' }),
   // 레퍼런스 탭: 채널 링크의 대표 영상(최근 쇼츠 50개 중 조회수 1위). 한 번 찾으면 기억해요.
   'GET /yt/top': async ({ q }) => {
