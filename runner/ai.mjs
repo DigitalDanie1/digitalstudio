@@ -44,6 +44,7 @@ async function askClaude(E, ctx, prompt, check) {
     catch (e) {
       const lim = /hit your limit[^"]*/i.exec(String(e.out || '') + String(e.err || ''));
       if (lim) throw new StepError('Claude 구독 사용 한도에 걸렸어요 (' + lim[0] + '). 풀린 뒤 다시 실행하세요.');
+      if (/authentication_error|Failed to authenticate|Re-authenticate/i.test(String(e.out || '') + String(e.err || ''))) throw new StepError('맥의 Claude Code 로그인이 만료됐어요. 맥 터미널에서 claude 를 실행해 /login 으로 다시 로그인한 뒤 다시 누르세요.');
       if (e instanceof StopError || e instanceof StepError) throw e.message.includes('ENOENT') ? new StepError('Claude Code(claude)를 못 찾았어요. 맥에 Claude Code 를 설치하고 로그인해 주세요.') : e;
       throw new StepError('Claude Code 실행 실패: ' + (lastLines(e.err) || lastLines(e.out) || e.message));
     }
