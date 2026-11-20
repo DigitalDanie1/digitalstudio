@@ -319,11 +319,13 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 ${lines.map(([a, sty, txt]) => `Dialogue: 1,${ts(a)},${ts(d)},${sty},,0,0,0,,${txt}`).join('\n')}
 `;
   const q = p => p.replace(/\\/g, '/').replace(/:/g, '\\:').replace(/'/g, "\\'"), fd = q(process.env.FIELDNOTE_AI_FONT_DIR || FONT_DIR);
-  const pop = (x, y) => `{\\an5\\pos(${x},${y})\\fscx135\\fscy135\\t(0,140,\\fscx100\\fscy100)}`;
+  // 한 줄이 화면 폭(약 960px)을 넘지 않게 글자 크기를 줄여요 (한글 한 글자 ≈ 글자 크기 1칸, 띄어쓰기 ≈ 0.35칸)
+  const fit = (t, base) => { const n = [...String(t).replace(/\[\[|\]\]/g, '')].reduce((a, c) => a + (c === ' ' ? 0.35 : /[ -~]/.test(c) ? 0.6 : 1), 0); return Math.min(base, Math.floor(960 / Math.max(1, n))); };
+  const pop = (x, y, t, base) => `{\\an5\\pos(${x},${y})\\fs${fit(t, base)}\\fscx130\\fscy130\\t(0,140,\\fscx100\\fscy100)}`;
   const logoF = (size, at) => `scale=w='${size}*min(1\\,0.55+max(0\\,t-${at})*3)':h=-1:eval=frame,format=rgba,fade=in:st=${at}:d=0.15:alpha=1`;
   // 인트로: 본편 인트로 장면을 꽉 채워 살짝 줌인 + 흰 섬광 + 후크 2줄 + 로고
   const inAss = E.p('편집/AI인트로.ass');
-  fs.writeFileSync(inAss, ass(IN_D, [[0, 'Mid', pop(540, 460) + hi(j.intro.l1)], [0.12, 'Big', pop(540, 640) + `{\\c${Y}}` + hi(j.intro.l2)], [0.5, 'Small', `{\\an5\\pos(540,1570)}${esc(st.handle)}`]]));
+  fs.writeFileSync(inAss, ass(IN_D, [[0, 'Mid', pop(540, 460, j.intro.l1, 100) + hi(j.intro.l1)], [0.12, 'Big', pop(540, 640, j.intro.l2, 156) + `{\\c${Y}}` + hi(j.intro.l2)], [0.5, 'Small', `{\\an5\\pos(540,1570)}${esc(st.handle)}`]]));
   ctx.log('인트로 그리는 중…');
   await ff(['-ss', '0', '-t', String(IN_D), '-i', E.p('편집/AI1차컷.mp4'), '-loop', '1', '-t', String(IN_D), '-i', logo, '-filter_complex',
     `[0:v]crop=${W}:${VH}:0:${VY},scale=w='${H}*16/9*(1+0.05*t)':h=-2:eval=frame,crop=${W}:${H},eq=brightness=-0.13:saturation=1.25,fade=in:st=0:d=0.18:color=white,fps=30,setsar=1[bg];` +
@@ -332,7 +334,7 @@ ${lines.map(([a, sty, txt]) => `Dialogue: 1,${ts(a)},${ts(d)},${sty},,0,0,0,,${t
     '-map', '[v]', '-map', '[a]', '-t', String(IN_D), '-c:v', 'libx264', '-crf', '19', '-preset', 'veryfast', '-c:a', 'aac', '-b:a', '160k', E.p('편집/AI인트로.mp4')], ctx);
   // 아웃트로: 본편 마지막 장면을 흐리게 멈추고 후크 + 큰 로고 + 구독 유도
   const outAss = E.p('편집/AI아웃트로.ass');
-  fs.writeFileSync(outAss, ass(OUT_D, [[0, 'Mid', pop(540, 360) + hi(j.outro.l1)], [0.15, 'Mid', pop(540, 470) + `{\\c${Y}}` + hi(j.outro.l2)],
+  fs.writeFileSync(outAss, ass(OUT_D, [[0, 'Mid', pop(540, 360, j.outro.l1, 100) + hi(j.outro.l1)], [0.15, 'Mid', pop(540, 470, j.outro.l2, 100) + `{\\c${Y}}` + hi(j.outro.l2)],
     [0.7, 'Mid', `{\\an5\\pos(540,1420)\\3c${R}\\bord10}` + esc(j.outro.cta)], [0.7, 'Small', `{\\an5\\pos(540,1540)}${esc(st.handle)}`]]));
   ctx.log('아웃트로 그리는 중…');
   await ff(['-sseof', '-0.2', '-i', E.p('편집/AI완성.mp4'), '-loop', '1', '-t', String(OUT_D), '-i', logo, '-f', 'lavfi', '-t', String(OUT_D), '-i', 'anullsrc=r=48000:cl=stereo', '-filter_complex',
