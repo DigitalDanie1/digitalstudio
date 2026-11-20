@@ -1354,7 +1354,7 @@ function ytFmtIdeas(f) { return db.ideas.filter(i => ideaPlatform(i) === 'YouTub
 // 순서: 직접 만든 주제 → 🔥 멋있는 기술 → 생활체육인 → 프로 경기
 function ytRank(i) { const id = String(i.id); return !id.startsWith('pf-starter-') ? 0 : /^pf-starter-gt-/.test(id) ? 1 : /^pf-starter-g[sl]-/.test(id) ? 2 : 3; }
 function ytPipeIdea() { const list = ytFmtIdeas(ytPipe.format); return list.find(i => i.id === ytPipe.ideaId) || list[0] || null; }
-function ytFirstUrl(i) { const m = String(i?.sources || '').match(/https?:\/\/(?:www\.)?(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)[\w-]+[^\s]*/); return m ? m[0] : ''; }
+function ytFirstUrl(i) { const src = String(i?.sources || ''), m = src.match(/https?:\/\/(?:www\.)?(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)[\w-]+[^\s]*/), f = src.match(/^(?:\/|~\/).+$/m); return m ? m[0] : f ? f[0].trim() : ''; }   // 내 파일(맥 경로)도 소스
 function ytRanges() { return ytPipe.ranges.split(/[,\s]+/).map(x => x.trim()).filter(x => /^\d{1,2}(:\d{2}){1,2}-\d{1,2}(:\d{2}){1,2}$/.test(x)); }
 function ytPipeText(kind) {
   const i = ytPipeIdea(), title = i ? i.title : '주제', dir = ytFolder(title), D = `~/Movies/FIELDNOTE/${dir}`, url = ytPipe.url || '<영상 URL>', rg = ytRanges(), sh = ytPipe.format !== 'long';

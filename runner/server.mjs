@@ -5,7 +5,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { HOME, StepError, StopError, sanitize, exists, parseRanges, isLocalSource, localPath, run, FFMPEG, YTDLP, lastLines, fmtTime, MAX_RANGE } from './util.mjs';
+import { HOME, StepError, StopError, sanitize, exists, parseRanges, isLocalSource, localPath, run, probe, FFMPEG, YTDLP, lastLines, fmtTime, MAX_RANGE } from './util.mjs';
 import { createHighlights, LEN_MIN, LEN_MAX } from './highlights.mjs';
 import { AI_STYLES, isRefLook } from './ai.mjs';
 import { listStyles, saveStyle, enqueue, cancelJob, listJobs, resolveReadable, thumbOf, shutdownImages, ImgError } from './images.mjs';
@@ -13,7 +13,7 @@ import { STEP_DEFS, STEP_FN, outputsFor, listAssets, checkScript, cleanPasted, p
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // 작업판이 쓰는 기능 수준. 3 = 새 9칸 순서 (/look, /ranges, deferRanges, 단계 clip·subs·fx)
-const API_LEVEL = 13;   // 13 = 레퍼런스 쇼츠 룩 (look ref-<영상ID>, view.refStyle) · 12 = 한 구간·하이라이트 길이 최대 3분(30초·1분·2분·3분), 쇼츠 최대 3분 · 11 = 하이라이트 '지난 작업' 초기화(/hl/reset, 돌고 있으면 멈추고 휴지통 한 폴더로) · 10 = AI 편집 단계(aicut·aistyle·aisubs, 맥의 Claude Code) · 9 = 유튜브 초기화(/reset, 에피소드·하이라이트 전부 휴지통 한 폴더로) · 8 = 미리보기 견본(/preview, 고른 룩·이펙트를 실제 영상 4초로) · 7 = 에피소드 완전히 지우기(/episode/delete, 휴지통으로) · 6 = 하이라이트 찾기(/hl/*) ·  4 = 7칸 순서 (/edit 1차·2차 편집, /draft, /feedback, 슬로우 구간 x0.5, 매트 스토리 룩) · 5 = 최종 결과물 레퍼런스(이펙트 팩: /fxpack, status.fxPacks)
+const API_LEVEL = 14;   // 14 = 내 영상 올리기 (POST /upload) · 13 = 레퍼런스 쇼츠 룩 (look ref-<영상ID>, view.refStyle) · 12 = 한 구간·하이라이트 길이 최대 3분(30초·1분·2분·3분), 쇼츠 최대 3분 · 11 = 하이라이트 '지난 작업' 초기화(/hl/reset, 돌고 있으면 멈추고 휴지통 한 폴더로) · 10 = AI 편집 단계(aicut·aistyle·aisubs, 맥의 Claude Code) · 9 = 유튜브 초기화(/reset, 에피소드·하이라이트 전부 휴지통 한 폴더로) · 8 = 미리보기 견본(/preview, 고른 룩·이펙트를 실제 영상 4초로) · 7 = 에피소드 완전히 지우기(/episode/delete, 휴지통으로) · 6 = 하이라이트 찾기(/hl/*) ·  4 = 7칸 순서 (/edit 1차·2차 편집, /draft, /feedback, 슬로우 구간 x0.5, 매트 스토리 룩) · 5 = 최종 결과물 레퍼런스(이펙트 팩: /fxpack, status.fxPacks)
 let VERSION = 'dev';
 try { VERSION = fs.readFileSync(path.join(HERE, 'version.txt'), 'utf8').trim() || 'dev'; } catch {}
 const PORT = +(process.env.FIELDNOTE_RUNNER_PORT || 4777);
@@ -655,6 +655,19 @@ const server = http.createServer(async (req, res) => {
       return req.method === 'HEAD' ? res.end() : fs.createReadStream(real).pipe(res);
     }
     if (key === 'GET /file') { const E = getEp(url.searchParams.get('ep')), rel = url.searchParams.get('path'); return serveFile(req, res, E, rel, url.searchParams.get('dl') ? `${sanitize(E.s.title, 60) || E.s.ep}-${path.basename(String(rel || ''))}` : ''); }
+    if (key === 'POST /upload') {   // 내 영상 파일 올리기: ~/Desktop/유투브/업로드/ 에 저장하고 그 경로를 소스로 써요
+      const name = sanitize(path.basename(String(url.searchParams.get('name') || '')).replace(/\.[^.]+$/, ''), 60) || 'video', ext = (path.extname(String(url.searchParams.get('name') || '')).toLowerCase() || '.mp4');
+      if (!/^\.(mp4|mov|m4v|mkv|webm|avi)$/.test(ext)) throw new HttpError(400, '영상 파일(mp4, mov, m4v, mkv, webm, avi)만 올릴 수 있어요.');
+      const dir = path.join(HOME_ROOT, '업로드'); fs.mkdirSync(dir, { recursive: true });
+      const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, ''), dest = path.join(dir, `${stamp}_${name}${ext}`), part = dest + '.part';
+      let n = 0; const out = fs.createWriteStream(part);
+      try { for await (const c of req) { n += c.length; if (n > 8e9) throw new HttpError(413, '파일이 너무 커요 (8GB 까지).'); if (!out.write(c)) await new Promise(r => out.once('drain', r)); } await new Promise((r, j) => out.end(e => e ? j(e) : r())); }
+      catch (e) { out.destroy(); fs.rmSync(part, { force: true }); throw e; }
+      fs.renameSync(part, dest);
+      const pr = await probe(dest).catch(() => ({}));
+      if (!pr.hasVideo) { fs.rmSync(dest, { force: true }); throw new HttpError(422, '영상 파일을 읽지 못했어요.'); }
+      return send(200, JSON.stringify({ ok: true, path: dest, name: path.basename(dest), duration: pr.duration || null, bytes: n }));
+    }
     if (key === 'POST /voice') { const r = await saveVoice(getEp(url.searchParams.get('ep')), url.searchParams, req); return send(200, JSON.stringify(r.json)); }
     const hm = /^\/hl\/([^/]+)\/file$/.exec(url.pathname);
     if (hm && key === 'GET /hl/' + hm[1] + '/file') { let id; try { id = decodeURIComponent(hm[1]); } catch { throw new HttpError(400, '주소가 이상해요.'); } return serveFile(req, res, { dir: getHL(id).dir }, url.searchParams.get('path')); }

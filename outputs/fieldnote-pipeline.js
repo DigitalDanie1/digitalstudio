@@ -669,7 +669,7 @@
     const g = (typeof YT_SOURCE_CHANNELS !== 'undefined' ? YT_SOURCE_CHANNELS : []).find(x => x.id === ch), seen = {};
     return (g ? g.sources : []).filter(s => s.enabled !== false && s.candidate && s.candidate.url && !seen[s.candidate.url] && (seen[s.candidate.url] = 1)).slice(0, 4);
   }
-  function ytLinkReset() { Object.assign(YL, { url: '', title: '', view: '', orig: '', author: '', state: '', vid: '', edited: false }); clearTimeout(YL.timer); }
+  function ytLinkReset() { Object.assign(YL, { url: '', title: '', view: '', orig: '', author: '', state: '', vid: '', edited: false, upMsg: '' }); clearTimeout(YL.timer); }
   function ylPaint() {
     const o = document.getElementById('plYlOrig'), t = document.getElementById('plYlTitle'), h = document.getElementById('plYlHint');
     if (o) o.textContent = YL.orig ? `원본: ${YL.orig}${YL.author ? ' · ' + YL.author : ''}` : '';
@@ -691,16 +691,38 @@
     YL.url = u; const i = document.getElementById('plYlUrl'); if (i && i.value !== u) i.value = u;
     clearTimeout(YL.timer); YL.timer = setTimeout(ylFetch, now ? 0 : 450);
   }
+  // 내 영상 파일 올리기: 맥 실행기에 보내서 ~/Desktop/유투브/업로드/ 에 저장, 그 경로를 소스로 써요
+  function ylUpload(file) {
+    if (!file) return;
+    if (runnerOnline === false) { toast('실행기가 꺼져 있어요. 맥에서 실행기를 켜 주세요.'); return; }
+    const box = document.getElementById('plYlUp'), show = t => { YL.upMsg = t; if (box) box.textContent = t; };
+    const mb = n => (n / 1048576).toFixed(0) + 'MB';
+    const x = new XMLHttpRequest(); YL.upping = true;
+    x.open('POST', RUNNER + '/upload?name=' + encodeURIComponent(file.name));
+    x.setRequestHeader('Content-Type', 'application/octet-stream');
+    x.upload.onprogress = e => e.lengthComputable && show(`올리는 중 ${Math.round(e.loaded / e.total * 100)}% (${mb(e.loaded)} / ${mb(e.total)})`);
+    x.onload = () => {
+      YL.upping = false; let j = {}; try { j = JSON.parse(x.responseText); } catch {}
+      if (x.status !== 200 || !j.path) { show('올리지 못했어요: ' + (j.error || x.status)); return; }
+      clearTimeout(YL.timer); YL.url = j.path; YL.vid = ''; YL.author = ''; YL.state = 'ok'; YL.orig = file.name;
+      if (!YL.edited || !YL.title) { YL.title = file.name.replace(/\.[^.]+$/, ''); YL.edited = false; }
+      const i = document.getElementById('plYlUrl'); if (i) i.value = j.path;
+      show(`올렸어요: ${file.name}${j.duration ? ' · ' + Math.floor(j.duration / 60) + '분 ' + Math.round(j.duration % 60) + '초' : ''}. 제목을 확인하고 "이 링크로 시작"을 누르세요.`); ylPaint();
+    };
+    x.onerror = () => { YL.upping = false; show('올리지 못했어요. 실행기가 켜져 있는지, 이 맥의 크롬인지 확인하세요.'); };
+    show('올리는 중 0%'); x.send(file);
+  }
   function ytLinkStart(it) {
     if (it.idea) return;
-    const url = YL.url.trim(), vid = ytVidOf(url), title = YL.title.trim();
-    if (!vid) { toast('유튜브 영상 링크를 넣어 주세요.'); return; }
+    const url = YL.url.trim(), local = /^(\/|~\/)/.test(url), vid = local ? '' : ytVidOf(url), title = YL.title.trim();
+    if (YL.upping) { toast('영상을 다 올린 뒤에 시작하세요.'); return; }
+    if (!vid && !local) { toast('유튜브 영상 링크를 넣거나 내 영상 파일을 올려 주세요.'); return; }
     if (!title) { toast('영상 제목을 적어 주세요.'); return; }
     const ch = ytLock || ytTab();
-    let idea = db.ideas.find(i => ideaPlatform(i) === 'YouTube' && ytCh(i) === ch && String(i.sources || '').includes(vid));
+    let idea = db.ideas.find(i => ideaPlatform(i) === 'YouTube' && ytCh(i) === ch && String(i.sources || '').includes(vid || url));
     if (!idea) {
       const g = (typeof YT_SOURCE_CHANNELS !== 'undefined' ? YT_SOURCE_CHANNELS : []).find(x => x.id === ch);
-      const hit = g && g.sources.find(s => s.candidate && ytVidOf(s.candidate.url) === vid);
+      const hit = vid && g && g.sources.find(s => s.candidate && ytVidOf(s.candidate.url) === vid);
       const def = typeof ytTabDefs === 'function' ? ytTabDefs(ch)[0] : null;
       const topicId = (hit && hit.candidate.topic) || (def && def.id) || (g && g.sources[0] && g.sources[0].topics[0]) || '';
       const note = [YL.view.trim(), YL.orig ? '원본 영상: ' + YL.orig + (YL.author ? ' · ' + YL.author : '') : ''].filter(Boolean).join('\n\n');
@@ -728,11 +750,11 @@
     const ep = it.ep, off = runnerOnline === false;
     const offMsg = '<p class="pl-error" role="alert"><b>실행기가 꺼져 있어요.</b> 맥에서 <code>~/Desktop/유투브/실행기/실행기 켜기.command</code> 를 더블클릭하세요. 켜진 창은 닫지 마세요.<br><span class="small">이 맥의 크롬에서만 돼요. "로컬 네트워크 접근"을 물으면 허용을 누르세요.</span></p>';
     const topic = {
-      id: 'topic', name: '원본 링크', title: '원본 링크', desc: '만들고 싶은 유튜브 영상 링크를 넣으세요. 그 영상으로 주제를 정해요.',
+      id: 'topic', name: '원본 링크', title: '원본 링크', desc: '만들고 싶은 유튜브 영상 링크를 넣거나, 내가 받아 둔 영상 파일을 올리세요. 그 영상으로 주제를 정해요.',
       btn: '이 링크로 시작',
       hideBtn: it => !!it.idea,
       isDone: it => !!it.idea,
-      result: it => it.idea ? `<b>${esc(it.idea.title)}</b>${ytFirstUrl(it.idea) ? ` · <a class="pl-link" href="${esc(ytFirstUrl(it.idea))}" target="_blank" rel="noopener noreferrer">원본 링크 ↗</a>` : ''}${it.ep ? '' : ' <button type="button" class="pl-link" data-pl-ytchange>다른 링크로 바꾸기</button>'}` : '',
+      result: it => it.idea ? `<b>${esc(it.idea.title)}</b>${/^https?:/.test(ytFirstUrl(it.idea)) ? ` · <a class="pl-link" href="${esc(ytFirstUrl(it.idea))}" target="_blank" rel="noopener noreferrer">원본 링크 ↗</a>` : ytFirstUrl(it.idea) ? ' · 내 영상 파일' : ''}${it.ep ? '' : ' <button type="button" class="pl-link" data-pl-ytchange>다른 링크로 바꾸기</button>'}` : '',
       body: it => {
         if (it.idea) return '';
         const tabs = ytLock ? '' : `<div class="filters yt-tabs pl-ytabs" role="tablist" aria-label="유튜브 채널">${YT_CHANNELS.filter(y => !YT_LOCKS[y.id]).map(y => `<button class="filter ${ytTab() === y.id ? 'active' : ''}" role="tab" aria-selected="${ytTab() === y.id}" data-yt-tab="${y.id}" title="${esc(ytChName(y.id))}">${esc(y.tab)}</button>`).join('')}</div>`;
@@ -741,6 +763,8 @@
         const chips = vids.length ? `<div class="pl-chips" role="group" aria-label="추천 소스 영상">${vids.map(x => `<button type="button" class="pl-chip" data-pl-ylchip="${esc(x.candidate.url)}" title="${esc(x.candidate.title || '')}">${esc(x.name)}</button>`).join('')}</div>` : '';
         const orig = YL.orig ? `원본: ${esc(YL.orig)}${YL.author ? ' · ' + esc(YL.author) : ''}` : '';
         const form = `<div class="pl-yl"><label>유튜브 영상 링크<input class="pl-input pl-yl-url" id="plYlUrl" data-yl="url" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off" value="${esc(YL.url)}"></label>${chips}
+          <label class="pl-yl-file">또는 내 영상 파일 올리기 <span class="small">(mp4·mov 등, 맥 실행기로 바로 올라가요)</span><input type="file" id="plYlFile" accept="video/*,.mkv" ${runnerOnline === false ? 'disabled' : ''}></label>
+          <p class="small" id="plYlUp" aria-live="polite">${esc(YL.upMsg || '')}</p>
           <p class="small pl-yl-orig" id="plYlOrig" aria-live="polite">${orig}</p>
           <label>영상 제목<input class="pl-input" id="plYlTitle" data-yl="title" placeholder="${esc(YL.state === 'fail' ? '제목을 직접 적어 주세요' : '링크를 넣으면 제목이 들어와요')}" value="${esc(YL.title)}"></label>
           <p class="small" id="plYlHint">${esc(YL.state === 'fail' ? '제목을 직접 적어 주세요.' : '한국어 제목으로 바꿔도 돼요.')}</p>
@@ -1543,6 +1567,7 @@
     else if (t.id === 'plAnswer') T.answer[c] = t.value;
     else if (t.dataset.plUrlinput) T.url[t.dataset.plUrlinput] = t.value;
     else if (t.hasAttribute('data-pl-caption')) { const p = c === 'insta' && window.InstaToon.current(); if (p) { p.caption = t.value; persist(); } }
+    else if (t.id === 'plYlFile') ylUpload(t.files && t.files[0]);
     else if (t.dataset.yl) { if (t.dataset.yl === 'url') ylSetUrl(t.value); else if (t.dataset.yl === 'title') { YL.title = t.value; YL.edited = true; } else YL.view = t.value; }
     else if (t.dataset.yaNew === 'fxtimes') { const { it } = evalSteps('youtube'); ytPipe.fxTimes = t.value; ytPipe.fxIdea = it.idea ? it.idea.id : ''; if (!ytPipe.fxPack) ytPipe.fxPack = ytFxPick(it, it.ep); document.querySelector('#plRoot [data-ya-act="fxpack"]')?.removeAttribute('disabled'); ytOutRefresh(); ytPrevSync(); }
     else if (t.dataset.yaNew === 'fxlabels') { const { it } = evalSteps('youtube'); ytPipe.fxLabels = t.value; ytPipe.fxIdea = it.idea ? it.idea.id : ''; if (!ytPipe.fxPack) ytPipe.fxPack = ytFxPick(it, it.ep); document.querySelector('#plRoot [data-ya-act="fxpack"]')?.removeAttribute('disabled'); ytOutRefresh(); ytPrevSync(); }
