@@ -296,7 +296,7 @@ document.addEventListener('click', async e => {
   const cur = runnerEp();
   runnerBusy = true;
   try {
-    if (run && run.dataset.yaSteps) { const ids = run.dataset.yaSteps.split(',').filter(Boolean); await runnerFetch('/run', { ep: cur.ep, steps: ids }); runnerOpenLog = ids[0]; toast('실행을 시작했어요.'); }
+    if (run && run.dataset.yaSteps) { const ids = run.dataset.yaSteps.split(',').filter(Boolean); await runnerFetch('/run', { ep: cur.ep, steps: ids, ...(typeof window.ytAiExtra === 'function' ? window.ytAiExtra(cur, ids) : {}) }); runnerOpenLog = ids[0]; toast('실행을 시작했어요.'); }
     else if (run) { await runnerFetch('/run', { ep: cur.ep, step: run.dataset.yaRun }); runnerOpenLog = run.dataset.yaRun; toast('실행을 시작했어요.'); }
     else {
       const a = act.dataset.yaAct;

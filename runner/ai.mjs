@@ -77,7 +77,7 @@ Object.assign(AI_STYLES, {
     fx: '라벨·팝업은 쓰지 않는다. fx 는 빈 배열.',
     caps: '- 자막은 영상 안 아래쪽에 노란 글씨로 짧게 (예: "(순식간에 뒤집힘)"). 괄호 감탄도 좋다.' },
 });
-export const AI_OUT = { aicut: ['편집/AI컷.json', '편집/AI1차컷.mp4'], aistyle: ['조사/research.md', '편집/AI완성.json', '편집/AI스타일본.mp4'], aisubs: ['편집/AI완성.mp4'], aibrand: ['편집/AI인트로.mp4', '편집/AI아웃트로.mp4', '편집/AI최종.mp4'], aithumb: ['편집/AI썸네일.jpg', '편집/AI썸네일.json'] };
+export const AI_OUT = { aicut: ['편집/AI컷.json', '편집/AI1차컷.mp4'], aistyle: ['조사/research.md', '편집/AI완성.json', '편집/AI스타일본.mp4'], aisubs: ['편집/AI자막.json', '편집/AI완성.mp4'], aibrand: ['편집/AI인트로.mp4', '편집/AI아웃트로.mp4', '편집/AI최종.mp4'], aithumb: ['편집/AI썸네일.jpg', '편집/AI썸네일.json'] };
 
 // 맥의 Claude Code 스킬(~/.claude/skills). 단계마다 해당 스킬 규칙을 먼저 읽고 따르게 해요. 없으면 건너뛰어요.
 const SKILL_DIR = path.join(HOME, '.claude/skills');
@@ -435,37 +435,90 @@ JSON 하나만 답해라: {"frame":{"l1":"","l2":""},"fx":[[시작,끝,{"type":"
   await render(E, ctx, st, plan, j, '편집/AI스타일본.mp4');
 }
 
+// 자막 3갈래 (작업판에서 켜고 끔, E.s.subsOpt): en = 영상 원문(영어 자동자막, 말 시각 그대로) / ko = 그 말의 한국어 번역 (원문과 1:1)
+// / ai = Claude 해설·후크 자막 (말이 없는 곳 + 인트로·아웃트로) / mine = 내가 넣는 자막 (시각·글, 위쪽에 따로 그림)
+export function parseMine(text) {
+  const out = [];
+  for (const [n, raw] of String(text || '').split(/\r?\n/).entries()) {
+    const l = raw.trim(); if (!l) continue;
+    const m = /^(\d+(?::\d{1,2})?(?:\.\d+)?)\s*[-~]\s*(\d+(?::\d{1,2})?(?:\.\d+)?)\s+(.+)$/.exec(l);
+    if (!m) throw new Error(`내 자막 ${n + 1}번째 줄 모양이 달라요: "${l}" (예: 0:03-0:06 넣을 말)`);
+    const sec = t => t.split(':').reduce((a, x) => a * 60 + +x, 0), a = sec(m[1]), b = sec(m[2]);
+    if (!(b > a)) throw new Error(`내 자막 ${n + 1}번째 줄: 끝 시각이 시작보다 뒤여야 해요.`);
+    out.push([r1(a), r1(b), m[3].slice(0, 60)]);
+  }
+  return out;
+}
 async function aisubs(E, ctx) {
   const st = styleOf(E), info = source(E), plan = readJson(E.p('편집/AI컷.json'));
   let base; try { base = readJson(E.p('편집/AI완성.json')); } catch { throw new StepError('스타일 입히기를 먼저 해 주세요.'); }
-  const segs = segsOf(E, info, plan), talk = st.kind !== 'sport';
-  ctx.log(`Claude 가 자막을 써요 (shorts-blueprint 자막 규칙${segs.length ? ', 말 자막 ' + segs.length + '덩어리는 원본 자막 시각에 맞춰요' : ''})…`);
-  const speech = segs.length ? `
-말 자막 S (원본 영어 자막을 완성 영상 시각으로 옮긴 것. 시각은 정확하다):
-${segs.map(x => `S${x.id} [${x.s}-${x.e}] ${x.t}`).join('\n')}
-- 말이 나오는 곳의 자막은 "lines" 로 쓴다: [[S번호들], "한국어"]. S번호는 이어지는 1~3개. 그 S 들에 실제로 있는 말만 옮긴다. 앞뒤 S 의 말을 끌어오거나 요약해서 섞지 마라. 자동자막이라 틀린 단어가 있으면 화면과 앞뒤 뜻으로 바로잡되, 없는 말을 지어내지 마라. 시각은 코드가 S 시각으로 넣는다.
-- ${talk ? '화자의 발언은 빠짐없이 lines 로 옮긴다 (짧은 맞장구는 빼도 된다).' : '중계·선수 말을 옮기고 싶을 때만 lines 를 쓴다. 해설 자막은 captions 로.'}
-- 말이 없는 곳(인트로·아웃트로 후크, 슬로우, 말 없는 장면)은 "captions" 로 [시작, 끝, "텍스트"]. captions 는 lines 로 쓴 S 구간과 겹치면 안 된다. 인트로 후크를 넣으려면 그 구간의 S 는 lines 로 쓰지 않는다.` : '';
-  const j = await askClaude(E, ctx, `${skills(ctx, ['shorts-blueprint'])}${common(E, st, info, plan, segs.length > 0)}
-이미 정한 위 제목·라벨·팝업 (바꾸지 말고 그대로 돌려줘라): ${JSON.stringify({ frame: base.frame, fx: base.fx, credits: base.credits, ranks: base.ranks, note: base.note })}
-
+  const o = { en: true, ko: true, ai: true, mine: [], ...(E.s.subsOpt || {}) };
+  const segs = (o.en || o.ko) ? segsOf(E, info, plan) : [], d = plan.duration;
+  if ((o.en || o.ko) && !segs.length) ctx.log('  영상 원문 자막이 없어요 (내 파일이거나 유튜브 자막이 없는 영상). 원문·번역 자막은 건너뛰어요.');
+  if (!o.ai && !segs.length && !o.mine.length) throw new StepError('넣을 자막이 없어요. 원문 자막이 없는 영상이라 "AI 해설·후크 자막"이나 "내 자막"을 켜 주세요.');
+  // 1) 원문 -> 한국어 (S 하나에 한 줄, 1:1). 프레임은 안 보고 말만 옮겨서 빨라요.
+  let ko = new Map();
+  if (o.ko && segs.length) {
+    ctx.log(`Claude 가 원문 ${segs.length}줄을 한국어로 옮겨요 (한 줄에 한 줄, 시각은 원문 그대로)…`);
+    const j = await askClaude(E, ctx, `너는 한국어 ${st.genre} 쇼츠의 번역가다. 원본: "${info.title}" (${info.channel}). 등장인물: ${JSON.stringify(plan.who || '')}
+아래는 영상에서 나오는 말을 자동자막으로 받은 것이다. 번호마다 그 줄에 있는 말만 한국어로 옮긴다.
+- 한 줄에 한 줄. 앞뒤 줄의 말을 끌어오거나 합치거나 요약하지 마라. 문장이 중간에 끊겨 있으면 끊긴 그대로 자연스럽게.
+- 자동자막의 틀린 단어(이름, 기술 이름)는 앞뒤 뜻으로 바로잡는다. 없는 말을 지어내지 마라.
+- 말투: ${st.tone}
+- 최대 2줄, 줄당 18자 이내, 줄바꿈은 \\n.
+${segs.map(x => `${x.id}. ${x.t}`).join('\n')}
+JSON 하나만 답해라: {"ko":[[1,"한국어"],[2,"한국어"]]}`,
+      x => { const m = new Map((x.ko || []).map(r => [+r[0], String(r[1] || '')])); const miss = segs.filter(g => !m.get(g.id)); if (miss.length) return `빠진 번호가 있어요: ${miss.slice(0, 8).map(g => g.id).join(', ')}`;
+        const long = segs.find(g => m.get(g.id).split(/\n|\\n/).some(l => l.length > 20)); return long ? `${long.id}번 한 줄이 18자를 넘어요.` : ''; });
+    ko = new Map(j.ko.map(r => [+r[0], String(r[1])]));
+  }
+  let speech = segs.map(g => ({ s: g.s, e: g.e, en: o.en ? g.t : '', ko: ko.get(g.id) || '' }));
+  // 2) Claude 해설·후크 자막: 말 자막이 없는 곳에만 (인트로·아웃트로 컷 안에서는 말 자막보다 앞서요)
+  let ai = [];
+  if (o.ai) {
+    const hookCuts = plan.cuts.filter(c => c.role === 'intro' || c.role === 'outro').map(c => c.out);
+    const inHook = (a, b) => hookCuts.some(([x, y]) => a < y && b > x);
+    const fixed = speech.filter(x => !inHook(x.s, x.e));
+    ctx.log(`Claude 가 해설·후크 자막을 써요 (shorts-blueprint 자막 규칙${fixed.length ? ', 말 자막 ' + fixed.length + '줄은 비워 둔 자리' : ''})…`);
+    const j = await askClaude(E, ctx, `${skills(ctx, ['shorts-blueprint'])}${common(E, st, info, plan, segs.length > 0)}
+이미 정한 위 제목·라벨·팝업: ${JSON.stringify({ frame: base.frame, fx: base.fx })}
 ${st.check}
-이번 할 일: 자막. 인트로와 아웃트로가 제일 중요하다. 둘 다 후크다.
-- 인트로(intro 컷 구간): 0초에 바로 시작. 결과/숫자/반전을 먼저 던진다 (예: "올림픽 5연패\\n시작 15초 만에 들어 던지기"). 인사, 설명, "오늘은" 금지.
-- 아웃트로(outro 컷 구간): 영상 끝까지. 다시 보게 만드는 한 줄 (예: "자, 15초 만에 [[한 번 더]].") 또는 댓글을 부르는 질문. 마지막 자막이 인트로로 이어지게.
+이번 할 일: 해설·후크 자막. 인트로와 아웃트로가 제일 중요하다. 둘 다 후크다.
+- 인트로(intro 컷 ${JSON.stringify(hookCuts[0] || [0, 2])}): 0초에 바로 시작. 결과/숫자/반전을 먼저 던진다. 인사, 설명, "오늘은" 금지.
+- 아웃트로(outro 컷): 영상 끝(${d}초)까지. 다시 보게 만드는 한 줄 또는 댓글을 부르는 질문.
 ${st.caps}
-- 한 자막 최대 2줄, 줄당 16자 이내, 줄바꿈은 \\n. 강조할 단어 하나만 [[단어]]. 자막끼리 겹치지 않게.${speech}
-JSON 하나만 답해라: {"frame":{...그대로},"fx":[...그대로],"credits":[...그대로],${segs.length ? '"lines":[[[1,2],"한국어"]],' : ''}"captions":[[시작,끝,"텍스트"]],"facts":["쓴 사실과 근거 한 줄씩"]}`,
-    x => { if (segs.length) { const m = mergeCaps(x, segs); if (m.err) return m.err; x.captions = m.captions; } return checkFinal(plan, true, st)(x); });
-  j.frame = base.frame; j.fx = base.fx; j.credits = base.credits; if (base.ranks) j.ranks = base.ranks; if (base.note) j.note = base.note;
+- 한 자막 최대 2줄, 줄당 16자 이내, 줄바꿈은 \\n. 강조할 단어 하나만 [[단어]]. 자막끼리 겹치지 않게.
+${fixed.length ? `- 아래 시각에는 영상 원문 자막(말)이 이미 나온다. 그 시각과 겹치게 쓰지 마라:\n${fixed.map(x => `  [${x.s}-${x.e}] ${x.en || x.ko}`).join('\n')}` : ''}
+JSON 하나만 답해라: {"captions":[[시작,끝,"텍스트"]],"facts":["쓴 사실과 근거 한 줄씩"]}`,
+      x => { const c = x.captions || []; if (!c.length) return '자막이 없어요.';
+        for (const [i, q] of c.entries()) { if (!(q[0] >= 0 && q[1] > q[0] && q[1] <= d + 0.6)) return `자막 ${i + 1}번 시각이 0~${d}초 밖이에요.`;
+          if (String(q[2]).split(/\n|\\n/).some(l => l.replace(/\[\[|\]\]/g, '').length > 18)) return `자막 ${i + 1}번 한 줄이 16자를 넘어요.`;
+          const hit = fixed.find(f => q[0] < f.e - 0.05 && q[1] > f.s + 0.05); if (hit) return `자막 ${i + 1}번이 원문 자막 [${hit.s}-${hit.e}] 과 겹쳐요.`; }
+        if (c[0][0] > 0.3) return '첫 자막(인트로 후크)이 0초에 시작해야 해요.';
+        if (c[c.length - 1][1] < d - 1.5) return '마지막 자막(아웃트로 후크)이 영상 끝까지 가야 해요.'; return ''; });
+    ai = j.captions.map(q => [+q[0], +q[1], String(q[2])]);
+    speech = speech.filter(x => !ai.some(q => x.s < q[1] - 0.05 && x.e > q[0] + 0.05));   // 후크가 이기는 자리의 말 자막은 빼요
+  }
+  // 3) 하나로: [시작, 끝, 큰 글(한국어 또는 영어), 작은 영어 줄]
+  const caps = [...speech.filter(x => x.ko || x.en).map(x => [x.s, x.e, x.ko || x.en, x.ko && x.en ? x.en : '']), ...ai.map(q => [q[0], q[1], q[2], ''])].sort((a, b) => a[0] - b[0]);
+  for (const [k, c] of caps.entries()) { const nx = caps[k + 1]; if (c[1] - c[0] < 1.2) c[1] = r1(Math.min(c[0] + 1.2, nx ? nx[0] : c[0] + 1.2)); }
+  const j = { frame: base.frame, fx: base.fx, credits: base.credits, captions: caps, mine: o.mine.filter(m => m[0] < d) };
+  if (base.ranks) j.ranks = base.ranks; if (base.note) j.note = base.note;
+  writeJson(E.p('편집/AI자막.json'), { opt: { en: o.en, ko: o.ko, ai: o.ai }, speech, ai, mine: j.mine });
   if (E.s.steps.aibrand) E.s.steps.aibrand = { status: 'todo' };
   writeJson(E.p('편집/AI완성.json'), j);
+  ctx.log(`자막: 원문 ${speech.filter(x => x.en).length}줄 · 번역 ${speech.filter(x => x.ko).length}줄 · 해설/후크 ${ai.length}줄 · 내 자막 ${j.mine.length}줄`);
   await render(E, ctx, st, plan, j, '편집/AI완성.mp4');
 }
 
 // ---------- 그리기 (ASS) ----------
 const bgr = hex => `&H00${hex.slice(4, 6)}${hex.slice(2, 4)}${hex.slice(0, 2)}&`;
 const esc = s => String(s ?? '').replace(/\\n/g, '\n').replace(/[{}\\]/g, '').replace(/\r?\n/g, '\\N');
+// 작은 영어 원문 줄: 한 줄 38자 안팎으로 접어요 (ASS 는 자동 줄바꿈을 끔)
+const wrapEn = t => { const ls = ['']; for (const w of String(t).split(/\s+/)) { if (ls[ls.length - 1] && (ls[ls.length - 1] + ' ' + w).length > 38) ls.push(w); else ls[ls.length - 1] = (ls[ls.length - 1] + ' ' + w).trim(); } return ls.slice(0, 3).map(esc).join('\\N'); };
+const enTail = en => en ? `\\N{\\fs40\\b0\\bord4\\c&HDCDCDC&}${wrapEn(en)}` : '';
+// 내 자막: 노란 글씨, 영상 위쪽 (다른 자막과 안 겹치게)
+const mineEv = (fin, add, y) => { for (const [a, b, t] of fin.mine || []) add(a, b, 8, 'Cap', `{\\an8\\pos(540,${y})\\fs58\\c&H00E6FF&\\bord6}${esc(t)}`); };
 const ts = x => { x = Math.max(0, x); const h = Math.floor(x / 3600), m = Math.floor(x % 3600 / 60), s = x % 60; return `${h}:${String(m).padStart(2, '0')}:${s.toFixed(2).padStart(5, '0')}`; };
 export function buildAss(fin, plan, st, src) {
   if (st.lay && st.lay !== 'mat') return buildAssLay(fin, plan, st, src || { w: 1920, h: 1080, cb: 0 });
@@ -476,7 +529,8 @@ export function buildAss(fin, plan, st, src) {
   add(0, end, 5, 'Title', `{\\an5\\pos(540,354)\\c${R}}${esc(fin.frame?.l2)}`);
   if (st.watermark) add(0, end, 4, 'Mark', `{\\an3\\pos(1050,1424)}${st.watermark[0]} {\\c${Y}}${st.watermark[1]}`);
   for (const [a, b, t] of fin.credits || []) add(a, b, 4, 'Credit', `{\\an8\\pos(540,1466)}영상: ${esc(t)}`);
-  for (const [a, b, t] of fin.captions || []) add(a, b, 3, 'Cap', `{\\an2\\pos(540,1345)}${hi(t)}`);
+  for (const [a, b, t, en] of fin.captions || []) add(a, b, 3, 'Cap', `{\\an2\\pos(540,1345)}${hi(t)}${enTail(en)}`);
+  mineEv(fin, add, VY + 40);
   for (const [a, b, f] of fin.fx || []) {
     if (f.type === 'label') { add(a, b, 6, 'Label', `{\\an7\\pos(44,505)}${esc(f.k)}`); if (f.s) add(a, b, 6, 'Sub', `{\\an7\\pos(44,598)}${esc(f.s)}`); }
     else if (f.type === 'pop') {
@@ -532,14 +586,14 @@ function buildAssLay(fin, plan, st, src) {
     ranks.forEach((r, k) => { const no = n - k, y = 1120 + (no - 1) * 84;   // 1위가 맨 위
       add(0, end, 5, 'Rank', `{\\an4\\pos(110,${y})}${no}.`);
       add(r[0], end, 5, 'Rank', `{\\an4\\pos(180,${y})\\fscx120\\fscy120\\t(0,150,\\fscx100\\fscy100)}${esc(r[2])}`); });
-    for (const [a, b, t] of caps) add(a, b, 3, 'Cap', `{\\an2\\pos(540,${L.vy + L.vh - 24})}${hi(t)}`);
+    for (const [a, b, t, en] of caps) add(a, b, 3, 'Cap', `{\\an2\\pos(540,${L.vy + L.vh - 24})}${hi(t)}${enTail(en)}`);
     for (const [a, b, t] of fin.credits || []) add(a, b, 4, 'Credit', `{\\an2\\pos(540,1880)}영상: ${esc(t)}`);
   } else if (st.lay === 'post') {
     if (st.name) add(0, end, 5, 'Name', `{\\an4\\pos(212,150)}${esc(st.name)}`);
     if (st.handle) add(0, end, 5, 'Name', `{\\an4\\pos(212,212)}${esc(st.handle)}`);
     add(0, end, 5, 'Title', `{\\an5\\pos(540,350)}${esc(fin.frame?.l1)}`);
     add(0, end, 5, 'Title', `{\\an5\\pos(540,445)}${esc(fin.frame?.l2)}`);
-    for (const [a, b, t] of caps) add(a, b, 3, 'Cap', `{\\an2\\pos(540,${L.vy + L.vh - 30})}${hi(t, '&HFFFFFF&', Y)}`);
+    for (const [a, b, t, en] of caps) add(a, b, 3, 'Cap', `{\\an2\\pos(540,${L.vy + L.vh - 30})}${hi(t, '&HFFFFFF&', Y)}${enTail(en)}`);
     if (fin.note) {
       add(0, end, 4, 'Draw', `{\\an7\\pos(80,1415)\\1c&HE6E6E6&\\bord0\\p1}m 55 0 b 85 0 110 25 110 55 b 110 85 85 110 55 110 b 25 110 0 85 0 55 b 0 25 25 0 55 0`);
       add(0, end, 5, 'NoteName', `{\\an4\\pos(232,1440)}${esc(st.name || '')}`);
@@ -555,12 +609,13 @@ function buildAssLay(fin, plan, st, src) {
         let s0 = a; for (const w of words) { const d = (b - a) * (w.replace(/\[\[|\]\]/g, '').length + 1) / tot, hot = /\[\[/.test(w);
           add(s0, s0 + d, 3, 'Word', `{\\an5\\pos(540,1150)\\fscx125\\fscy125\\t(0,90,\\fscx100\\fscy100)${hot ? `\\c${Y}` : ''}}${esc(w.replace(/\[\[|\]\]/g, ''))}`); s0 += d; }
       }
-    } else for (const [a, b, t] of caps) add(a, b, 3, 'Cap', `{\\an2\\pos(540,${st.explain ? 1560 : 1250})}${hi(t, st.explain ? Y : R)}`);
+    } else for (const [a, b, t, en] of caps) add(a, b, 3, 'Cap', `{\\an2\\pos(540,${st.explain ? 1560 : 1250})}${hi(t, st.explain ? Y : R)}${enTail(en)}`);
     if (st.name) add(0, end, 4, 'Mark', `{\\an5\\pos(540,1470)}${esc(st.name)}`);
     for (const [a, b, t] of fin.credits || []) add(a, b, 4, 'Credit', `{\\an7\\pos(30,30)}영상: ${esc(t)}`);
   }
   const S = (n, size, col, outline, oc = '&H00000000&', border = 1, back = '&H00000000&', bold = -1) => `Style: ${n},${FONT},${size},${col},&H000000FF&,${oc},${back},${bold},0,0,0,100,100,0,0,${border},${outline},0,5,0,0,0,1`;
   const K = '&H00000000&', Wh = '&H00FFFFFF&';
+  mineEv(fin, add, L.vy + 40);
   const styles = st.lay === 'post'
     ? [S('Title', 86, K, 0), S('Name', 46, K, 0), S('Cap', 62, Y, 5), S('NoteName', 36, '&H00AAAAAA&', 0), S('Note', 50, '&H00222222&', 0, K, 1, K, 0), S('Credit', 30, '&H00888888&', 0), S('Draw', 10, Wh, 0)]
     : st.lay === 'rank'
@@ -679,10 +734,16 @@ async function aithumb(E, ctx) {
   let fin = {}; try { fin = readJson(E.p('편집/AI완성.json')); } catch {}
   const sheetsOf = pre => { try { return fs.readdirSync(E.p('분석')).filter(f => f.startsWith(pre + '_')).sort().map(f => E.p('분석', f)); } catch { return []; } };
   const coarse = sheetsOf('coarse'), fine = sheetsOf('fine');
-  ctx.log('Claude 가 썸네일 카피와 액션·리액션 장면을 골라요…');
   const nos = t => String(t || '').replace(/\s/g, '').length;
-  const st = styleOf(E);
-  const j = await askClaude(E, ctx, `${skills(ctx, ['thumbnail-3tier'])}너는 ${st.genre} 쇼츠 썸네일 작가다. 규칙: 예쁘게 말고 3단 원색 대비.
+  const st = styleOf(E), my = E.s.thumbText || {}, myTop = String(my.top || '').trim(), myBot = String(my.bot || '').trim();
+  let prev = null; try { prev = readJson(E.p('편집/AI썸네일.json')); } catch {}
+  let j;
+  if ((myTop || myBot) && prev && prev.left && prev.right) {   // 내가 적은 카피만 바꿀 때: 장면은 그대로, Claude 없이 바로 다시 그려요
+    j = { ...prev, top: myTop || prev.top, bot: myBot || prev.bot, mine: { top: !!myTop, bot: !!myBot } };
+    ctx.log('내가 적은 카피로 바로 다시 그려요 (장면은 전과 같아요).');
+  } else {
+  ctx.log('Claude 가 썸네일 카피와 액션·리액션 장면을 골라요…');
+  j = await askClaude(E, ctx, `${skills(ctx, ['thumbnail-3tier'])}너는 ${st.genre} 쇼츠 썸네일 작가다. 규칙: 예쁘게 말고 3단 원색 대비.
 - 상단 카피(노랑, 검정 띠): 결정적 순간 1개만. 공백 빼고 12자 이하.
 - 중앙 2분할: 왼쪽 = ${st.thumbL}, 오른쪽 = ${st.thumbR}.
 - 하단 카피(흰 글씨, 빨강 또는 파랑 띠): 반전/궁금증. 공백 빼고 16자 이하.
@@ -697,10 +758,12 @@ async function aithumb(E, ctx) {
 ${coarse.length ? `- 전체 영상 2초 간격 6x5 타일: 시트 k(1부터) 타일 i 의 시각 = ((k-1)*30 + i)*2 초\n${coarse.map(f => '  ' + f).join('\n')}\n` : ''}- 고른 구간 0.2초 간격 5x5 타일:
 ${plan.sheets || `원본 ${r1(plan.window[0])}초부터: 시트 k 타일 i 의 시각 = ${r1(plan.window[0])} + ((k-1)*25 + i)*0.2 초\n${fine.map(f => '  ' + f).join('\n')}`}
 x 는 그 프레임에서 인물이 있는 가로 위치(0=왼쪽 끝, 0.5=가운데, 1=오른쪽 끝). 썸네일 칸은 세로로 길어서 x 기준으로 잘라낸다.
-JSON 하나만 답해라: {"top":"","bot":"","color":"red|blue","left":{"t":원본초,"x":0.5,"why":""},"right":{"t":원본초,"x":0.5,"why":""}}`,
-    x => !x.top || !x.bot ? 'top, bot 이 있어야 해요.' : nos(x.top) > 12 ? `상단 카피가 ${nos(x.top)}자예요 (12자 이하).` : nos(x.bot) > 16 ? `하단 카피가 ${nos(x.bot)}자예요 (16자 이하).`
-      : /(그리고|그래서|했는데|하면서)/.test(x.top + x.bot) ? '내용 설명형 단어가 있어요.' : [x.top, x.bot].some(t => nos(t) >= 7 && !/\s/.test(t)) ? '띄어쓰기가 없어요. 맞춤법대로 띄어 써라.' : !['red', 'blue'].includes(x.color) ? 'color 는 red 또는 blue.'
-      : ![x.left, x.right].every(f => f && f.t >= 0 && f.t <= dur && f.x >= 0 && f.x <= 1) ? `left/right 의 t 는 0~${Math.round(dur)}, x 는 0~1.` : Math.abs(x.left.t - x.right.t) < 0.5 ? '왼쪽과 오른쪽은 다른 장면이어야 해요.' : '');
+${myTop ? `상단 카피는 내가 정했다. 그대로 쓴다: "${myTop}"\n` : ''}${myBot ? `하단 카피는 내가 정했다. 그대로 쓴다: "${myBot}"\n` : ''}JSON 하나만 답해라: {"top":"","bot":"","color":"red|blue","left":{"t":원본초,"x":0.5,"why":""},"right":{"t":원본초,"x":0.5,"why":""}}`,
+    x => { if (myTop) x.top = myTop; if (myBot) x.bot = myBot; return !x.top || !x.bot ? 'top, bot 이 있어야 해요.' : !myTop && nos(x.top) > 12 ? `상단 카피가 ${nos(x.top)}자예요 (12자 이하).` : !myBot && nos(x.bot) > 16 ? `하단 카피가 ${nos(x.bot)}자예요 (16자 이하).`
+      : /(그리고|그래서|했는데|하면서)/.test((myTop ? '' : x.top) + (myBot ? '' : x.bot)) ? '내용 설명형 단어가 있어요.' : [myTop ? '' : x.top, myBot ? '' : x.bot].some(t => nos(t) >= 7 && !/\s/.test(t)) ? '띄어쓰기가 없어요. 맞춤법대로 띄어 써라.' : !['red', 'blue'].includes(x.color) ? 'color 는 red 또는 blue.'
+      : ![x.left, x.right].every(f => f && f.t >= 0 && f.t <= dur && f.x >= 0 && f.x <= 1) ? `left/right 의 t 는 0~${Math.round(dur)}, x 는 0~1.` : Math.abs(x.left.t - x.right.t) < 0.5 ? '왼쪽과 오른쪽은 다른 장면이어야 해요.' : ''; });
+  j.mine = { top: !!myTop, bot: !!myBot };
+  }
   writeJson(E.p('편집/AI썸네일.json'), j);
   const fitT = (t, base, w) => { const n = [...String(t)].reduce((a, c) => a + (c === ' ' ? 0.35 : /[ -~]/.test(c) ? 0.6 : 1), 0); return Math.min(base, Math.floor(w / Math.max(1, n))); };
   const assF = E.p('편집/AI썸네일.ass');

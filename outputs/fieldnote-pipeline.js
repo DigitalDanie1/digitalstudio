@@ -908,6 +908,16 @@
   const aiLookName = id => isRef(id) ? '레퍼런스 쇼츠 스타일' : (YT_AI_LOOKS.find(l => l.id === id) || ytLooks().find(l => l.id === id) || { name: id }).name;
   // #ytRefs 탭의 쇼츠 (이미 위 스타일의 참고 영상인 것은 빼요)
   const ytRefLooks = ch => (typeof window.ytRefShorts === 'function' ? window.ytRefShorts(ch) : []).filter(r => !YT_AI_LOOKS.some(l => l.ref.includes(r.id))).map(r => ({ id: 'ref-' + r.id, vid: r.id, title: r.title, from: r.from }));
+  // 자막·썸네일 입력 칸 초안 (화면이 다시 그려져도 남게): 에피소드별
+  const YD = {};
+  function ytSubDraft(ep) { const k = 's:' + (ep ? ep.ep : ''); if (!YD[k]) { const o = (ep && ep.subsOpt) || {}; YD[k] = { en: o.en !== false, ko: o.ko !== false, ai: o.ai !== false, mine: o.mine || '' }; } return YD[k]; }
+  function ytThumbDraft(ep) { const k = 't:' + (ep ? ep.ep : ''); if (!YD[k]) { const o = (ep && ep.thumbText) || {}; YD[k] = { top: o.top || '', bot: o.bot || '' }; } return YD[k]; }
+  window.ytAiExtra = (ep, ids) => { const x = {}; if (ids.includes('aisubs')) x.subs = { ...ytSubDraft(ep) }; if (ids.includes('aithumb')) x.thumb = { ...ytThumbDraft(ep) }; return x; };
+  // 만든 자막 목록 (편집/AI자막.json) 은 실행기에서 받아 와서 기억해요
+  const SJ = {};
+  function ytSubJson(ep, o) { const k = ep.ep + ':' + (o.mtime || ''); if (SJ[k] !== undefined) return SJ[k]; SJ[k] = null;
+    fetch(`${RUNNER}/file?ep=${encodeURIComponent(ep.ep)}&path=${encodeURIComponent(o.path)}`).then(r => r.json()).then(d => { SJ[k] = { speech: d.speech || [], ai: d.ai || [], mine: d.mine || [] }; repaint('youtube', true); }).catch(() => { SJ[k] = { speech: [], ai: [], mine: [] }; });
+    return null; }
   function ytAiCards(it, ep, off) {
     const names = ['1차 컷 (영상 종류)', '스타일 선택', '스타일 입히기', '자막', '인트로·아웃트로', '썸네일', '다운로드'];
     const chId = it.idea ? ytCh(it.idea) : ytTab(), sport = chId === 'yt-wrestling', myLook = AI_CH[chId] || 'yt-mat';
@@ -968,13 +978,25 @@
       result: () => ep ? errOf(ST) + (styDone ? vid('aistyle', '편집/AI스타일본.mp4', '스타일본 (자막 전)') + (out('aistyle', '조사/research.md') ? `<p class="small">${ytFileLink(ep.ep, { path: '조사/research.md' })} · 제목·라벨에 쓴 사실의 근거</p>` : '') : '') + logs(ST) : '',
     });
     const SU = ['aisubs'], subDone = ok('aisubs');
+    // 자막: 원문(영어)·번역(한국어)·해설/후크(AI)·내 자막을 나눠 켜고, 만든 뒤 줄별로 확인
+    const SO = ytSubDraft(ep), subJ = out('aisubs', '편집/AI자막.json');
+    const fmtT = x => { x = +x || 0; return Math.floor(x / 60) + ':' + (x % 60).toFixed(1).padStart(4, '0'); };
+    const subTable = () => { if (!subJ) return ''; const d = ytSubJson(ep, subJ); if (!d) return '<p class="small">자막 목록 읽는 중…</p>';
+      const rows = [...d.speech.map(x => [x.s, x.e, 'sp', x.en, x.ko]), ...d.ai.map(q => [q[0], q[1], 'ai', '', q[2]]), ...d.mine.map(q => [q[0], q[1], 'my', '', q[2]])].sort((a, b) => a[0] - b[0]);
+      const tag = { sp: '원문', ai: 'AI 해설·후크', my: '내 자막' };
+      return `<details class="pl-peek" open><summary>자막 목록 ${rows.length}줄 (완성 영상 시각)</summary><table class="pl-subt" style="width:100%;font-size:13px;border-collapse:collapse"><thead><tr><th style="text-align:left">시각</th><th style="text-align:left">종류</th><th style="text-align:left">영어 원문</th><th style="text-align:left">한국어 / 자막</th></tr></thead><tbody>${rows.map(r => `<tr style="border-top:1px solid var(--line)"><td style="white-space:nowrap;padding:4px 6px 4px 0">${fmtT(r[0])}-${fmtT(r[1])}</td><td style="white-space:nowrap;padding-right:6px">${tag[r[2]]}</td><td style="color:var(--muted)">${esc(r[3] || '')}</td><td>${esc(String(r[4] || '').replace(/\\n|\n/g, ' / '))}</td></tr>`).join('')}</tbody></table></details>`; };
+    const chk = (k, label, hint) => `<div style="display:flex;gap:10px;align-items:baseline;padding:6px 0"><input type="checkbox" id="plSub_${k}" data-pl-sub="${k}" ${SO[k] ? 'checked' : ''} style="width:18px;height:18px;flex:none;position:relative;top:3px"><label for="plSub_${k}" style="cursor:pointer"><b>${label}</b> <span class="small">${hint}</span></label></div>`;
+    const subForm = `<fieldset style="border:1px solid var(--line);border-radius:10px;padding:8px 14px;margin:0 0 12px"><legend class="small" style="padding:0 6px">넣을 자막 (따로 켜고 꺼요)</legend>${chk('en', '영어 원문', '영상에서 나오는 말 그대로, 말하는 시각에 맞춰 작은 회색 줄로. Claude 없이 바로 나와요.')}${chk('ko', '한국어 번역', '원문 한 줄에 한 줄씩 옮겨서 큰 흰 글씨로 (원문 위에).')}${chk('ai', 'AI 해설·후크 자막', '말이 없는 곳 + 인트로·아웃트로 후크. Claude 가 써요.')}</fieldset><div class="pl-ya-form">
+      <label>내가 넣고 싶은 자막 <span class="small">(한 줄에 하나: <code>0:03-0:06 넣을 말</code> · 완성 영상 시각 · 노란 글씨로 영상 위쪽에 따로 나와요)</span><textarea class="pl-input" rows="3" id="plSubMine" data-pl-sub="mine" placeholder="0:03-0:06 여기서 승부가 갈렸다">${esc(SO.mine)}</textarea></label>
+      <p class="small">유튜브 자막이 없는 영상(내 파일 등)은 원문·번역이 비어요. 만든 뒤 아래 자막 목록에서 원문과 번역을 줄별로 맞춰 볼 수 있어요.</p></div>`;
     const c4 = card(3, {
-      desc: !styDone ? '스타일을 입히면 열려요.' : (sport ? 'Claude 가 한국어 자막을 써요. 0초부터 결과를 먼저 던지는 인트로 후크, 슬로우 구간마다 ①②③ 단계 이름, 다시 보게 만드는 아웃트로 후크까지.' : 'Claude 가 영어 발언을 뜻 그대로 한국어 자막으로 옮겨요. 0초부터 가장 센 한 마디를 던지는 인트로 후크, 다시 보게 만드는 아웃트로 후크까지.'),
+      body: () => styDone ? subForm : '',
+      desc: !styDone ? '스타일을 입히면 열려요.' : '자막은 네 가지를 따로 넣어요: 영어 원문(영상에서 나오는 말), 한국어 번역(원문과 한 줄씩 짝), AI 해설·후크, 내가 넣는 자막. 원문·번역 시각은 영상 자막 시각 그대로라 말과 어긋나지 않아요.',
       btn: () => runIn(SU) ? '실행 멈춤' : subDone ? '자막 다시 쓰기' : '자막 넣기',
       attrs: stopOr(SU, 'data-ya-steps="aisubs"'), cls: runIn(SU) ? 'danger' : '',
       disabled: () => off || !styDone || busyElse(SU),
       isDone: () => subDone, statusLine: runLine(SU),
-      result: () => ep ? errOf(SU) + (subDone ? vid('aisubs', '편집/AI완성.mp4', '완성본') : '') + logs(SU) : '',
+      result: () => ep ? errOf(SU) + (subDone ? vid('aisubs', '편집/AI완성.mp4', '완성본') + subTable() : '') + logs(SU) : '',
     });
     const BR = ['aibrand'], brDone = ok('aibrand');
     const c5 = card(4, {
@@ -986,7 +1008,11 @@
       result: () => ep ? errOf(BR) + (brDone ? vid('aibrand', '편집/AI최종.mp4', '최종본 (인트로 + 본편 + 아웃트로)') + `<div class="pl-files">${['편집/AI인트로.mp4', '편집/AI아웃트로.mp4'].filter(p => out('aibrand', p)).map(p => ytFileLink(ep.ep, { path: p })).join(' ')}</div>` : '') + logs(BR) : '',
     });
     const TH = ['aithumb'], thDone = ok('aithumb'), thImg = out('aithumb', '편집/AI썸네일.jpg');
+    const TT = ytThumbDraft(ep);
     const c6 = card(5, {
+      body: () => cutDone ? `<div class="pl-ya-form"><label>상단 카피 직접 쓰기 <span class="small">(비우면 Claude 가 써요 · 노랑 글씨)</span><input class="pl-input" id="plThTop" data-pl-th="top" maxlength="30" placeholder="예: 금메달이 잡았다" value="${esc(TT.top)}"></label>
+        <label>하단 카피 직접 쓰기 <span class="small">(비우면 Claude 가 써요 · 흰 글씨, 빨강/파랑 띠)</span><input class="pl-input" id="plThBot" data-pl-th="bot" maxlength="40" placeholder="예: 도발했다가 1초 만에 넘어갔다" value="${esc(TT.bot)}"></label>
+        <p class="small">썸네일을 한 번 만든 뒤에 카피만 바꾸면, 장면은 그대로 두고 바로 다시 그려요 (몇 초).</p></div>` : '',
       desc: !cutDone ? '1차 컷이 끝나면 열려요.' : '예쁘게 말고 3단 원색 대비: 위 노랑 후킹 카피(12자 이하) + 가운데 2분할(액션 | 리액션 표정) + 아래 빨강/파랑 반전 카피(16자 이하). Claude 가 카피와 두 장면을 골라 1280x720 으로 만들어요.',
       btn: () => runIn(TH) ? '실행 멈춤' : thDone ? '다시 만들기' : '썸네일 만들기',
       attrs: stopOr(TH, 'data-ya-steps="aithumb"'), cls: runIn(TH) ? 'danger' : '',
@@ -1570,6 +1596,8 @@
     else if (t.dataset.plUrlinput) T.url[t.dataset.plUrlinput] = t.value;
     else if (t.hasAttribute('data-pl-caption')) { const p = c === 'insta' && window.InstaToon.current(); if (p) { p.caption = t.value; persist(); } }
     else if (t.id === 'plYlFile') ylUpload(t.files && t.files[0]);
+    else if (t.dataset.plSub) { const { it } = evalSteps('youtube'), d = ytSubDraft(it.ep); d[t.dataset.plSub] = t.type === 'checkbox' ? t.checked : t.value; if (t.type === 'checkbox') t.closest('label')?.classList.toggle('on', t.checked); }
+    else if (t.dataset.plTh) { const { it } = evalSteps('youtube'); ytThumbDraft(it.ep)[t.dataset.plTh] = t.value; }
     else if (t.dataset.yl) { if (t.dataset.yl === 'url') ylSetUrl(t.value); else if (t.dataset.yl === 'title') { YL.title = t.value; YL.edited = true; } else YL.view = t.value; }
     else if (t.dataset.yaNew === 'fxtimes') { const { it } = evalSteps('youtube'); ytPipe.fxTimes = t.value; ytPipe.fxIdea = it.idea ? it.idea.id : ''; if (!ytPipe.fxPack) ytPipe.fxPack = ytFxPick(it, it.ep); document.querySelector('#plRoot [data-ya-act="fxpack"]')?.removeAttribute('disabled'); ytOutRefresh(); ytPrevSync(); }
     else if (t.dataset.yaNew === 'fxlabels') { const { it } = evalSteps('youtube'); ytPipe.fxLabels = t.value; ytPipe.fxIdea = it.idea ? it.idea.id : ''; if (!ytPipe.fxPack) ytPipe.fxPack = ytFxPick(it, it.ep); document.querySelector('#plRoot [data-ya-act="fxpack"]')?.removeAttribute('disabled'); ytOutRefresh(); ytPrevSync(); }

@@ -7,13 +7,13 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { HOME, StepError, StopError, sanitize, exists, parseRanges, isLocalSource, localPath, run, probe, FFMPEG, YTDLP, lastLines, fmtTime, MAX_RANGE } from './util.mjs';
 import { createHighlights, LEN_MIN, LEN_MAX } from './highlights.mjs';
-import { AI_STYLES, isRefLook } from './ai.mjs';
+import { AI_STYLES, isRefLook, parseMine } from './ai.mjs';
 import { listStyles, saveStyle, enqueue, cancelJob, listJobs, resolveReadable, thumbOf, shutdownImages, ImgError } from './images.mjs';
 import { STEP_DEFS, STEP_FN, outputsFor, listAssets, checkScript, cleanPasted, parseScript, parseBanner, parseHook, PLACEHOLDER, SCRIPT_MAX_LINES, CHANNEL_PROFILES, LOOK_CHOICES, lookKeyOf, FX_PACKS, fxPackOf, parseFxTimes, migrateState, layoutLines, draftText, draftTranscript, splitAnswer, feedbackPrompt, callClaude, parseCredit, previewPlan, renderPreview } from './steps.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // 작업판이 쓰는 기능 수준. 3 = 새 9칸 순서 (/look, /ranges, deferRanges, 단계 clip·subs·fx)
-const API_LEVEL = 15;   // 15 = 실행기 다시 켜기 (POST /restart, health.disk) · 14 = 내 영상 올리기 (POST /upload) · 13 = 레퍼런스 쇼츠 룩 (look ref-<영상ID>, view.refStyle) · 12 = 한 구간·하이라이트 길이 최대 3분(30초·1분·2분·3분), 쇼츠 최대 3분 · 11 = 하이라이트 '지난 작업' 초기화(/hl/reset, 돌고 있으면 멈추고 휴지통 한 폴더로) · 10 = AI 편집 단계(aicut·aistyle·aisubs, 맥의 Claude Code) · 9 = 유튜브 초기화(/reset, 에피소드·하이라이트 전부 휴지통 한 폴더로) · 8 = 미리보기 견본(/preview, 고른 룩·이펙트를 실제 영상 4초로) · 7 = 에피소드 완전히 지우기(/episode/delete, 휴지통으로) · 6 = 하이라이트 찾기(/hl/*) ·  4 = 7칸 순서 (/edit 1차·2차 편집, /draft, /feedback, 슬로우 구간 x0.5, 매트 스토리 룩) · 5 = 최종 결과물 레퍼런스(이펙트 팩: /fxpack, status.fxPacks)
+const API_LEVEL = 16;   // 16 = 자막 원문·번역·해설·내 자막 나눠 켜기 (run body.subs), 썸네일 내 카피 (run body.thumb) · 15 = 실행기 다시 켜기 (POST /restart, health.disk) · 14 = 내 영상 올리기 (POST /upload) · 13 = 레퍼런스 쇼츠 룩 (look ref-<영상ID>, view.refStyle) · 12 = 한 구간·하이라이트 길이 최대 3분(30초·1분·2분·3분), 쇼츠 최대 3분 · 11 = 하이라이트 '지난 작업' 초기화(/hl/reset, 돌고 있으면 멈추고 휴지통 한 폴더로) · 10 = AI 편집 단계(aicut·aistyle·aisubs, 맥의 Claude Code) · 9 = 유튜브 초기화(/reset, 에피소드·하이라이트 전부 휴지통 한 폴더로) · 8 = 미리보기 견본(/preview, 고른 룩·이펙트를 실제 영상 4초로) · 7 = 에피소드 완전히 지우기(/episode/delete, 휴지통으로) · 6 = 하이라이트 찾기(/hl/*) ·  4 = 7칸 순서 (/edit 1차·2차 편집, /draft, /feedback, 슬로우 구간 x0.5, 매트 스토리 룩) · 5 = 최종 결과물 레퍼런스(이펙트 팩: /fxpack, status.fxPacks)
 let VERSION = 'dev';
 try { VERSION = fs.readFileSync(path.join(HERE, 'version.txt'), 'utf8').trim() || 'dev'; } catch {}
 const PORT = +(process.env.FIELDNOTE_RUNNER_PORT || 4777);
@@ -58,7 +58,7 @@ function loadAll() {
 function view(E) {
   return {
     ep: E.s.ep, title: E.s.title, note: E.s.note || '', ideaId: E.s.ideaId || '', format: E.s.format, channel: E.s.channel || '',
-    look: E.s.look || '', lookUsed: lookKeyOf(E), vtype: E.s.vtype || '', refStyle: E.s.refStyle && E.s.refStyle.look === E.s.look ? { name: E.s.refStyle.name, desc: E.s.refStyle.desc, base: E.s.refStyle.base } : null,
+    look: E.s.look || '', lookUsed: lookKeyOf(E), vtype: E.s.vtype || '', subsOpt: E.s.subsOpt ? { en: E.s.subsOpt.en, ko: E.s.subsOpt.ko, ai: E.s.subsOpt.ai, mine: E.s.subsOpt.mineText || '' } : null, thumbText: E.s.thumbText || null, refStyle: E.s.refStyle && E.s.refStyle.look === E.s.look ? { name: E.s.refStyle.name, desc: E.s.refStyle.desc, base: E.s.refStyle.base } : null,
     fxPack: E.s.fxPack || '', fxPackUsed: fxPackOf(E).id, fxTimes: E.s.fxTimes || '', fxLabels: E.s.fxLabels || [],
     sources: E.s.sources.map(x => ({ url: x.url, ranges: x.ranges })),
     steps: STEP_DEFS.map(d => {
@@ -481,6 +481,13 @@ const routes = {
     }
     if (ids.includes('script')) E.s.gate = false;
     if (typeof body.vtype === 'string' && /^[a-z0-9]{1,20}$/.test(body.vtype)) E.s.vtype = body.vtype;   // AI 편집: 영상 종류
+    if (ids.includes('aisubs') && body.subs && typeof body.subs === 'object') {   // AI 자막: 원문(en)·번역(ko)·해설/후크(ai) 켜고 끄기 + 내 자막
+      let mine; try { mine = parseMine(body.subs.mine); } catch (e) { throw new HttpError(400, e.message); }
+      E.s.subsOpt = { en: body.subs.en !== false, ko: body.subs.ko !== false, ai: body.subs.ai !== false, mine, mineText: String(body.subs.mine || '').slice(0, 4000) };
+    }
+    if (ids.includes('aithumb')) {   // 썸네일: 내가 적은 상단·하단 카피 (비우면 Claude 가 써요)
+      const t = body.thumb || {}; E.s.thumbText = { top: String(t.top || '').trim().slice(0, 30), bot: String(t.bot || '').trim().slice(0, 40) };
+    }
     launch(E, ids, false); return { json: { ok: true, step: ids[0], steps: ids } };
   },
   'POST /runall': ({ body }) => {
