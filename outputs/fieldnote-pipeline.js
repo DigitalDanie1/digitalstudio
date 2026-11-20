@@ -1349,13 +1349,16 @@
     const next = v < lastIdx ? `<button type="button" class="pl-nav-btn ${done[v] ? 'go' : ''}" data-pl-next ${done[v] ? '' : 'disabled'}>다음 단계 →</button>` : '';
     const finish = allDone ? `<div class="pl-finish"><b>🎉 이 작업이 끝났어요.</b> ${esc(PLATFORM_PLAYBOOK[PF_NAME[c]]?.metric ? '올린 뒤 볼 숫자: ' + PLATFORM_PLAYBOOK[PF_NAME[c]].metric : '')}<button type="button" class="pl-primary again" data-pl-new>＋ 새 작업 시작</button></div>` : '';
     const lastLabel = v === lastIdx ? '<span class="pl-tag">마지막 · 업로드</span>' : '';
+    const yt = c === 'youtube', doneN = done.filter(Boolean).length;
+    const prog = yt && it.idea ? `<div class="pl-prog"><span><b>${doneN}/${N}</b> 단계 끝 · 지금 <b>${esc(steps[Math.min(now, lastIdx)].name)}</b></span><i><i style="width:${Math.round(doneN / N * 100)}%"></i></i></div>` : '';
+    const runBox = statusLine ? (yt ? `<div class="pl-run" role="status">${statusLine}</div>` : `<p class="small pl-status">${statusLine}</p>`) : '';
     return `<section class="pl ${c === 'youtube' ? 'pl-yt' : ''}" id="plRoot" data-c="${c}" data-v="${v}" style="--pc:${pc}">${c === 'youtube' ? '<i id="ytAuto" hidden></i>' : ''}
-      <div class="pl-top">${items}${insta}</div>${c === 'youtube' ? ytPlayerHtml(it) : ''}${bar}
+      <div class="pl-top">${items}${insta}</div>${c === 'youtube' ? ytPlayerHtml(it) : ''}${prog}${bar}
       <article class="pl-card" aria-live="polite"><div class="pl-steplabel">${v + 1} / ${N} 단계 ${lastLabel}</div>
-        <h2>${esc(val(s.title, it))}</h2><p class="pl-desc">${esc(val(s.desc, it))}</p>
+        <h2>${esc(val(s.title, it))}</h2><p class="pl-desc">${esc(val(s.desc, it))}</p>${yt ? runBox : ''}
         ${c === 'youtube' && !AI_CH[it.idea ? ytCh(it.idea) : ytTab()] ? ytOutHtml(it) : ''}${val(s.body || '', it) || ''}${err}
-        ${btn}${statusLine ? `<p class="small pl-status">${statusLine}</p>` : ''}
-        <div class="pl-result" aria-label="이 단계의 결과"><div class="pl-result-h">결과</div>${res || '<span class="small">아직 없어요. 위 버튼을 누르면 여기에 나와요.</span>'}</div>
+        ${btn}${yt ? '' : runBox}
+        ${yt && !res ? '' : `<div class="pl-result" aria-label="이 단계의 결과"><div class="pl-result-h">결과</div>${res || '<span class="small">아직 없어요. 위 버튼을 누르면 여기에 나와요.</span>'}</div>`}
         ${finish}
         <div class="pl-nav"><button type="button" class="pl-nav-btn" data-pl-prev ${v > 0 ? '' : 'disabled'}>← 이전</button>${next}</div>
       </article></section>`;
@@ -1735,6 +1738,25 @@ span.pl-fxlink{color:var(--muted)}
 .pl-pair{color:var(--pc)}.pl-lesson{margin:0 0 8px;color:var(--muted)}.pl-views{color:var(--muted);margin:0 0 0 0}
 @media (prefers-reduced-motion:reduce){.fxm *{animation:none!important}}
 .pl-topic.on{border-color:var(--pc);background:color-mix(in srgb,var(--pc) 12%,var(--panel2))}
+.pl-prog{display:flex;align-items:center;gap:12px;margin:0 0 10px;font-size:13px;color:var(--muted)}.pl-prog b{color:var(--text)}
+.pl-prog>i{flex:1;height:6px;border-radius:99px;background:var(--line);overflow:hidden}.pl-prog>i>i{display:block;height:100%;background:var(--pc);border-radius:99px;transition:width .4s}
+.pl-yt .pl-bar{flex-wrap:nowrap;gap:0;overflow-x:auto;padding:4px 0 2px;margin-bottom:14px}
+.pl-yt .pl-bar li{flex:1 1 0;min-width:72px;position:relative}
+.pl-yt .pl-bar li+li::before{content:"";position:absolute;top:19px;left:calc(-50% + 16px);right:calc(50% + 16px);height:2px;background:var(--line)}
+.pl-yt .pl-bar li.done+li::before{background:var(--green)}
+.pl-yt .pl-bar button{flex-direction:column;justify-content:flex-start;gap:6px;min-height:0;padding:4px 2px;border:0;background:transparent;text-align:center;font-size:12px;border-radius:8px}
+.pl-yt .pl-bar .pl-n{width:30px;height:30px;font-size:13px;background:var(--panel2);position:relative;z-index:1}
+.pl-yt .pl-bar .done .pl-n{background:var(--green);border-color:var(--green);color:#0b1f15}.pl-yt .pl-bar .now .pl-n{background:var(--pc);border-color:var(--pc);color:#111}
+.pl-yt .pl-nm{max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
+.pl-yt .pl-bar .view button{box-shadow:none;color:var(--text);font-weight:800}.pl-yt .pl-bar .view .pl-n{box-shadow:0 0 0 4px color-mix(in srgb,var(--pc) 35%,transparent)}
+.pl-yt .pl-bar .now button{border:0}
+.pl-run{margin:0 0 16px;padding:14px 16px;border-radius:12px;border:1px solid color-mix(in srgb,var(--pc) 55%,var(--line));background:color-mix(in srgb,var(--pc) 9%,var(--panel2));font-size:14px;line-height:1.5}
+.pl-run b:first-child{font-size:26px;font-weight:900;color:var(--text);margin-right:4px;vertical-align:-2px}
+.pl-run>div{height:10px!important;margin-top:10px!important}
+.pl-yt .pl-primary{min-height:56px;font-size:18px}
+.pl-yt .pl-looks .pl-topic{position:relative}.pl-yt .pl-looks .pl-topic.on::after{content:"✓";position:absolute;top:8px;right:10px;width:22px;height:22px;border-radius:50%;background:var(--pc);color:#111;font-size:13px;font-weight:900;display:grid;place-items:center}
+.pl-yt .pl-looks .pl-lk-txt .small{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.pl-yt .pl-looks .pl-lk-txt b{padding-right:26px}
 .pl-topic em{font-style:normal;font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:1px 6px;flex:none}
 .pl-help{margin:10px 0;font-size:14px}.pl-help summary{cursor:pointer;color:var(--pc);min-height:36px;display:flex;align-items:center}.pl-help ol{margin:6px 0 0;padding-left:20px;line-height:1.7}.pl-help code{background:var(--panel2);padding:1px 5px;border-radius:4px}
 .pl-link{background:none;border:0;color:var(--pc);text-decoration:underline;cursor:pointer;font-size:14px;padding:6px 0;min-height:36px}
