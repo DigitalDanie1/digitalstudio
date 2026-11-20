@@ -322,13 +322,14 @@ document.addEventListener('click', async e => {
         }
         if (typeof ytPipe === 'object') { ytPipe.look = ''; ytPipe.lookIdea = ''; }
       } else if (a === 'aicut') {
-        // 레슬링 AI 편집 ②: 에피소드가 없으면 만들고(구간은 AI 가 골라요) 소스 확인·영상 받기·AI 하이라이트 1차 컷을 이어서 돌려요
+        // AI 편집 ② (레슬링·기독교·보수/이민): 에피소드가 없으면 만들고(구간은 AI 가 골라요) 소스 확인·영상 받기·AI 하이라이트 1차 컷을 이어서 돌려요
         if (act.dataset.yaConfirm && !confirm(act.dataset.yaConfirm)) return;
         const idea = runnerIdea(); if (!idea) throw new Error('주제를 먼저 고르세요');
         let ep = cur && cur.ep;
         if (!ep) {
           const url = (typeof ytPipe === 'object' && ytPipe.url) || ytFirstUrl(idea);
-          const r = await runnerFetch('/episodes', { title: idea.title, note: idea.note || '', url, deferRanges: true, ideaId: idea.id, channel: 'yt-wrestling', format: 'shorts' });
+          let channel = 'yt-wrestling'; try { channel = (typeof ytValidCh === 'function' && ytValidCh(idea.ytChannel)) || (typeof ytChannelOfTopic === 'function' && ytChannelOfTopic(idea.topicId)) || (typeof ytTab === 'function' && ytTab()) || channel; } catch (e) {}
+          const r = await runnerFetch('/episodes', { title: idea.title, note: idea.note || '', url, deferRanges: true, ideaId: idea.id, channel, format: 'shorts' });
           ep = r.ep;
           if (!idea.ytStarted || idea.ytHidden) { idea.ytStarted = idea.ytStarted || Date.now(); delete idea.ytHidden; persist(); }
         }

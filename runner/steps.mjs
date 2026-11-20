@@ -25,6 +25,7 @@ export const STEP_DEFS = [
   { id: 'aistyle', name: 'AI 스타일 입히기' },
   { id: 'aisubs', name: 'AI 자막' },
   { id: 'aibrand', name: 'AI 인트로·아웃트로' },
+  { id: 'aithumb', name: 'AI 썸네일' },
 ];
 // 스튜디오 카드(9칸) 와 실행기 단계의 짝: 링크·룩 = 실행기 단계 없음 / 영상 다운 = research+download / 컷 편집 = 구간+clip+plan+rough /
 // 자막 = subs / 이펙트 = fx / 음악·녹음 = script(대본, 게이트) → 녹음 → mix / 업로드 패키지 = upload / 올리기 = 없음
@@ -334,7 +335,7 @@ export function outputsFor(id, E) {
     case 'subs': return ['편집/자막본.mp4', ...(exists(E.p('편집/원본자막.ass')) ? ['편집/원본자막.ass'] : [])];
     case 'fx': return ['편집/완성본.mp4'];
     case 'mix': return ['편집/최종본.mp4'];
-    case 'aicut': case 'aistyle': case 'aisubs': case 'aibrand': return AI_OUT[id];
+    case 'aicut': case 'aistyle': case 'aisubs': case 'aibrand': case 'aithumb': return AI_OUT[id];
     case 'upload': return ['업로드/업로드.txt', '업로드/업로드.json', '업로드/영상.mp4', '업로드/썸네일.jpg'];
     default: return [];
   }

@@ -9,10 +9,49 @@ import { HOME, FFMPEG, FONT_DIR, FONT_NAME, StepError, StopError, run, ff, probe
 const CLAUDE = process.env.FIELDNOTE_CLAUDE || [path.join(HOME, '.local/bin/claude'), path.join(HOME, '.claude/local/claude'), '/opt/homebrew/bin/claude', '/usr/local/bin/claude'].find(exists) || 'claude';
 const FONT = process.env.FIELDNOTE_AI_FONT || FONT_NAME;
 const W = 1080, H = 1920, VY = 470, VH = 970;   // 화면 틀: 경기 화면은 y=470 부터 1080x970
-export const AI_STYLES = {
-  'yt-mat': { name: 'MAT STORY', handle: '@matstoryhq', logo: '브랜드/matstory_logo.png', watermark: ['MAT', 'STORY'], yellow: 'FFD600', red: 'FF3B30', tone: '반말, 짧고 세게. 레슬링을 모르는 사람도 알아듣게. 위 제목 2줄 끝에 "ㄷㄷ" 가능.' },
+// 채널마다: 무엇을 하이라이트로 보는지(kind), 말투, 브랜드. 로고·핸들이 없으면 인트로·아웃트로는 글자만 넣어요.
+const SPORT = {
+  kind: 'sport',
+  pick: '한 번에 보이는 결정적 기술(들어 던지기, 테이크다운, 폴, 역전), 점수판이 크게 바뀌는 순간, 관중/중계가 터지는 순간',
+  cut: `결정적 기술 하나를 중심으로 짠다.
+1) intro (후크, 1.5~3초): 맥락 설명 없이 제일 충격적인 순간부터. 첫 프레임부터 몸이 움직이고 있어야 한다.
+2) 점수판/결과가 보이는 장면이 있으면 짧게 (role score, 1.5~3초)
+3) 같은 기술을 슬로우로 다시: 동작을 2~3단계(예: 낮추기 / 허리 감기 / 넘기기)로 나눠 단계마다 컷 하나 (role slow, step 에 단계 이름). speed 는 0.15~0.5, 단계 하나가 출력에서 4~7초가 되게.
+4) 기술 뒤 반응/세리머니가 있으면 원속도 (role after)
+5) outro (후크, 2~4초): 다시 보고 싶게. 마지막 프레임이 intro 첫 프레임으로 이어지는 루프가 기본.
+전체 출력 길이는 30~50초.`,
+  roles: 'intro|score|slow|after|outro',
+  who: '선수/팀/대회. 누가 어느 쪽인지는 싱글릿 글씨·색·점수판 이름 같은 화면 근거로만 정하고 근거를 괄호로 적어라. 확실하지 않으면 빈칸',
+  check: '1차 컷의 who 와 moments 의 선수 구분(누가 누구를 넘겼는지, 누가 이겼는지)은 틀릴 수 있다. 조사 결과와 프레임(싱글릿 글씨·색)으로 다시 확인한다.',
+  fx: '인트로가 끝난 직후 선수 라벨 하나 (type label, k=이름 (팀/국가), s=대회 · 체급). 점수판 컷에 점수 팝업 (type pop, text=큰 숫자 예 "4 : 0", sub=설명, y 600~700). 커리어 숫자 같은 큰 사실이 확인되면 pop 하나 더.',
+  caps: '- slow 컷에는 그 단계 이름을 "① ...", "② ...", "③ ..." 로 그 컷 구간에 정확히 맞춘다.',
+  thumbL: '주인공의 결정적 액션 컷', thumbR: '관중/상대/코치의 리액션 컷 (얼굴 표정이 보여야 함)',
 };
-export const AI_OUT = { aicut: ['편집/AI컷.json', '편집/AI1차컷.mp4'], aistyle: ['조사/research.md', '편집/AI완성.json', '편집/AI스타일본.mp4'], aisubs: ['편집/AI완성.mp4'], aibrand: ['편집/AI인트로.mp4', '편집/AI아웃트로.mp4', '편집/AI최종.mp4'] };
+const TALK = {
+  kind: 'talk',
+  pick: '가장 논쟁적이거나 감정이 터지는 발언, 청중·상대 반응이 터지는 순간 (중계 자막을 꼭 보고 판단)',
+  cut: `화자의 가장 강한 발언 하나를 중심으로 짠다. 모든 컷은 speed 1 (슬로우 없음).
+1) intro (후크, 2~4초): 가장 센 한 마디가 나오는 순간. 맥락 설명 없이 바로.
+2) main 컷 1~3개: 그 발언의 맥락과 핵심 논지. 문장 중간에서 끊지 마라 (중계 자막 시각으로 문장 경계를 확인).
+3) 청중·상대 반응이 있으면 짧게 (role react, 1.5~3초)
+4) outro (후크, 2~4초): 결론 한 마디, 또는 반박이 나오기 직전에서 끊기.
+전체 출력 길이는 30~55초.`,
+  roles: 'intro|main|react|outro',
+  who: '화자 이름·직함·자리(토론회, 설교, 인터뷰 등). 화면 이름 자막이나 중계 자막 근거로만 적고 근거를 괄호로. 확실하지 않으면 빈칸',
+  check: '1차 컷의 who 와 moments 는 틀릴 수 있다. 조사 결과와 화면 이름 자막·중계 자막으로 다시 확인한다.',
+  fx: '인트로가 끝난 직후 화자 라벨 하나 (type label, k=이름, s=직함 · 자리). 확인된 핵심 숫자가 있으면 팝업 하나 (type pop, text=숫자, sub=설명, y 600~700). 없으면 팝업 없음.',
+  caps: '- 화자의 영어 발언은 뜻이 바뀌지 않게 한국어로 옮기고, 그 말이 나오는 시각에 맞춘다. 영상에 없는 말을 지어내지 마라.',
+  thumbL: '화자가 가장 강한 표정·손짓을 하는 컷', thumbR: '청중/상대의 리액션 컷 (얼굴 표정이 보여야 함)',
+};
+const TALK_RULES = ['자막과 문장은 모두 한국어로만. 영어 문장을 그대로 두지 않는다.', '화자의 말을 옮길 때 누가 한 말인지 분명히 밝힌다.', '영상에 없는 발언을 지어내지 않는다.'];
+export const AI_STYLES = {
+  'yt-mat': { ...SPORT, genre: '레슬링', name: 'MAT STORY', handle: '@matstoryhq', logo: '브랜드/matstory_logo.png', watermark: ['MAT', 'STORY'], yellow: 'FFD600', red: 'FF3B30', tone: '반말, 짧고 세게. 레슬링을 모르는 사람도 알아듣게. 위 제목 2줄 끝에 "ㄷㄷ" 가능.' },
+  'yt-christian': { ...TALK, genre: '기독교 해설', name: '', handle: '', logo: '브랜드/christian_logo.png', watermark: null, yellow: '3DE0C0', red: 'FFFFFF', cta: '0E1B33', rules: TALK_RULES,
+    tone: '존댓말, 차분하지만 단호하게. 성경과 교리는 쉬운 말로. 이단성 주장에는 날카롭게, 교단의 공식 판단과 의견은 나눠서. 사람을 조롱하지 않는다.' },
+  'yt-politics': { ...TALK, genre: '보수·기독교 가치 관점의 정치·이민 시사 해설', name: '', handle: '', logo: '브랜드/politics_logo.png', watermark: ['FIELD', 'NOTE'], yellow: 'FFD400', red: 'FF3B30', rules: TALK_RULES,
+    tone: '존댓말, 짧고 단단하게. 사실, 추정("~로 알려져 있어요"), 의견("제 생각엔")을 나눠서. 사람을 조롱하지 않는다.' },
+};
+export const AI_OUT = { aicut: ['편집/AI컷.json', '편집/AI1차컷.mp4'], aistyle: ['조사/research.md', '편집/AI완성.json', '편집/AI스타일본.mp4'], aisubs: ['편집/AI완성.mp4'], aibrand: ['편집/AI인트로.mp4', '편집/AI아웃트로.mp4', '편집/AI최종.mp4'], aithumb: ['편집/AI썸네일.jpg', '편집/AI썸네일.json'] };
 
 // 맥의 Claude Code 스킬(~/.claude/skills). 단계마다 해당 스킬 규칙을 먼저 읽고 따르게 해요. 없으면 건너뛰어요.
 const SKILL_DIR = path.join(HOME, '.claude/skills');
@@ -24,7 +63,9 @@ const skills = (ctx, names) => {
 const readJson = f => JSON.parse(fs.readFileSync(f, 'utf8'));
 const writeJson = (f, o) => { fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, JSON.stringify(o, null, 1)); };
 const r1 = n => Math.round(n * 10) / 10;
-const styleOf = E => { const st = AI_STYLES[E.s.look || '']; if (!st) throw new StepError(`AI 편집은 지금 매트 스토리 룩만 돼요. 편집 스타일에서 매트 스토리 룩을 골라 주세요.`); return st; };
+// 채널의 AI 스타일: 고른 룩이 AI 스타일이면 그것, 아니면 채널 기본
+const CH_STYLE = { 'yt-wrestling': 'yt-mat', 'yt-christian': 'yt-christian', 'yt-politics': 'yt-politics' };
+const styleOf = E => { const st = AI_STYLES[E.s.look || ''] || AI_STYLES[CH_STYLE[E.s.channel] || 'yt-mat']; return st; };
 
 function source(E) {
   let info; try { info = readJson(E.p('소스.json'))[0]; } catch { info = null; }
@@ -84,6 +125,7 @@ async function sheets(E, ctx, src, name, a, dur, fps, cols, rows, width) {
 
 // ---------- 2. 하이라이트 1차 컷 ----------
 async function aicut(E, ctx) {
+  const st = styleOf(E);
   const info = source(E), dur = (await probe(info.file, ctx)).duration;
   if (!dur) throw new StepError('영상 길이를 못 읽었어요.');
   const tr = transcript(E, info), trTxt = tr ? '영어 중계 자막(원본 시각):\n' + tr : '(중계 자막 없음)';
@@ -91,12 +133,12 @@ async function aicut(E, ctx) {
   if (dur > 60) {
     ctx.log('전체 영상을 2초 간격으로 훑어봐요…');
     const coarse = await sheets(E, ctx, info.file, 'coarse', 0, dur, 0.5, 6, 5, 320);
-    const pick = await askClaude(E, ctx, `너는 레슬링 쇼츠 편집자다. 아래 영상에서 세로 쇼츠 하나로 만들 가장 강한 하이라이트 한 장면을 고른다.
+    const pick = await askClaude(E, ctx, `너는 ${st.genre} 쇼츠 편집자다. 아래 영상에서 세로 쇼츠 하나로 만들 가장 강한 하이라이트 한 장면을 고른다.
 영상: "${info.title}" (${info.channel}), 길이 ${Math.round(dur)}초.
 아래 썸네일 시트를 Read 도구로 전부 보고 판단해라:
 ${coarse}
 ${trTxt}
-고를 기준: 한 번에 보이는 결정적 기술(들어 던지기, 테이크다운, 폴, 역전), 점수판이 크게 바뀌는 순간, 관중/중계가 터지는 순간.
+고를 기준: ${st.pick}.
 JSON 하나만 답해라: {"a": 시작초, "b": 끝초, "why": "한 줄"}  (b-a 는 15~40초, 결정적 순간 앞 3초 이상 포함)`,
       j => !(j.b > j.a) ? 'b 가 a 보다 커야 해요.' : j.a < 0 || j.b > dur + 1 ? `시각은 0~${Math.round(dur)}초 안이어야 해요.` : j.b - j.a > 60 ? '60초를 넘어요.' : '');
     win = [Math.max(0, +pick.a), Math.min(dur, +pick.b)];
@@ -104,24 +146,20 @@ JSON 하나만 답해라: {"a": 시작초, "b": 끝초, "why": "한 줄"}  (b-a 
   }
   ctx.log('고른 장면을 0.2초 간격으로 봐요…');
   const fine = await sheets(E, ctx, info.file, 'fine', win[0], win[1] - win[0], 5, 5, 5, 384);
-  const plan = await askClaude(E, ctx, `${skills(ctx, ['shorts-blueprint', 'edit-plan-sheet'])}너는 레슬링 쇼츠 편집자다. 아래는 "${info.title}" 의 원본 ${r1(win[0])}~${r1(win[1])}초를 0.2초 간격으로 뽑은 프레임 시트다. Read 도구로 전부 봐라:
+  const plan = await askClaude(E, ctx, `${skills(ctx, ['shorts-blueprint', 'edit-plan-sheet'])}너는 ${st.genre} 쇼츠 편집자다. 아래는 "${info.title}" 의 원본 ${r1(win[0])}~${r1(win[1])}초를 0.2초 간격으로 뽑은 프레임 시트다. Read 도구로 전부 봐라:
 ${fine}
 ${trTxt}
 
-할 일: 결정적 기술 하나를 중심으로 세로 쇼츠 1차 컷 편집안을 짠다. 인트로와 아웃트로가 제일 중요하다. 둘 다 후크여야 한다.
-1) intro (후크, 1.5~3초): 맥락 설명 없이 제일 충격적인 순간부터. 첫 프레임부터 몸이 움직이고 있어야 한다. 스크롤을 멈추게 하는 장면.
-2) 점수판/결과가 보이는 장면이 있으면 짧게 (role score, 1.5~3초)
-3) 같은 기술을 슬로우로 다시: 동작을 2~3단계(예: 낮추기 / 허리 감기 / 넘기기)로 나눠 단계마다 컷 하나 (role slow). speed 는 0.15~0.5, 단계 하나가 출력에서 4~7초가 되게.
-4) 기술 뒤 반응/세리머니가 있으면 원속도 (role after)
-5) outro (후크, 2~4초): 끝나는 순간 다시 보고 싶게. 마지막 프레임이 intro 첫 프레임으로 자연스럽게 이어지는 루프가 기본. 결과가 터지기 직전에서 끊는 것도 가능.
-전체 출력 길이(각 컷 (b-a)/speed 의 합)는 30~50초. 첫 컷은 반드시 intro, 마지막 컷은 반드시 outro.
+할 일: 세로 쇼츠 1차 컷 편집안을 짠다. 인트로와 아웃트로가 제일 중요하다. 둘 다 후크여야 한다. 스크롤을 멈추게 하는 장면으로 시작한다.
+${st.cut}
+각 컷의 출력 길이는 (b-a)/speed. 첫 컷은 반드시 intro, 마지막 컷은 반드시 outro.
 시각은 반드시 프레임에서 직접 확인한 원본 초(소수점 1자리)로 적어라.
 
 JSON 하나만 답해라:
 {"moments":[{"t":원본초,"what":"그 순간 화면에 보이는 것"}],
- "cuts":[{"a":원본초,"b":원본초,"speed":1,"role":"intro|score|slow|after|outro","step":"슬로우 단계 이름(slow 일 때만)"}],
- "who":"선수/팀/대회. 누가 어느 쪽인지는 싱글릿 글씨·색·점수판 이름 같은 화면 근거로만 정하고 근거를 괄호로 적어라. 확실하지 않으면 빈칸",
- "crop_bottom": 화면 아래쪽 중계 띠(뉴스 티커·광고 띠 등)가 차지하는 높이 비율 0~0.25 (없으면 0. 경기 장면이 잘리지 않게)}`,
+ "cuts":[{"a":원본초,"b":원본초,"speed":1,"role":"${st.roles}","step":"슬로우 단계 이름(slow 일 때만)"}],
+ "who":"${st.who}",
+ "crop_bottom": 화면 아래쪽 중계 띠(뉴스 티커·광고 띠 등)가 차지하는 높이 비율 0~0.25 (없으면 0. 장면이 잘리지 않게)}`,
     j => {
       const c = j.cuts;
       if (!Array.isArray(c) || c.length < 3) return 'cuts 가 3개 이상 있어야 해요.';
@@ -138,7 +176,7 @@ JSON 하나만 답해라:
     });
   writeJson(E.p('편집/AI컷.json'), { window: win, ...plan });
   for (const f of ['편집/AI완성.json', '편집/AI스타일본.mp4', '편집/AI완성.mp4']) fs.rmSync(E.p(f), { force: true });
-  for (const id of ['aistyle', 'aisubs', 'aibrand']) if (E.s.steps[id]) E.s.steps[id] = { status: 'todo' };
+  for (const id of ['aistyle', 'aisubs', 'aibrand', 'aithumb']) if (E.s.steps[id]) E.s.steps[id] = { status: 'todo' };
   await renderCut(E, ctx, info);
 }
 
@@ -183,13 +221,14 @@ function checkFinal(plan, needCaps) {
     return '';
   };
 }
-const common = (E, st, info, plan) => `너는 한국어 레슬링 쇼츠 채널 "${st.name}" 의 편집 작가다.
+const common = (E, st, info, plan) => `너는 한국어 ${st.genre} 쇼츠 채널${st.name ? ` "${st.name}"` : ''}의 편집 작가다.
 원본: "${info.title}" (${info.channel}) ${info.url}
 1차 컷 편집안 (cuts 의 out = 완성 영상의 [시작초, 끝초], a/b = 원본 초, moments = 원본 시각에 보이는 것). 완성 영상 길이 ${plan.duration}초:
 ${JSON.stringify({ moments: plan.moments, cuts: plan.cuts, who: plan.who }, null, 1)}
 프레임 시트(원본 ${r1(plan.window[0])}초부터 0.2초 간격, 5x5 타일, Read 로 확인): ${fineList(E)}
 ${transcript(E, info) ? '영어 중계 자막(원본 시각):\n' + transcript(E, info) : ''}
 말투: ${st.tone}
+${(st.rules || []).map(r => '- ' + r).join('\n')}
 사실은 화면/중계 자막에서 확인된 것, 또는 조사 파일 ${E.p('조사/research.md')} 의 A·B 등급만 쓴다. 확인 못 한 숫자/기록/과장은 쓰지 않는다. 시각은 모두 완성 영상 기준 초.`;
 
 async function aistyle(E, ctx) {
@@ -198,12 +237,12 @@ async function aistyle(E, ctx) {
   fs.mkdirSync(E.p('조사'), { recursive: true });
   const j = await askClaude(E, ctx, `${skills(ctx, ['source-check-research', 'shorts-blueprint'])}${common(E, st, info, plan)}
 
-주의: 1차 컷의 who 와 moments 의 선수 구분(누가 누구를 넘겼는지, 누가 이겼는지)은 틀릴 수 있다. 조사 결과와 프레임(싱글릿 글씨·색)으로 다시 확인하고, 다르면 조사와 화면을 따른다.
+주의: ${st.check} 다르면 조사와 화면을 따른다.
 먼저 할 일: 이 경기·선수·대회·기록을 source-check-research 방식(한·영 검색, A/B/C 등급, 교차 확인, 확인 못 한 것 표시)으로 조사해서 Write 도구로 ${E.p('조사/research.md')} 에 저장한다.
 
 이번 할 일: 스타일 요소만 정한다 (자막은 다음 단계).
-- 위 고정 제목 l1(노랑), l2(빨강): 각 14자 이내. 이것이 인트로 후크다. 사람+결과+숫자. 설명·인사 금지.
-- fx: 인트로가 끝난 직후 선수 라벨 하나 (type label, k=이름 (팀/국가), s=대회 · 체급). 점수판 컷에 점수 팝업 (type pop, text=큰 숫자 예 "4 : 0", sub=설명, y 600~700). 커리어 숫자 같은 큰 사실이 확인되면 pop 하나 더. 남발 금지. 아웃트로에는 fx 를 두지 않는다.
+- 위 고정 제목 l1, l2: 각 14자 이내. 이것이 인트로 후크다. 사람+결과+숫자. 설명·인사 금지.
+- fx: ${st.fx} 남발 금지. 아웃트로에는 fx 를 두지 않는다.
 - credits: [[0, ${plan.duration}, "원본 채널명"]]
 JSON 하나만 답해라: {"frame":{"l1":"","l2":""},"fx":[[시작,끝,{"type":"label","k":"","s":""}],[시작,끝,{"type":"pop","text":"","sub":"","y":660}]],"credits":[[0,${plan.duration},"${info.channel || ''}"]],"facts":["쓴 사실과 근거 한 줄씩"]}`, checkFinal(plan, false));
   j.captions = [];
@@ -220,11 +259,11 @@ async function aisubs(E, ctx) {
   const j = await askClaude(E, ctx, `${skills(ctx, ['shorts-blueprint'])}${common(E, st, info, plan)}
 이미 정한 위 제목·라벨·팝업 (바꾸지 말고 그대로 돌려줘라): ${JSON.stringify({ frame: base.frame, fx: base.fx, credits: base.credits })}
 
-선수 구분과 승패는 조사 파일과 프레임 기준이다 (1차 컷의 who·moments 가 틀렸을 수 있다).
+${st.check}
 이번 할 일: 자막. 인트로와 아웃트로가 제일 중요하다. 둘 다 후크다.
 - 인트로(intro 컷 구간): 0초에 바로 시작. 결과/숫자/반전을 먼저 던진다 (예: "올림픽 5연패\\n시작 15초 만에 들어 던지기"). 인사, 설명, "오늘은" 금지.
 - 아웃트로(outro 컷 구간): 영상 끝까지. 다시 보게 만드는 한 줄 (예: "자, 15초 만에 [[한 번 더]].") 또는 댓글을 부르는 질문. 마지막 자막이 인트로로 이어지게.
-- slow 컷에는 그 단계 이름을 "① ...", "② ...", "③ ..." 로 그 컷 구간에 정확히 맞춘다.
+${st.caps}
 - 한 자막 최대 2줄, 줄당 16자 이내, 줄바꿈은 \\n. 강조할 단어 하나만 [[단어]]. 자막끼리 겹치지 않게.
 JSON 하나만 답해라: {"frame":{...그대로},"fx":[...그대로],"credits":[...그대로],"captions":[[시작,끝,"텍스트"]],"facts":["쓴 사실과 근거 한 줄씩"]}`, checkFinal(plan, true));
   j.frame = base.frame; j.fx = base.fx; j.credits = base.credits;
@@ -243,7 +282,7 @@ export function buildAss(fin, plan, st) {
   const add = (a, b, layer, style, text) => ev.push(`Dialogue: ${layer},${ts(a)},${ts(b)},${style},,0,0,0,,${text}`);
   add(0, end, 5, 'Title', `{\\an5\\pos(540,262)\\c${Y}}${esc(fin.frame?.l1)}`);
   add(0, end, 5, 'Title', `{\\an5\\pos(540,354)\\c${R}}${esc(fin.frame?.l2)}`);
-  add(0, end, 4, 'Mark', `{\\an3\\pos(1050,1424)}${st.watermark[0]} {\\c${Y}}${st.watermark[1]}`);
+  if (st.watermark) add(0, end, 4, 'Mark', `{\\an3\\pos(1050,1424)}${st.watermark[0]} {\\c${Y}}${st.watermark[1]}`);
   for (const [a, b, t] of fin.credits || []) add(a, b, 4, 'Credit', `{\\an8\\pos(540,1466)}영상: ${esc(t)}`);
   for (const [a, b, t] of fin.captions || []) add(a, b, 3, 'Cap', `{\\an2\\pos(540,1345)}${hi(t)}`);
   for (const [a, b, f] of fin.fx || []) {
@@ -291,16 +330,17 @@ const IN_D = 2.2, OUT_D = 3.2;
 async function aibrand(E, ctx) {
   const st = styleOf(E), info = source(E), plan = readJson(E.p('편집/AI컷.json'));
   if (!exists(E.p('편집/AI완성.mp4'))) throw new StepError('자막까지 끝내고 해 주세요.');
-  const root = E.homeRoot || path.join(HOME, 'Desktop/유투브'), logo = path.join(root, st.logo);
-  if (!exists(logo)) throw new StepError(`채널 로고 파일이 없어요: ${logo}`);
+  const root = E.homeRoot || path.join(HOME, 'Desktop/유투브'), logoPath = path.join(root, st.logo), hasLogo = exists(logoPath);
+  if (!hasLogo) ctx.log(`  채널 로고가 없어서 글자만 넣어요 (${logoPath} 에 넣으면 들어가요)`);
+  const logoIn = d => hasLogo ? ['-loop', '1', '-t', String(d), '-i', logoPath] : ['-f', 'lavfi', '-t', String(d), '-i', 'color=c=black@0.0:s=16x16,format=rgba'];
   const fin = readJson(E.p('편집/AI완성.json'));
   ctx.log('Claude 가 인트로·아웃트로 후크 문장을 써요…');
   const short = (t, n) => String(t || '').replace(/\[\[|\]\]/g, '').length <= n;
-  const j = await askClaude(E, ctx, `${skills(ctx, ['shorts-blueprint'])}너는 한국어 레슬링 쇼츠 채널 "${st.name}" (${st.handle}) 의 편집 작가다.
+  const j = await askClaude(E, ctx, `${skills(ctx, ['shorts-blueprint'])}너는 한국어 ${st.genre} 쇼츠 채널${st.name ? ` "${st.name}"` : ''}${st.handle ? ` (${st.handle})` : ''}의 편집 작가다.
 본편 쇼츠 앞에 붙일 인트로(${IN_D}초)와 뒤에 붙일 아웃트로(${OUT_D}초) 문장을 쓴다. 둘 다 무조건 후크다.
 본편: 위 제목 ${JSON.stringify(fin.frame)}, 자막 ${JSON.stringify(fin.captions)}
 1차 컷 정보: ${JSON.stringify({ moments: plan.moments, who: plan.who })}
-사실은 조사 파일 ${E.p('조사/research.md')} 의 A·B 등급만 쓴다 (Read 로 확인). 선수 구분·승패는 조사 파일 기준.
+사실은 조사 파일 ${E.p('조사/research.md')} 의 A·B 등급만 쓴다 (Read 로 확인). ${st.check}
 말투: ${st.tone}
 - 인트로: 0.1초 만에 스크롤을 멈추게 하는 한 방. 결과·숫자·반전·질문 중 하나. 인사·채널 소개·"오늘은" 금지. l1 은 짧은 도발(10자 이내), l2 는 핵심 한 방(12자 이내). 강조 단어 하나만 [[단어]].
 - 아웃트로: 끝까지 본 사람이 다시 보거나 구독하게 만드는 한 방. l1 은 여운/반전/질문(12자 이내), l2 는 다음 편 예고나 떡밥(12자 이내), cta 는 구독 유도 한 줄(14자 이내, 예: "구독하고 다음 기술 보기").
@@ -325,9 +365,9 @@ ${lines.map(([a, sty, txt]) => `Dialogue: 1,${ts(a)},${ts(d)},${sty},,0,0,0,,${t
   const logoF = (size, at) => `scale=w='${size}*min(1\\,0.55+max(0\\,t-${at})*3)':h=-1:eval=frame,format=rgba,fade=in:st=${at}:d=0.15:alpha=1`;
   // 인트로: 본편 인트로 장면을 꽉 채워 살짝 줌인 + 흰 섬광 + 후크 2줄 + 로고
   const inAss = E.p('편집/AI인트로.ass');
-  fs.writeFileSync(inAss, ass(IN_D, [[0, 'Mid', pop(540, 460, j.intro.l1, 100) + hi(j.intro.l1)], [0.12, 'Big', pop(540, 640, j.intro.l2, 156) + `{\\c${Y}}` + hi(j.intro.l2)], [0.5, 'Small', `{\\an5\\pos(540,1570)}${esc(st.handle)}`]]));
+  fs.writeFileSync(inAss, ass(IN_D, [[0, 'Mid', pop(540, 460, j.intro.l1, 100) + hi(j.intro.l1)], [0.12, 'Big', pop(540, 640, j.intro.l2, 156) + `{\\c${Y}}` + hi(j.intro.l2)], ...(st.handle ? [[0.5, 'Small', `{\\an5\\pos(540,1570)}${esc(st.handle)}`]] : []), ...(!hasLogo && st.name ? [[0.45, 'Mid', `{\\an5\\pos(540,1290)}${esc(st.name)}`]] : [])]));
   ctx.log('인트로 그리는 중…');
-  await ff(['-ss', '0', '-t', String(IN_D), '-i', E.p('편집/AI1차컷.mp4'), '-loop', '1', '-t', String(IN_D), '-i', logo, '-filter_complex',
+  await ff(['-ss', '0', '-t', String(IN_D), '-i', E.p('편집/AI1차컷.mp4'), ...logoIn(IN_D), '-filter_complex',
     `[0:v]crop=${W}:${VH}:0:${VY},scale=w='${H}*16/9*(1+0.05*t)':h=-2:eval=frame,crop=${W}:${H},eq=brightness=-0.13:saturation=1.25,fade=in:st=0:d=0.18:color=white,fps=30,setsar=1[bg];` +
     `[1:v]${logoF(470, 0.45)}[lg];[bg][lg]overlay=x='(W-w)/2':y='1290-h/2':eval=frame,subtitles=filename='${q(inAss)}':fontsdir='${fd}',format=yuv420p[v];` +
     `[0:a]aresample=48000,aformat=channel_layouts=stereo,afade=t=out:st=${IN_D - 0.3}:d=0.3[a]`,
@@ -335,9 +375,9 @@ ${lines.map(([a, sty, txt]) => `Dialogue: 1,${ts(a)},${ts(d)},${sty},,0,0,0,,${t
   // 아웃트로: 본편 마지막 장면을 흐리게 멈추고 후크 + 큰 로고 + 구독 유도
   const outAss = E.p('편집/AI아웃트로.ass');
   fs.writeFileSync(outAss, ass(OUT_D, [[0, 'Mid', pop(540, 360, j.outro.l1, 100) + hi(j.outro.l1)], [0.15, 'Mid', pop(540, 470, j.outro.l2, 100) + `{\\c${Y}}` + hi(j.outro.l2)],
-    [0.7, 'Mid', `{\\an5\\pos(540,1420)\\3c${R}\\bord10}` + esc(j.outro.cta)], [0.7, 'Small', `{\\an5\\pos(540,1540)}${esc(st.handle)}`]]));
+    [0.7, 'Mid', `{\\an5\\pos(540,1420)\\3c${st.cta ? bgr(st.cta) : R}\\bord10}` + esc(j.outro.cta)], ...(st.handle ? [[0.7, 'Small', `{\\an5\\pos(540,1540)}${esc(st.handle)}`]] : []), ...(!hasLogo && st.name ? [[0.3, 'Big', `{\\an5\\pos(540,930)}${esc(st.name)}`]] : [])]));
   ctx.log('아웃트로 그리는 중…');
-  await ff(['-sseof', '-0.2', '-i', E.p('편집/AI완성.mp4'), '-loop', '1', '-t', String(OUT_D), '-i', logo, '-f', 'lavfi', '-t', String(OUT_D), '-i', 'anullsrc=r=48000:cl=stereo', '-filter_complex',
+  await ff(['-sseof', '-0.2', '-i', E.p('편집/AI완성.mp4'), ...logoIn(OUT_D), '-f', 'lavfi', '-t', String(OUT_D), '-i', 'anullsrc=r=48000:cl=stereo', '-filter_complex',
     `[0:v]trim=end_frame=1,loop=loop=-1:size=1,trim=duration=${OUT_D},setpts=PTS-STARTPTS,crop=${W}:${VH}:0:${VY},scale=-2:${H},crop=${W}:${H},boxblur=24:2,eq=brightness=-0.32,fps=30,setsar=1[bg];` +
     `[1:v]${logoF(660, 0.3)}[lg];[bg][lg]overlay=x='(W-w)/2':y='930-h/2':eval=frame,subtitles=filename='${q(outAss)}':fontsdir='${fd}',fade=out:st=${OUT_D - 0.25}:d=0.25,format=yuv420p[v]`,
     '-map', '[v]', '-map', '2:a', '-t', String(OUT_D), '-c:v', 'libx264', '-crf', '19', '-preset', 'veryfast', '-c:a', 'aac', '-b:a', '160k', E.p('편집/AI아웃트로.mp4')], ctx);
@@ -349,4 +389,56 @@ ${lines.map(([a, sty, txt]) => `Dialogue: 1,${ts(a)},${ts(d)},${sty},,0,0,0,,${t
   ctx.log(`완성: 편집/AI최종.mp4 (인트로 ${IN_D}초 + 본편 ${plan.duration}초 + 아웃트로 ${OUT_D}초)`);
 }
 
-export const AI_FN = { aicut, aistyle, aisubs, aibrand };
+// ---------- 7. 썸네일: 예쁘게 말고 3단 원색 대비 (상단 노랑 카피 / 중앙 액션|리액션 2분할 / 하단 빨강·파랑 반전 카피) ----------
+const TW = 1280, TH = 720, TOP = 140, BOT = 120;
+async function aithumb(E, ctx) {
+  const info = source(E), plan = readJson(E.p('편집/AI컷.json')), dur = (await probe(info.file, ctx)).duration;
+  let fin = {}; try { fin = readJson(E.p('편집/AI완성.json')); } catch {}
+  const sheetsOf = pre => { try { return fs.readdirSync(E.p('분석')).filter(f => f.startsWith(pre + '_')).sort().map(f => E.p('분석', f)); } catch { return []; } };
+  const coarse = sheetsOf('coarse'), fine = sheetsOf('fine');
+  ctx.log('Claude 가 썸네일 카피와 액션·리액션 장면을 골라요…');
+  const nos = t => String(t || '').replace(/\s/g, '').length;
+  const st = styleOf(E);
+  const j = await askClaude(E, ctx, `너는 ${st.genre} 쇼츠 썸네일 작가다. 규칙: 예쁘게 말고 3단 원색 대비.
+- 상단 카피(노랑, 검정 띠): 결정적 순간 1개만. 공백 빼고 12자 이하.
+- 중앙 2분할: 왼쪽 = ${st.thumbL}, 오른쪽 = ${st.thumbR}.
+- 하단 카피(흰 글씨, 빨강 또는 파랑 띠): 반전/궁금증. 공백 빼고 16자 이하.
+- 내용 설명형 문장 금지 (그리고/그래서/했는데/하면서 금지). 파스텔·분홍 금지.
+원본: "${info.title}" (${info.channel}), 길이 ${Math.round(dur)}초.
+본편 제목·자막: ${JSON.stringify({ frame: fin.frame, captions: fin.captions })}
+장면 정보: ${JSON.stringify({ moments: plan.moments, who: plan.who })}
+사실은 조사 파일 ${E.p('조사/research.md')} 의 A·B 등급만 (Read 로 확인). ${st.check}
+프레임 시트를 Read 로 보고 장면을 골라라:
+${coarse.length ? `- 전체 영상 2초 간격 6x5 타일: 시트 k(1부터) 타일 i 의 시각 = ((k-1)*30 + i)*2 초\n${coarse.map(f => '  ' + f).join('\n')}\n` : ''}- 하이라이트 구간 0.2초 간격 5x5 타일 (원본 ${r1(plan.window[0])}초부터): 시트 k 타일 i 의 시각 = ${r1(plan.window[0])} + ((k-1)*25 + i)*0.2 초
+${fine.map(f => '  ' + f).join('\n')}
+x 는 그 프레임에서 인물이 있는 가로 위치(0=왼쪽 끝, 0.5=가운데, 1=오른쪽 끝). 썸네일 칸은 세로로 길어서 x 기준으로 잘라낸다.
+JSON 하나만 답해라: {"top":"","bot":"","color":"red|blue","left":{"t":원본초,"x":0.5,"why":""},"right":{"t":원본초,"x":0.5,"why":""}}`,
+    x => !x.top || !x.bot ? 'top, bot 이 있어야 해요.' : nos(x.top) > 12 ? `상단 카피가 ${nos(x.top)}자예요 (12자 이하).` : nos(x.bot) > 16 ? `하단 카피가 ${nos(x.bot)}자예요 (16자 이하).`
+      : /(그리고|그래서|했는데|하면서)/.test(x.top + x.bot) ? '내용 설명형 단어가 있어요.' : !['red', 'blue'].includes(x.color) ? 'color 는 red 또는 blue.'
+      : ![x.left, x.right].every(f => f && f.t >= 0 && f.t <= dur && f.x >= 0 && f.x <= 1) ? `left/right 의 t 는 0~${Math.round(dur)}, x 는 0~1.` : Math.abs(x.left.t - x.right.t) < 0.5 ? '왼쪽과 오른쪽은 다른 장면이어야 해요.' : '');
+  writeJson(E.p('편집/AI썸네일.json'), j);
+  const fitT = (t, base, w) => { const n = [...String(t)].reduce((a, c) => a + (c === ' ' ? 0.35 : /[ -~]/.test(c) ? 0.6 : 1), 0); return Math.min(base, Math.floor(w / Math.max(1, n))); };
+  const assF = E.p('편집/AI썸네일.ass');
+  fs.writeFileSync(assF, `[Script Info]\nScriptType: v4.00+\nPlayResX: ${TW}\nPlayResY: ${TH}\nScaledBorderAndShadow: yes\n\n[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: T,${FONT},96,&H0000E6FF&,&H000000FF&,&H00000000&,&H00000000&,-1,0,0,0,100,100,-2,0,1,4,3,5,0,0,0,1
+Style: B,${FONT},84,&H00FFFFFF&,&H000000FF&,&H00000000&,&H00000000&,-1,0,0,0,100,100,-2,0,1,5,3,5,0,0,0,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 1,0:00:00.00,0:00:05.00,T,,0,0,0,,{\\an5\\pos(${TW / 2},${TOP / 2 + 2})\\fs${fitT(j.top, 104, 1220)}}${esc(j.top)}
+Dialogue: 1,0:00:00.00,0:00:05.00,B,,0,0,0,,{\\an5\\pos(${TW / 2},${TH - BOT / 2 + 2})\\fs${fitT(j.bot, 88, 1220)}}${esc(j.bot)}
+`);
+  const q = p => p.replace(/\\/g, '/').replace(/:/g, '\\:').replace(/'/g, "\\'"), MH = TH - TOP - BOT, half = TW / 2;
+  const cb = Math.min(0.25, Math.max(0, +plan.crop_bottom || 0));
+  const cell = (i, x) => `[${i}:v]trim=end_frame=1,setpts=PTS-STARTPTS,${cb ? `crop=iw:trunc(ih*${(1 - cb).toFixed(3)}/2)*2:0:0,` : ''}scale=w=${half}:h=${MH}:force_original_aspect_ratio=increase,crop=${half}:${MH}:x='(iw-${half})*${(+x).toFixed(3)}':y='(ih-${MH})/2',setsar=1[c${i}]`;
+  ctx.log('썸네일 그리는 중…');
+  await ff(['-ss', String(j.left.t), '-i', info.file, '-ss', String(j.right.t), '-i', info.file, '-filter_complex',
+    `${cell(0, j.left.x)};${cell(1, j.right.x)};color=c=black:s=${TW}x${TH}:d=1[bg];[bg][c0]overlay=0:${TOP}:shortest=1[a];[a][c1]overlay=${half}:${TOP}[b];` +
+    `[b]drawbox=x=${half - 3}:y=${TOP}:w=6:h=${MH}:color=0xFFE600:t=fill,drawbox=x=0:y=${TH - BOT}:w=${TW}:h=${BOT}:color=${j.color === 'blue' ? '0x0047FF' : '0xE60012'}:t=fill,` +
+    `subtitles=filename='${q(assF)}':fontsdir='${q(process.env.FIELDNOTE_AI_FONT_DIR || FONT_DIR)}'[v]`,
+    '-map', '[v]', '-frames:v', '1', '-q:v', '2', E.p('편집/AI썸네일.jpg')], ctx);
+  ctx.log(`완성: 편집/AI썸네일.jpg · 상단 "${j.top}" · 하단 "${j.bot}"`);
+}
+
+export const AI_FN = { aicut, aistyle, aisubs, aibrand, aithumb };
