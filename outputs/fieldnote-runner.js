@@ -186,7 +186,7 @@ function ytAutoLiveBody() {
   const cur = runnerEp(), idea = runnerIdea();
   if (!idea) return runnerFlow(1) + '<p class="small">위에서 작업할 주제를 고르세요. 주제가 없으면 AI 주제 발굴이나 소스 탭에서 먼저 등록하세요.</p>';
   if (!cur) return runnerFlow(1) + `<div class="yaw-start"><b>이 주제는 아직 제작 전이에요.</b>
-      <p class="small">소스 영상 주소와 구간을 넣고 시작하면 ~/Desktop/유투브 에 이 주제의 폴더가 생기고 ② 제작이 열려요. (한 구간 15초까지, UWW·올림픽·RAF 공식 먼저)</p>
+      <p class="small">소스 영상 주소와 구간을 넣고 시작하면 ~/Desktop/유투브 에 이 주제의 폴더가 생기고 ② 제작이 열려요. (한 구간 3분까지, UWW·올림픽·RAF 공식 먼저)</p>
       <div class="ya-form"><input class="input" data-ya-new="url" placeholder="소스 유튜브 주소" value="${esc((typeof ytPipe === 'object' && ytPipe.url) || ytFirstUrl(idea))}">
       <input class="input" data-ya-new="ranges" placeholder="구간: 0:30-0:42, 1:05-1:12" value="${esc((typeof ytPipe === 'object' && ytPipe.ranges) || '')}">
       <button class="btn primary" data-ya-act="create">이 주제로 제작 시작</button></div></div>`;
@@ -236,7 +236,7 @@ function ytAutoLiveBody() {
     <details class="ya-new" data-ya-settings><summary>실행 옵션 · 프로젝트 폴더</summary>
       <div class="ya-row">${cur.running ? '<button class="btn danger" data-ya-act="stop">실행 멈춤</button>' : `<button class="btn" data-ya-act="runall" ${cur.gate || doneN === cur.steps.length ? 'disabled' : ''}>남은 단계 이어서 실행</button>`}<button class="btn ghost" data-ya-act="open">폴더 열기</button></div>
       <p class="small ya-source-list">${src}</p></details>
-    <details class="ya-new" data-ya-source-form><summary>＋ 이 에피소드에 소스 추가</summary><div class="ya-form"><input class="input" data-ya-src="url" placeholder="유튜브 주소"><input class="input" data-ya-src="ranges" placeholder="구간: 0:30-0:42, 1:05-1:12 (한 구간 15초까지)"><button class="btn" data-ya-act="addsrc">추가</button></div></details>`;
+    <details class="ya-new" data-ya-source-form><summary>＋ 이 에피소드에 소스 추가</summary><div class="ya-form"><input class="input" data-ya-src="url" placeholder="유튜브 주소"><input class="input" data-ya-src="ranges" placeholder="구간: 0:30-0:42, 1:05-1:12 (한 구간 3분까지)"><button class="btn" data-ya-act="addsrc">추가</button></div></details>`;
 }
 function runnerFlow(at, pct) {
   const step = (n, label, sub, act) => `<li class="${n < at ? 'done' : n === at ? 'now' : ''}"><span>${n}</span><div><b>${label}</b><small>${sub}</small></div>${act || ''}</li>`;

@@ -629,7 +629,7 @@
   }
   const YT_GROUPS = [
     { id: 'g-dl', name: '링크 영상 다운', ids: ['research', 'download'], desc: '링크의 영상을 맥에 통째로 받아요. 영어 자막이 있으면 같이 받아요.', go: '영상 받기' },
-    { id: 'g-cut', name: '컷 편집', ids: ['clip', 'plan', 'rough'], desc: '쓸 구간을 넣으세요. 한 구간은 15초까지예요. 구간을 잘라 이어 붙여 가편집을 만들어요.', go: '컷 편집 실행' },
+    { id: 'g-cut', name: '컷 편집', ids: ['clip', 'plan', 'rough'], desc: '쓸 구간을 넣으세요. 한 구간은 3분까지예요. 구간을 잘라 이어 붙여 가편집을 만들어요.', go: '컷 편집 실행' },
     { id: 'g-subs', name: '자막 자동화', ids: ['subs'], desc: '영상 속 말을 자동 자막으로 입혀요. 소스 영상의 자막을 쓰고, AI 키가 있으면 한국어로 옮겨요.', go: '자막 넣기' },
     { id: 'g-fx', name: '이펙트', ids: ['fx'], desc: '고른 룩의 배너·훅 제목·흑백 인트로·워터마크를 입혀요. 끝나면 위에서 바로 볼 수 있어요.', go: '이펙트 넣기' },
     { id: 'g-voice', name: '음악/녹음', ids: ['script', 'mix'], desc: '대본을 만들고 한 번 읽어 본 뒤, 줄마다 내 목소리를 녹음하고 배경음악을 골라 합쳐요. 대본 자막도 이때 영상에 들어가요.', go: '대본 만들기' },
@@ -838,7 +838,7 @@
           let b = '';
           if (isCut && !locked && !G.running) {
             const cur = ((ep.sources && ep.sources[0] && ep.sources[0].ranges) || []).join(', ');
-            b += `<div class="pl-ya-form"><label>쓸 구간 (쉼표로 여러 개 · 한 구간은 15초까지)<input class="pl-input" data-ya-new="ranges" placeholder="0:30-0:42, 1:05-1:12" value="${esc(ytPipe.ranges || cur)}"></label></div>`;
+            b += `<div class="pl-ya-form"><label>쓸 구간 (쉼표로 여러 개 · 한 구간은 3분까지)<input class="pl-input" data-ya-new="ranges" placeholder="0:30-0:42, 1:05-1:12" value="${esc(ytPipe.ranges || cur)}"></label></div>`;
           }
           return b + (scrPanel ? ytScriptPanel(ep, saveMode) : '') + (isVoice && recState.open ? `<div id="yaRec">${recPanel()}</div>` : '');
         },
@@ -998,7 +998,7 @@
     const rangesNow = ((ep.sources && ep.sources[0] && ep.sources[0].ranges) || []).join(', ');
     const e1 = {
       id: 'e1', name: '1차 편집', title: '1차 편집',
-      desc: !dlDone ? '링크 영상을 먼저 받아 주세요.' : '쓸 구간을 넣으면 고른 스타일로 1차 편집본을 만들어요. 한 구간은 15초까지, 끝에 x0.5 를 붙이면 0.5배 슬로우예요.',
+      desc: !dlDone ? '링크 영상을 먼저 받아 주세요.' : '쓸 구간을 넣으면 고른 스타일로 1차 편집본을 만들어요. 한 구간은 3분까지, 끝에 x0.5 를 붙이면 0.5배 슬로우예요.',
       btn: () => editing && (ep.editRound || 1) === 1 ? '실행 멈춤' : round >= 1 && !redo ? '1차 편집 다시 만들기' : '1차 편집 만들기',
       attrs: () => editing && (ep.editRound || 1) === 1 ? 'data-ya-act="stop"' : `data-ya-act="edit" data-ya-round="1"${round >= 1 && !redo ? ' data-ya-confirm="1차 편집을 다시 만들어요. 계속할까요?"' : ''}`,
       cls: editing && (ep.editRound || 1) === 1 ? 'danger' : '',
@@ -1006,7 +1006,7 @@
       isDone: () => round >= 1,
       statusLine: () => (ep.editRound || 1) === 1 ? runLine() : '',
       result: editResult(1),
-      body: () => dlDone && !editing ? `<div class="pl-ya-form"><label>쓸 구간 (쉼표로 여러 개 · 슬로우: 0:30-0:34x0.5)<input class="pl-input" data-ya-new="ranges" placeholder="0:30-0:42, 1:05-1:09x0.5" value="${esc(ytPipe.ranges || rangesNow)}"></label><div class="pl-chips"><button type="button" class="pl-chip ${(ytPipe.ranges || rangesNow) === '전체' ? 'on' : ''}" data-ya-allrange>영상 전체 쓰기</button><span class="small">구간을 고르지 않고 영상 전체를 써요 (쇼츠는 앞 58초까지).</span></div></div>` : '',
+      body: () => dlDone && !editing ? `<div class="pl-ya-form"><label>쓸 구간 (쉼표로 여러 개 · 슬로우: 0:30-0:34x0.5)<input class="pl-input" data-ya-new="ranges" placeholder="0:30-0:42, 1:05-1:09x0.5" value="${esc(ytPipe.ranges || rangesNow)}"></label><div class="pl-chips"><button type="button" class="pl-chip ${(ytPipe.ranges || rangesNow) === '전체' ? 'on' : ''}" data-ya-allrange>영상 전체 쓰기</button><span class="small">구간을 고르지 않고 영상 전체를 써요 (쇼츠는 앞 3분까지).</span></div></div>` : '',
       run: () => {},
     };
     const e2 = {

@@ -31,7 +31,7 @@ export const STEP_DEFS = [
 // 자막 = subs / 이펙트 = fx / 음악·녹음 = script(대본, 게이트) → 녹음 → mix / 업로드 패키지 = upload / 올리기 = 없음
 
 
-const SPEC = { shorts: { w: 1080, h: 1920, maxTotal: 58 }, long: { w: 1920, h: 1080, maxTotal: 600 } };
+const SPEC = { shorts: { w: 1080, h: 1920, maxTotal: 180 }, long: { w: 1920, h: 1080, maxTotal: 600 } };
 const specOf = E => SPEC[E.s.format] || SPEC.shorts;
 const readJson = (f, d = null) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return d; } };
 const writeJson = (f, o) => { fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, JSON.stringify(o, null, 2)); };

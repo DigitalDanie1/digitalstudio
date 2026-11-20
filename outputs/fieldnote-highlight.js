@@ -63,6 +63,8 @@ async function rf(p, body) {
   if (!r.ok) throw new Error((d && d.error) || d || r.status);
   return d;
 }
+const secL = s => s < 60 ? s + '초' : Math.floor(s / 60) + '분' + (s % 60 ? ' ' + s % 60 + '초' : '');
+const LENS = [10, 15, 30, 60, 120, 180];
 const fmt = s => { s = Math.max(0, Math.round(s)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return h ? `${h}:${String(m).padStart(2, '0')}:${String(x).padStart(2, '0')}` : `${m}:${String(x).padStart(2, '0')}`; };
 const media = (id, rel) => `${base()}/hl/${encodeURIComponent(id)}/file?path=${encodeURIComponent(rel)}`;
 const chanId = () => { let c = ''; try { c = (typeof ytLock === 'string' && ytLock) || (typeof ytTab === 'function' && ytTab()) || ''; } catch (_) {} return c || 'yt-wrestling'; };
@@ -117,7 +119,7 @@ function startCard() {
   <div class="hl-row"><label class="hl-f hl-grow">유튜브 주소<input type="text" data-hl-url value="${e_(S.url)}" placeholder="https://www.youtube.com/watch?v=..." autocomplete="off" inputmode="url"></label>
   ${S.eps.length ? `<span class="hl-or">또는</span><label class="hl-f hl-grow">이미 받은 영상 (작업판의 에피소드)<select data-hl-ep><option value="">고르지 않음</option>${eps}</select></label>` : ''}</div>
   <div class="hl-row" style="margin-top:12px"><label class="hl-f" style="width:110px">몇 개 찾을까요<input type="number" min="1" max="30" step="1" data-hl-count value="${S.count}"></label>
-  <label class="hl-f" style="width:200px">길이 <b data-hl-lenv style="color:var(--text)">${S.len}초</b><input type="range" min="5" max="15" step="1" data-hl-len value="${S.len}"></label>
+  <label class="hl-f" style="width:140px">길이<select data-hl-len>${LENS.filter(n => n <= 15 || S.api >= 12).concat(LENS.includes(S.len) ? [] : [S.len]).sort((a, b) => a - b).map(n => `<option value="${n}" ${S.len === n ? 'selected' : ''}>${secL(n)}</option>`).join('')}</select></label>
   <button type="button" class="btn primary" data-hl-act="start" ${busy || off ? 'disabled' : ''}>${busy ? '돌아가는 중…' : off ? '실행기가 켜지면 눌러져요' : '하이라이트 찾기'}</button></div>
   ${S.err ? `<div class="pl-error" role="alert">${e_(S.err)}</div>` : ''}</section>`;
 }
@@ -133,7 +135,7 @@ function progressCard() {
 function candCard(c) {
   const v = ed(c), j = S.cur, on = !!S.checked[key(c)], pv = c.pv || { a: Math.max(0, c.a - 2) };
   return `<article class="hl-c ${on ? 'sel' : ''}" data-hl-card="${e_(key(c))}">
-  <div class="hl-ch"><input type="checkbox" data-hl-check="${e_(key(c))}" ${on ? 'checked' : ''} aria-label="${c.rank}위 고르기"><span class="hl-rank">#${c.rank}</span><span class="hl-time"><span data-hl-range>${fmt(v.a)}–${fmt(v.b)}</span><span class="hl-len" data-hl-lenlab>${v.b - v.a}초</span></span></div>
+  <div class="hl-ch"><input type="checkbox" data-hl-check="${e_(key(c))}" ${on ? 'checked' : ''} aria-label="${c.rank}위 고르기"><span class="hl-rank">#${c.rank}</span><span class="hl-time"><span data-hl-range>${fmt(v.a)}–${fmt(v.b)}</span><span class="hl-len" data-hl-lenlab>${secL(v.b - v.a)}</span></span></div>
   <div class="hl-th">${(c.thumbs || []).map(t => `<img loading="lazy" src="${e_(media(j.id, t))}" alt="">`).join('')}</div>
   <div class="hl-sc"><div class="m"><span>움직임</span><span class="hl-bar"><i style="width:${c.motion}%"></i></span><b>${c.motion}</b></div><div class="a"><span>소리</span><span class="hl-bar"><i style="width:${c.audio}%"></i></span><b>${c.audio}</b></div></div>
   ${c.preview ? `<video controls preload="none" playsinline poster="${e_(media(j.id, (c.thumbs||[])[1] || (c.thumbs||[])[0] || ""))}" data-hl-video="${e_(key(c))}" data-pv="${pv.a}" src="${e_(media(j.id, c.preview))}"></video>` : '<p class="hl-note">미리보기를 못 만들었어요.</p>'}
@@ -231,12 +233,12 @@ document.addEventListener('click', async e => {
     const c = (S.cur.candidates || []).find(x => key(x) === n.dataset.hlNudge); if (!c) return;
     const v = ed(c), w = n.dataset.w, d = +n.dataset.d, dur = S.cur.duration || 1e9;
     const na = w === 'a' ? v.a + d : v.a, nb = w === 'b' ? v.b + d : v.b;
-    if (na < 0 || nb > dur || nb - na < 2) { say('더 못 옮겨요. (최소 2초, 최대 15초)'); return; }
-    if (nb - na > 15) { say('한 구간은 15초까지예요.'); return; }
+    if (na < 0 || nb > dur || nb - na < 2) { say('더 못 옮겨요. (최소 2초, 최대 3분)'); return; }
+    if (nb - na > (S.api >= 12 ? 180 : 15)) { say(`한 구간은 ${S.api >= 12 ? '3분' : '15초'}까지예요.`); return; }
     v.a = na; v.b = nb;
     const card = n.closest('[data-hl-card]');
     card.querySelector('[data-hl-a]').textContent = fmt(v.a); card.querySelector('[data-hl-b]').textContent = fmt(v.b);
-    card.querySelector('[data-hl-range]').textContent = `${fmt(v.a)}–${fmt(v.b)}`; card.querySelector('[data-hl-lenlab]').textContent = `${v.b - v.a}초`;
+    card.querySelector('[data-hl-range]').textContent = `${fmt(v.a)}–${fmt(v.b)}`; card.querySelector('[data-hl-lenlab]').textContent = secL(v.b - v.a);
     const vid = card.querySelector('video'); if (vid) { try { vid.currentTime = Math.max(0, (w === 'a' ? v.a : Math.max(v.a, v.b - 3)) - (+vid.dataset.pv || 0)); } catch (_) {} }
   }
 });
@@ -245,13 +247,13 @@ document.addEventListener('change', e => {
   if (t.matches('[data-hl-check]')) {
     S.checked[t.dataset.hlCheck] = t.checked; t.closest('[data-hl-card]')?.classList.toggle('sel', t.checked);
     const cnt = document.querySelector('[data-hl-count]'); if (cnt) cnt.textContent = chosenText();
+  } else if (t.matches('[data-hl-len]')) { S.len = Math.round(+t.value) || 10;
   } else if (t.matches('[data-hl-ep]')) { S.ep = t.value; if (S.ep) { S.url = ''; const u = document.querySelector('[data-hl-url]'); if (u) u.value = ''; } }
 });
 document.addEventListener('input', e => {
   const t = e.target; if (!t.matches) return;
   if (t.matches('[data-hl-url]')) { S.url = t.value; if (t.value.trim() && S.ep) { S.ep = ''; const s = document.querySelector('[data-hl-ep]'); if (s) s.value = ''; } }
   else if (t.matches('[data-hl-count]')) S.count = Math.max(1, Math.min(30, Math.round(+t.value) || 8));
-  else if (t.matches('[data-hl-len]')) { S.len = Math.max(5, Math.min(15, Math.round(+t.value) || 10)); const l = document.querySelector('[data-hl-lenv]'); if (l) l.textContent = S.len + '초'; }
 });
 // 미리보기: 처음 시작 위치(앞 2초 여유)로 맞추고, 끝에 닿으면 멈춰요
 document.addEventListener('play', e => {

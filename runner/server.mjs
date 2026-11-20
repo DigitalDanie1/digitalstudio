@@ -13,7 +13,7 @@ import { STEP_DEFS, STEP_FN, outputsFor, listAssets, checkScript, cleanPasted, p
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // 작업판이 쓰는 기능 수준. 3 = 새 9칸 순서 (/look, /ranges, deferRanges, 단계 clip·subs·fx)
-const API_LEVEL = 11;   // 11 = 하이라이트 '지난 작업' 초기화(/hl/reset, 돌고 있으면 멈추고 휴지통 한 폴더로) · 10 = AI 편집 단계(aicut·aistyle·aisubs, 맥의 Claude Code) · 9 = 유튜브 초기화(/reset, 에피소드·하이라이트 전부 휴지통 한 폴더로) · 8 = 미리보기 견본(/preview, 고른 룩·이펙트를 실제 영상 4초로) · 7 = 에피소드 완전히 지우기(/episode/delete, 휴지통으로) · 6 = 하이라이트 찾기(/hl/*) ·  4 = 7칸 순서 (/edit 1차·2차 편집, /draft, /feedback, 슬로우 구간 x0.5, 매트 스토리 룩) · 5 = 최종 결과물 레퍼런스(이펙트 팩: /fxpack, status.fxPacks)
+const API_LEVEL = 12;   // 12 = 한 구간·하이라이트 길이 최대 3분(30초·1분·2분·3분), 쇼츠 최대 3분 · 11 = 하이라이트 '지난 작업' 초기화(/hl/reset, 돌고 있으면 멈추고 휴지통 한 폴더로) · 10 = AI 편집 단계(aicut·aistyle·aisubs, 맥의 Claude Code) · 9 = 유튜브 초기화(/reset, 에피소드·하이라이트 전부 휴지통 한 폴더로) · 8 = 미리보기 견본(/preview, 고른 룩·이펙트를 실제 영상 4초로) · 7 = 에피소드 완전히 지우기(/episode/delete, 휴지통으로) · 6 = 하이라이트 찾기(/hl/*) ·  4 = 7칸 순서 (/edit 1차·2차 편집, /draft, /feedback, 슬로우 구간 x0.5, 매트 스토리 룩) · 5 = 최종 결과물 레퍼런스(이펙트 팩: /fxpack, status.fxPacks)
 let VERSION = 'dev';
 try { VERSION = fs.readFileSync(path.join(HERE, 'version.txt'), 'utf8').trim() || 'dev'; } catch {}
 const PORT = +(process.env.FIELDNOTE_RUNNER_PORT || 4777);
@@ -149,7 +149,7 @@ const editPct = E => { const P = E.prog; let done = 0; for (const id of Object.k
 function expectSecs(E) {   // 결과 영상 예상 길이 (편집 계획이 있으면 그 길이)
   try { const P = JSON.parse(fs.readFileSync(E.p('편집/편집계획.json'), 'utf8')); if (P.total > 0) return P.total; } catch {}
   let t = 0, info = []; try { info = JSON.parse(fs.readFileSync(E.p('소스.json'), 'utf8')); } catch {}
-  for (const [i, s] of E.s.sources.entries()) for (const r of s.ranges) { if (r === '전체') { t += Math.min(58, info[i]?.duration || 58); continue; } const m = /^(\d+(?::\d+)*)-(\d+(?::\d+)*)(?:x([\d.]+))?$/.exec(r); if (!m) continue; const sec = x => x.split(':').reduce((a, n) => a * 60 + +n, 0); t += (sec(m[2]) - sec(m[1])) / (m[3] ? +m[3] : 1); }
+  for (const [i, s] of E.s.sources.entries()) for (const r of s.ranges) { if (r === '전체') { t += Math.min(180, info[i]?.duration || 180); continue; } const m = /^(\d+(?::\d+)*)-(\d+(?::\d+)*)(?:x([\d.]+))?$/.exec(r); if (!m) continue; const sec = x => x.split(':').reduce((a, n) => a * 60 + +n, 0); t += (sec(m[2]) - sec(m[1])) / (m[3] ? +m[3] : 1); }
   return t || 30;
 }
 // 1차·2차 편집: 자르기 → 계획 → 가편집 → 자막 → 이펙트 → (대본이 없으면 양식) → 대본 자막·소리 합치기(최종본). 대본 확인에서 멈추지 않아요.
@@ -272,7 +272,7 @@ function hlMake(J, body) {
     E.s.steps.research = { status: 'done' }; E.s.steps.download = { status: 'done' };
     save(E);
     const total = g.ranges.reduce((t, r) => { const [x, y] = r.split('-').map(z => z.split(':').reduce((a, n) => a * 60 + +n, 0)); return t + y - x; }, 0);
-    if (total > 58) warns.push(`"${g.title}" 는 합치면 ${total}초라서 쇼츠 한도(58초)를 넘어요. 컷 편집에서 줄여 주세요.`);
+    if (total > 180) warns.push(`"${g.title}" 는 합치면 ${fmtTime(total)}라서 쇼츠 한도(3분)를 넘어요. 컷 편집에서 줄여 주세요.`);
     made.push({ ep: E.s.ep, title: g.title, ranges: g.ranges });
   }
   return { ok: true, mode, episodes: made, warnings: warns };

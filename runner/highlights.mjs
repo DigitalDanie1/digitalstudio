@@ -84,7 +84,7 @@ const pct = (arr, v) => { let c = 0; for (const x of arr) if (x <= v) c++; retur
 export function pickHighlights(an, { count = COUNT_DEFAULT, len = LEN_DEFAULT, gap = GAP, duration } = {}) {
   const dt = an.dt || DT, dur = duration || an.duration || an.motion.length * dt;
   count = Math.max(1, Math.min(COUNT_MAX, Math.round(count))); len = Math.max(LEN_MIN, Math.min(LEN_MAX, Math.round(len)));
-  const { score, zm, za } = scoreSeries(an), work = score.slice(), gs = Math.round(gap / dt);
+  const { score, zm, za } = scoreSeries(an), work = score.slice(), gs = Math.round(Math.max(gap, len) / dt);   // 긴 구간끼리 겹치지 않게
   const cuts = an.cuts || [], peaks = [];
   for (let k = 0; k < count * 2; k++) {   // 컷이 많은 구간은 점수를 깎아서 순서가 바뀔 수 있어서, 넉넉히 뽑은 뒤 추려요
     let p = -1, best = 0.3;   // 이보다 낮은 건 그냥 평범한 장면

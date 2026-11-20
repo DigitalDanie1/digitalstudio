@@ -25,7 +25,7 @@ export function fmtTime(sec) {
   return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`;
 }
 // "0:30-0:42, 1:05-1:12x0.5" → ['0:30-0:42','1:05-1:12x0.5'] (잘못된 항목이 있으면 Error). 끝의 x0.5 = 0.5배 느리게(슬로우)
-export const MAX_RANGE = 15;
+export const MAX_RANGE = 180;   // 한 구간 최대 3분 (하이라이트 30초·1분·2분·3분)
 export const ALL_RANGE = '전체';
 export function parseRanges(input) {
   const toks = Array.isArray(input) ? input : String(input || '').split(/[,\s]+/).map(x => x.trim()).filter(Boolean);
