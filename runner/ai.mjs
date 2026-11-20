@@ -343,27 +343,34 @@ async function refStyle(E, ctx) {
   for (const f of fs.readdirSync(out)) if (f.startsWith('ref_')) fs.rmSync(path.join(out, f));
   await ff(['-i', vid, '-vf', `fps=${fps.toFixed(3)},scale=216:-2,tile=5x4`, '-q:v', '4', path.join(out, 'ref_%02d.jpg')], ctx);
   const list = fs.readdirSync(out).filter(f => f.startsWith('ref_')).sort().map(f => '- ' + path.join(out, f)).join('\n');
+  // 말하는 채널(기독교·정치)은 채널 스타일(말투·규칙)은 그대로 두고 화면 틀만 고르게 해요
+  const chKey = CH_STYLE[E.s.channel] || 'yt-mat', talk = AI_STYLES[chKey].kind !== 'sport';
+  const bases = talk ? { mat: '검은 바탕, 위 2줄 제목, 가운데 영상, 아래 자막, 화자 라벨·숫자 팝업', full: '꽉 찬 화면, 자막과 라벨을 영상 위에 얹기, 위 제목 작게', post: '흰 바탕 SNS 게시물 모양, 검은 굵은 제목 2줄, 가운데 영상, 아래 채널 한마디 카드' } : REF_BASES;
+  const fxTypes = talk ? 'mat·full 은 label, pop. post 는 없음 (빈 배열)' : 'mat 은 ' + REF_FX['yt-mat'] + ', top5·post 는 없음, 나머지는 ring, arrow, label, pop';
   ctx.log('Claude 가 레퍼런스 쇼츠의 편집 스타일을 봐요…');
   const j = await askClaude(E, ctx, `너는 쇼츠 편집 스타일 분석가다. 아래는 레퍼런스 쇼츠 "${title}" (https://www.youtube.com/shorts/${id}, ${Math.round(dur)}초) 를 ${r1(1 / fps)}초 간격으로 뽑은 프레임 시트다 (5x4 타일, 왼쪽 위부터 가로로). Read 로 모두 본다:
 ${list}
 이 쇼츠의 화면 구성, 제목·자막 위치와 색, 글자 크기, 강조 방식, 이펙트(링·화살표·라벨·숫자 팝업), 말투, 컷 리듬을 본다.
 우리 렌더러는 아래 틀 중 하나로만 그릴 수 있다. 가장 가까운 틀 하나를 base 로 고른다:
-${Object.entries(REF_BASES).map(([k, v]) => `- ${k}: ${v}`).join('\n')}
+${Object.entries(bases).map(([k, v]) => `- ${k}: ${v}`).join('\n')}
 그 틀 안에서 이 레퍼런스처럼 보이게 하는 규칙을 한국어로 쓴다 (레퍼런스의 문장을 베끼지 말고, 방식만 따른다):
 - yellow: 강조색 hex 6자리 (# 없이), red: 두 번째 색 hex 6자리
 - title: 위 제목 2줄(l1, l2)을 어떻게 쓰는지 (각 14자 이내). 레퍼런스에 위 제목이 없으면 짧은 후크로 쓰되 그렇게 적는다.
-- fx: 어떤 이펙트를 언제 몇 개 쓰는지. 쓸 수 있는 type: ${'mat 은 ' + REF_FX['yt-mat'] + ', top5·post 는 없음, 나머지는 ring, arrow, label, pop'}. ring·arrow 는 x, y (원본 프레임 0~1).
+- fx: 어떤 이펙트를 언제 몇 개 쓰는지. 쓸 수 있는 type: ${fxTypes}. ring·arrow 는 x, y (원본 프레임 0~1).
 - caps: 자막 규칙 (위치는 틀이 정함. 길이, 말투, 강조, 리듬).
 - tone: 말투 한 줄.
 - name: 이 스타일 이름 (12자 이내, 예: "스토리텔링 룩"), desc: 한 줄 설명 (40자 이내).
-JSON 하나만 답해라: {"base":"yt-mat","name":"","desc":"","yellow":"FFD600","red":"FF3B30","title":"","fx":"","caps":"","tone":""}`,
-    x => !REF_BASES[x.base] ? 'base 는 ' + Object.keys(REF_BASES).join(', ') + ' 중 하나여야 해요.' : !/^[0-9A-Fa-f]{6}$/.test(x.yellow || '') || !/^[0-9A-Fa-f]{6}$/.test(x.red || '') ? 'yellow, red 는 hex 6자리여야 해요.' : !x.name || !x.caps ? 'name, caps 가 있어야 해요.' : '');
-  const base = AI_STYLES[j.base], over = { yellow: j.yellow.toUpperCase(), red: j.red.toUpperCase(), caps: '- ' + j.caps, tone: base.tone + ' ' + (j.tone || '') };
+JSON 하나만 답해라: {"base":"${Object.keys(bases)[0]}","name":"","desc":"","yellow":"FFD600","red":"FF3B30","title":"","fx":"","caps":"","tone":""}`,
+    x => !bases[x.base] ? 'base 는 ' + Object.keys(bases).join(', ') + ' 중 하나여야 해요.' : !/^[0-9A-Fa-f]{6}$/.test(x.yellow || '') || !/^[0-9A-Fa-f]{6}$/.test(x.red || '') ? 'yellow, red 는 hex 6자리여야 해요.' : !x.name || !x.caps ? 'name, caps 가 있어야 해요.' : '');
+  const bk = talk ? chKey : j.base, base = AI_STYLES[bk], over = { yellow: j.yellow.toUpperCase(), red: j.red.toUpperCase(), caps: (talk ? base.caps + '\n' : '') + '- ' + j.caps, tone: base.tone + ' ' + (j.tone || '') };
+  const flat = talk ? j.base === 'post' : ['yt-top5', 'yt-post'].includes(j.base);
+  if (talk && j.base !== 'mat') { over.lay = j.base; if (j.base === 'post') { const P = AI_STYLES['yt-post']; Object.assign(over, { white: true, extra: P.extra, extraJson: P.extraJson }); } }
   if (j.title && j.base !== 'yt-top5') over.title = '위 제목: ' + j.title + ' l1, l2 각 14자 이내. 이것이 인트로 후크다.';
-  if (j.fx && !['yt-top5', 'yt-post'].includes(j.base)) over.fx = j.fx + (j.base === 'yt-mat' ? '' : ' ' + PT);
-  E.s.refStyle = { look: E.s.look, id, title, base: j.base, name: String(j.name).slice(0, 20), desc: String(j.desc || '').slice(0, 60), over };
+  if (flat) over.fx = '라벨·팝업은 쓰지 않는다. fx 는 빈 배열.';
+  else if (j.fx) over.fx = j.fx + (talk || j.base === 'yt-mat' ? '' : ' ' + PT);
+  E.s.refStyle = { look: E.s.look, id, title, base: bk, lay: j.base, name: String(j.name).slice(0, 20), desc: String(j.desc || '').slice(0, 60), over };
   writeJson(cache, E.s.refStyle);
-  ctx.log(`레퍼런스 스타일: ${E.s.refStyle.name} (틀: ${j.base})`);
+  ctx.log(`레퍼런스 스타일: ${E.s.refStyle.name} (틀: ${j.base}${talk ? ', 말투·규칙은 ' + chKey : ''})`);
 }
 
 async function aistyle(E, ctx) {
