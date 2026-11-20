@@ -58,7 +58,7 @@ function loadAll() {
 function view(E) {
   return {
     ep: E.s.ep, title: E.s.title, note: E.s.note || '', ideaId: E.s.ideaId || '', format: E.s.format, channel: E.s.channel || '',
-    look: E.s.look || '', lookUsed: lookKeyOf(E),
+    look: E.s.look || '', lookUsed: lookKeyOf(E), vtype: E.s.vtype || '',
     fxPack: E.s.fxPack || '', fxPackUsed: fxPackOf(E).id, fxTimes: E.s.fxTimes || '', fxLabels: E.s.fxLabels || [],
     sources: E.s.sources.map(x => ({ url: x.url, ranges: x.ranges })),
     steps: STEP_DEFS.map(d => {
@@ -444,6 +444,7 @@ const routes = {
       ids = [id];
     }
     if (ids.includes('script')) E.s.gate = false;
+    if (typeof body.vtype === 'string' && /^[a-z0-9]{1,20}$/.test(body.vtype)) E.s.vtype = body.vtype;   // AI 편집: 영상 종류
     launch(E, ids, false); return { json: { ok: true, step: ids[0], steps: ids } };
   },
   'POST /runall': ({ body }) => {

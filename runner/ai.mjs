@@ -91,7 +91,43 @@ const writeJson = (f, o) => { fs.mkdirSync(path.dirname(f), { recursive: true })
 const r1 = n => Math.round(n * 10) / 10;
 // 채널의 AI 스타일: 고른 룩이 AI 스타일이면 그것, 아니면 채널 기본
 const CH_STYLE = { 'yt-wrestling': 'yt-mat', 'yt-christian': 'yt-christian', 'yt-politics': 'yt-politics' };
-const styleOf = E => { const st = AI_STYLES[E.s.look || ''] || AI_STYLES[CH_STYLE[E.s.channel] || 'yt-mat']; return st; };
+// 영상 종류 (레슬링): 처음에 고르면 1차 컷·자막·라벨이 그 틀로 짜여요. 없으면 하이라이트.
+export const VTYPES = {
+  highlight: { vname: '하이라이트' },
+  analysis: { vname: '분석',
+    pick: '기술 하나가 준비 자세 → 진입 → 마무리까지 깨끗하게 다 보이는 장면',
+    cut: `기술 하나를 해부한다 (Fight Lab "A closer look" 방식).
+1) intro (1.5~2.5초): 기술이 터지는 결과 장면, 원속도.
+2) setup (role setup, 2~4초): 기술 직전 자세, speed 0.5.
+3) 기술을 3~4단계로 쪼개 단계마다 컷 하나 (role slow, step 에 단계 이름). speed 0.15~0.35, 단계 하나가 출력에서 5~8초. 손 위치·발 위치·무게중심이 보이는 순간으로.
+4) outro (2~4초): 같은 기술을 원속도로 처음부터 끝까지 한 번 더.
+전체 출력 길이는 30~55초.`,
+    roles: 'intro|setup|slow|outro',
+    fx: '인트로가 끝난 직후 선수 라벨 하나 (type label, k=이름 (팀/국가), s=대회 · 체급). 점수 팝업은 꼭 필요할 때만.',
+    caps: '- slow 컷마다 "① 단계 이름" 다음 줄에 왜 되는지 한 줄 (손·발·무게중심·타이밍 중 하나). 결과 자랑보다 원리 설명.' },
+  top5: { vname: 'TOP 5', multi: true,
+    pick: '서로 다른 장면 3~5개: 각각 한 번에 보이는 결정적 기술·역전·명장면. 비슷한 장면 중복 금지',
+    cut: `골라 둔 장면들로 카운트다운 랭킹을 만든다.
+1) intro (1.5~2.5초): 1위 장면의 가장 센 순간을 먼저 살짝.
+2) rank 컷: 낮은 순위부터 1위까지 (장면 5개면 5위→1위, 3개면 3위→1위). 순위마다 원속도 3~8초 (role rank, step 에 "N위 · 기술/선수 이름"). 1위는 슬로우 컷 하나 더 가능 (role slow).
+3) outro (2~3초): 1위 장면을 다시.
+전체 출력 길이는 30~58초.`,
+    roles: 'intro|rank|slow|outro',
+    fx: '각 rank 컷 시작에 순위 라벨 (type label, k="N위", s=기술 · 선수 이름). 점수 팝업 없음.',
+    caps: '- rank 컷이 시작할 때마다 "N위" + 왜 이 순위인지 한 줄. 순위는 컷 순서와 같게.' },
+  info: { vname: '간단 정보',
+    pick: '팁 하나·실수 하나·규칙 하나를 보여 주기 좋은 장면 (실수하는 순간, 규칙이 적용되는 순간, 위험한 습관)',
+    cut: `정보 한 가지만 전한다 (예: "프로 선수들도 무심코 하는 최악의 습관"). 짧게.
+1) intro (1.5~3초): 문제 장면(실수·반칙·위험한 습관)부터.
+2) main 1~2컷 (원속도 또는 speed 0.5): 왜 문제인지 보이는 장면.
+3) fix 컷이 있으면 (role fix): 올바른 모습.
+4) outro (2~3초): 핵심 한 줄로 끝낼 장면.
+전체 출력 길이는 15~30초.`,
+    roles: 'intro|main|slow|fix|outro',
+    fx: '라벨 하나 (type label, k=주제 이름, s=한 줄 설명). 팝업 없음.',
+    caps: '- 정보 하나만. 질문 → 이유 → 답 순서. 문장은 짧게.' },
+};
+const styleOf = E => { const st = AI_STYLES[E.s.look || ''] || AI_STYLES[CH_STYLE[E.s.channel] || 'yt-mat']; const v = st.kind === 'sport' && VTYPES[E.s.vtype]; return v ? { ...st, ...v } : st; };
 
 function source(E) {
   let info; try { info = readJson(E.p('소스.json'))[0]; } catch { info = null; }
@@ -155,10 +191,23 @@ async function aicut(E, ctx) {
   const info = source(E), dur = (await probe(info.file, ctx)).duration;
   if (!dur) throw new StepError('영상 길이를 못 읽었어요.');
   const tr = transcript(E, info), trTxt = tr ? '영어 중계 자막(원본 시각):\n' + tr : '(중계 자막 없음)';
-  let win = [0, dur];
+  let win = [0, dur], picks = null;
   if (dur > 60) {
     ctx.log('전체 영상을 2초 간격으로 훑어봐요…');
     const coarse = await sheets(E, ctx, info.file, 'coarse', 0, dur, 0.5, 6, 5, 320);
+    if (st.multi) {
+      const pk = await askClaude(E, ctx, `너는 ${st.genre} 쇼츠 편집자다. 아래 영상에서 TOP 랭킹 쇼츠에 넣을 장면을 고른다.
+영상: "${info.title}" (${info.channel}), 길이 ${Math.round(dur)}초.
+아래 썸네일 시트를 Read 도구로 전부 보고 판단해라:
+${coarse}
+${trTxt}
+고를 기준: ${st.pick}.
+JSON 하나만 답해라: {"picks":[{"a": 시작초, "b": 끝초, "why": "한 줄"}]}  (장면 3~5개, 각 b-a 는 4~15초, 결정적 순간 앞 2초 이상 포함)`,
+        j => !Array.isArray(j.picks) || j.picks.length < 3 || j.picks.length > 5 ? 'picks 는 3~5개여야 해요.' : j.picks.some(x => !(x.b > x.a) || x.a < 0 || x.b > dur + 1 || x.b - x.a > 20) ? `각 장면은 0~${Math.round(dur)}초 안, 20초 이하.` : '');
+      picks = pk.picks.map(x => [Math.max(0, +x.a), Math.min(dur, +x.b)]);
+      win = [Math.min(...picks.map(x => x[0])), Math.max(...picks.map(x => x[1]))];
+      ctx.log(`  고른 장면 ${picks.length}개: ${picks.map(x => `${r1(x[0])}~${r1(x[1])}`).join(', ')}`);
+    } else {
     const pick = await askClaude(E, ctx, `너는 ${st.genre} 쇼츠 편집자다. 아래 영상에서 세로 쇼츠 하나로 만들 가장 강한 하이라이트 한 장면을 고른다.
 영상: "${info.title}" (${info.channel}), 길이 ${Math.round(dur)}초.
 아래 썸네일 시트를 Read 도구로 전부 보고 판단해라:
@@ -169,10 +218,13 @@ JSON 하나만 답해라: {"a": 시작초, "b": 끝초, "why": "한 줄"}  (b-a 
       j => !(j.b > j.a) ? 'b 가 a 보다 커야 해요.' : j.a < 0 || j.b > dur + 1 ? `시각은 0~${Math.round(dur)}초 안이어야 해요.` : j.b - j.a > 60 ? '60초를 넘어요.' : '');
     win = [Math.max(0, +pick.a), Math.min(dur, +pick.b)];
     ctx.log(`  고른 장면: ${r1(win[0])}~${r1(win[1])}초 · ${pick.why || ''}`);
+    }
   }
   ctx.log('고른 장면을 0.2초 간격으로 봐요…');
-  const fine = await sheets(E, ctx, info.file, 'fine', win[0], win[1] - win[0], 5, 5, 5, 384);
-  const plan = await askClaude(E, ctx, `${skills(ctx, ['shorts-blueprint', 'edit-plan-sheet'])}너는 ${st.genre} 쇼츠 편집자다. 아래는 "${info.title}" 의 원본 ${r1(win[0])}~${r1(win[1])}초를 0.2초 간격으로 뽑은 프레임 시트다. Read 도구로 전부 봐라:
+  let fine;
+  if (picks) { try { for (const f of fs.readdirSync(E.p('분석'))) if (f.startsWith('fine_')) fs.rmSync(E.p('분석', f)); } catch {} const parts = []; for (const [k, [a, b]] of picks.entries()) parts.push(await sheets(E, ctx, info.file, `fine_${k + 1}`, a, b - a, 5, 5, 5, 384)); fine = parts.join('\n'); }
+  else fine = await sheets(E, ctx, info.file, 'fine', win[0], win[1] - win[0], 5, 5, 5, 384);
+  const plan = await askClaude(E, ctx, `${skills(ctx, ['shorts-blueprint', 'edit-plan-sheet'])}너는 ${st.genre} 쇼츠 편집자다. 아래는 "${info.title}" 의 ${picks ? `골라 둔 장면 ${picks.length}개(${picks.map(x => `${r1(x[0])}~${r1(x[1])}초`).join(', ')})` : `원본 ${r1(win[0])}~${r1(win[1])}초`}를 0.2초 간격으로 뽑은 프레임 시트다. Read 도구로 전부 봐라:
 ${fine}
 ${trTxt}
 
@@ -200,7 +252,7 @@ JSON 하나만 답해라:
       const total = c.reduce((t, x) => t + (x.b - x.a) / x.speed, 0);
       return total > 58 ? `출력 길이가 ${r1(total)}초예요. 58초 이하로 줄여라.` : total < 15 ? `출력 길이가 ${r1(total)}초예요. 너무 짧아요.` : '';
     });
-  writeJson(E.p('편집/AI컷.json'), { window: win, ...plan });
+  writeJson(E.p('편집/AI컷.json'), { window: win, vtype: E.s.vtype || 'highlight', sheets: fine, ...plan });
   for (const f of ['편집/AI완성.json', '편집/AI스타일본.mp4', '편집/AI완성.mp4']) fs.rmSync(E.p(f), { force: true });
   for (const id of ['aistyle', 'aisubs', 'aibrand', 'aithumb']) if (E.s.steps[id]) E.s.steps[id] = { status: 'todo' };
   await renderCut(E, ctx, info);
@@ -264,7 +316,8 @@ const common = (E, st, info, plan) => `너는 한국어 ${st.genre} 쇼츠 채�
 원본: "${info.title}" (${info.channel}) ${info.url}
 1차 컷 편집안 (cuts 의 out = 완성 영상의 [시작초, 끝초], a/b = 원본 초, moments = 원본 시각에 보이는 것). 완성 영상 길이 ${plan.duration}초:
 ${JSON.stringify({ moments: plan.moments, cuts: plan.cuts, who: plan.who }, null, 1)}
-프레임 시트(원본 ${r1(plan.window[0])}초부터 0.2초 간격, 5x5 타일, Read 로 확인): ${fineList(E)}
+프레임 시트 (Read 로 확인):
+${plan.sheets || `원본 ${r1(plan.window[0])}초부터 0.2초 간격, 5x5 타일: ${fineList(E)}`}
 ${transcript(E, info) ? '영어 중계 자막(원본 시각):\n' + transcript(E, info) : ''}
 말투: ${st.tone}
 ${(st.rules || []).map(r => '- ' + r).join('\n')}
@@ -542,8 +595,8 @@ async function aithumb(E, ctx) {
 장면 정보: ${JSON.stringify({ moments: plan.moments, who: plan.who })}
 사실은 조사 파일 ${E.p('조사/research.md')} 의 A·B 등급만 (Read 로 확인). ${st.check}
 프레임 시트를 Read 로 보고 장면을 골라라:
-${coarse.length ? `- 전체 영상 2초 간격 6x5 타일: 시트 k(1부터) 타일 i 의 시각 = ((k-1)*30 + i)*2 초\n${coarse.map(f => '  ' + f).join('\n')}\n` : ''}- 하이라이트 구간 0.2초 간격 5x5 타일 (원본 ${r1(plan.window[0])}초부터): 시트 k 타일 i 의 시각 = ${r1(plan.window[0])} + ((k-1)*25 + i)*0.2 초
-${fine.map(f => '  ' + f).join('\n')}
+${coarse.length ? `- 전체 영상 2초 간격 6x5 타일: 시트 k(1부터) 타일 i 의 시각 = ((k-1)*30 + i)*2 초\n${coarse.map(f => '  ' + f).join('\n')}\n` : ''}- 고른 구간 0.2초 간격 5x5 타일:
+${plan.sheets || `원본 ${r1(plan.window[0])}초부터: 시트 k 타일 i 의 시각 = ${r1(plan.window[0])} + ((k-1)*25 + i)*0.2 초\n${fine.map(f => '  ' + f).join('\n')}`}
 x 는 그 프레임에서 인물이 있는 가로 위치(0=왼쪽 끝, 0.5=가운데, 1=오른쪽 끝). 썸네일 칸은 세로로 길어서 x 기준으로 잘라낸다.
 JSON 하나만 답해라: {"top":"","bot":"","color":"red|blue","left":{"t":원본초,"x":0.5,"why":""},"right":{"t":원본초,"x":0.5,"why":""}}`,
     x => !x.top || !x.bot ? 'top, bot 이 있어야 해요.' : nos(x.top) > 12 ? `상단 카피가 ${nos(x.top)}자예요 (12자 이하).` : nos(x.bot) > 16 ? `하단 카피가 ${nos(x.bot)}자예요 (16자 이하).`

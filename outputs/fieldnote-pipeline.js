@@ -881,7 +881,7 @@
   const AI_LOOKS = [...Object.values(AI_CH), ...YT_AI_LOOKS.map(l => l.id)];
   const aiLookName = id => (YT_AI_LOOKS.find(l => l.id === id) || ytLooks().find(l => l.id === id) || { name: id }).name;
   function ytAiCards(it, ep, off) {
-    const names = ['하이라이트 1차 컷', '스타일 선택', '스타일 입히기', '자막', '인트로·아웃트로', '썸네일', '다운로드'];
+    const names = ['1차 컷 (영상 종류)', '스타일 선택', '스타일 입히기', '자막', '인트로·아웃트로', '썸네일', '다운로드'];
     const chId = it.idea ? ytCh(it.idea) : ytTab(), sport = chId === 'yt-wrestling', myLook = AI_CH[chId] || 'yt-mat';
     const st = id => (ep && (ep.steps || []).find(x => x.id === id)) || { status: 'todo', outputs: [] }, ok = id => st(id).status === 'done';
     const out = (id, p) => (st(id).outputs || []).find(o => o.path === p && o.exists);
@@ -896,8 +896,17 @@
     const stopOr = (ids, attrs) => () => runIn(ids) ? 'data-ya-act="stop"' : attrs;
     const card = (i, o) => ({ id: 'ai' + i, name: names[i], title: names[i], run: () => {}, ...o });
     const CUT = ['research', 'download', 'aicut'], cutDone = ok('aicut'), lookOk = !!ep && AI_LOOKS.includes(ep.look);
+    // 영상 종류 (레슬링만): 1차 컷을 만들기 전에 고르고, 1차 컷·자막·라벨이 그 틀로 짜여요
+    const VT = [
+      { id: 'highlight', name: '하이라이트 중심', desc: '결정적 기술 하나 · 원속도 → 단계별 슬로우 → 원속도 (지금까지 만든 것)' },
+      { id: 'analysis', name: '분석 중심', desc: '기술 하나를 해부 · 준비 자세 → 3~4단계 슬로우 + 왜 되는지 설명', ref: 'https://www.youtube.com/@officialfightlab/shorts' },
+      { id: 'top5', name: 'TOP 5', desc: '서로 다른 장면 3~5개를 낮은 순위부터 1위까지 카운트다운', ref: 'https://www.youtube.com/shorts/sShsZ2ZUUZM' },
+      { id: 'info', name: '간단한 정보', desc: '팁·실수·규칙 하나만 · 질문 → 이유 → 답 · 15~30초', ref: 'https://www.youtube.com/shorts/WHy8SK2vi3s' },
+    ];
+    const vpick = (it.idea && ytPipe.vtypeIdea === it.idea.id && ytPipe.vtype) || (ep && ep.vtype) || 'highlight';
+    const vtChips = () => sport ? `<p class="small"><b>어떤 영상을 원하세요?</b> 고른 종류로 1차 컷을 짜요. 바꾸면 "AI 가 다시 자르기"로 다시 짜요.</p><div class="pl-looks" role="radiogroup" aria-label="영상 종류">${VT.map(v => `<button type="button" role="radio" aria-checked="${vpick === v.id}" class="pl-topic ${vpick === v.id ? 'on' : ''}" data-ya-vtype="${v.id}"><span class="pl-lk-txt"><b>${esc(v.name)}</b><span class="small">${esc(v.desc)}</span></span></button>`).join('')}</div><p class="small">레퍼런스: ${VT.filter(v => v.ref).map(v => `<a href="${esc(v.ref)}" target="_blank" rel="noopener">${esc(v.name)}</a>`).join(' · ')}</p>` : '';
     const c1 = card(0, {
-      desc: !it.idea ? '앞 단계를 끝내면 열려요.' : (sport ? 'Claude 가 영상을 처음부터 끝까지 보고 제일 센 장면을 골라 1차 컷을 만들어요. 인트로(첫 1.5~3초)는 제일 충격적인 순간부터, 아웃트로는 인트로로 다시 이어지게 잘라요. 기술은 원속도 → 단계별 슬로우 → 원속도로 세 번 보여 줘요.' : 'Claude 가 영상과 영어 자막을 처음부터 끝까지 보고 가장 센 발언을 골라 1차 컷을 만들어요. 인트로는 가장 센 한 마디부터, 문장 중간에서 끊지 않고, 아웃트로는 결론 한 마디나 반박 직전에서 끊어요.'),
+      desc: !it.idea ? '앞 단계를 끝내면 열려요.' : (sport ? `먼저 어떤 영상을 원하는지 고르세요. Claude 가 영상을 처음부터 끝까지 보고 그 종류(지금: ${(VT.find(v => v.id === vpick) || VT[0]).name})로 1차 컷을 만들어요. 인트로는 제일 충격적인 순간부터, 아웃트로는 다시 보고 싶게 잘라요.` : 'Claude 가 영상과 영어 자막을 처음부터 끝까지 보고 가장 센 발언을 골라 1차 컷을 만들어요. 인트로는 가장 센 한 마디부터, 문장 중간에서 끊지 않고, 아웃트로는 결론 한 마디나 반박 직전에서 끊어요.'),
       btn: () => runIn(CUT) ? '실행 멈춤' : cutDone ? 'AI 가 다시 자르기' : '1차 컷 만들기',
       attrs: stopOr(CUT, `data-ya-act="aicut"${cutDone ? ' data-ya-confirm="1차 컷을 다시 만들어요. 스타일·자막도 다시 해야 해요. 계속할까요?"' : ''}`),
       cls: runIn(CUT) ? 'danger' : '',
@@ -905,7 +914,7 @@
       isDone: () => cutDone,
       statusLine: runLine(CUT),
       result: () => ep ? errOf(CUT) + (cutDone ? `<p><b>1차 컷이 나왔어요.</b> 인트로·아웃트로가 후크인지 보고, 아니면 "AI 가 다시 자르기"를 누르세요.</p>` + vid('aicut', '편집/AI1차컷.mp4', '1차 컷') : '') + logs(CUT) : '',
-      body: () => (off ? '<p class="pl-error" role="alert"><b>실행기가 꺼져 있어요.</b></p>' : old ? oldMsg : ''),
+      body: () => (off ? '<p class="pl-error" role="alert"><b>실행기가 꺼져 있어요.</b></p>' : old ? oldMsg : '') + (it.idea ? vtChips() : ''),
     });
     const choices = sport ? [myLook, ...YT_AI_LOOKS.map(l => l.id)] : [myLook];
     const picked = it.idea && ytPipe.lookIdea === it.idea.id && choices.includes(ytPipe.look) ? ytPipe.look : '';
@@ -1063,7 +1072,7 @@
       const ok = id => (ep.steps || []).some(x => x.id === id && x.status === 'done'), r = ep.round || 0, fb = (ep.feedbackAt || 0) > (ep.editAt || 0);
       if (AI_CH[ytCh(i)]) {   // AI 작업판 8칸
         const af = [true, ok('aicut'), ok('aicut') && AI_LOOKS.includes(ep.look), ok('aistyle'), ok('aisubs'), ok('aibrand'), ok('aithumb'), ok('aibrand') && ok('aithumb')], an = af.filter(Boolean).length, ak = af.findIndex(x => !x);
-        const AN = ['원본 링크', '하이라이트 1차 컷', '스타일 선택', '스타일 입히기', '자막', '인트로·아웃트로', '썸네일', '다운로드'], ab = [];
+        const AN = ['원본 링크', '1차 컷', '스타일 선택', '스타일 입히기', '자막', '인트로·아웃트로', '썸네일', '다운로드'], ab = [];
         if (ep.running) ab.push('<i class="b run">실행 중</i>');
         if ((ep.steps || []).some(x => ['research', 'download', 'aicut', 'aistyle', 'aisubs', 'aibrand', 'aithumb'].includes(x.id) && x.status === 'failed')) ab.push('<i class="b fail">실패</i>');
         return `${an}/8 단계 · ${esc(ak < 0 ? '끝' : AN[ak])}${ab.length ? `<span class="pl-wbs">${ab.join('')}</span>` : ''}`;
@@ -1474,6 +1483,7 @@
     if (t.hasAttribute('data-pl-outtoggle')) { T.outOpen = !ytOutOpen(); ytOutRefresh(); return; }
     if (t.dataset.plOutmode) { YP.mode = t.dataset.plOutmode === 'mock' ? 'mock' : 'real'; ytOutRefresh(); return; }
     if (t.dataset.yaFxpick) { const { it } = ctx(); ytPipe.fxPack = t.dataset.yaFxpick; ytPipe.fxIdea = it.idea ? it.idea.id : ''; repaint('youtube', true); return; }
+    if (t.dataset.yaVtype) { const { it } = ctx(); ytPipe.vtype = t.dataset.yaVtype; ytPipe.vtypeIdea = it.idea ? it.idea.id : ''; repaint('youtube', true); return; }
     if (t.dataset.yaLookpick) { const { it } = ctx(); ytPipe.look = t.dataset.yaLookpick; ytPipe.lookIdea = it.idea ? it.idea.id : ''; repaint('youtube', true); return; }
     if (t.hasAttribute('data-pl-ytchange')) { ytLinkReset(); adapter('youtube').fresh(); T.view.youtube = 0; repaint('youtube', true); return; }
     if (t.dataset.plYsrc) { const u = t.dataset.plYsrc, i = document.querySelector('#plRoot [data-ya-new="url"]'); ytPipe.url = u; if (i) i.value = u; return; }
