@@ -68,7 +68,7 @@ function view(E) {
       return o;
     }),
     running: E.running, gate: !!E.s.gate,
-    progress: E.prog ? editPct(E) : null,
+    progress: E.prog ? editPct(E) : E.aiProg ? aiPct(E) : null,
     round: E.s.round || 0, editRound: E.s.editRound || 0, editAt: E.s.editAt || 0, feedbackAt: E.s.feedbackAt || 0, hasScript: hasScript(E),
   };
 }
@@ -111,17 +111,36 @@ async function runStep(E, id) {
 function launch(E, ids, chain) {
   E.ctrl.aborted = false;
   E.running = ids[0];
+  const ai = ids.filter(id => AI_SECS[id]);
+  E.aiProg = ai.length ? { ids: ai, cur: '', t0: 0 } : null;
   (async () => {
     for (const id of ids) {
       if (E.ctrl.aborted) break;
       if (chain && E.s.steps[id].status === 'done' && id !== ids[0]) continue;
       if (chain && id === 'mix') { makeCtx(E, 'mix').log('목소리 녹음 단계에서 멈췄어요. "음악/녹음"에서 녹음하고 "목소리·음악 넣기"를 누르세요.'); break; }
+      if (E.aiProg) { E.aiProg.cur = id; E.aiProg.t0 = Date.now(); }
       const ok = await runStep(E, id);
+      if (ok && E.aiProg && AI_SECS[id]) aiLearn(id, (Date.now() - E.aiProg.t0) / 1000);
       if (!ok) break;
       if (id === 'script') break;  // 게이트
     }
-    E.running = null;
+    E.running = null; E.aiProg = null;
   })();
+}
+// ---------- AI 편집 진행 퍼센트 ----------
+// Claude 가 영상을 보는 동안은 진행을 알 수 없어서, 단계마다 지난번에 걸린 시간으로 어림해요 (처음엔 기본값). 끝나기 전에는 95%를 넘지 않아요.
+const AI_SECS = { research: 10, download: 60, aicut: 300, aistyle: 240, aisubs: 150, aibrand: 120, aithumb: 120 };
+const AI_TIMES_F = path.join(DATA, '.ai-times.json');
+let aiTimes = {}; try { aiTimes = JSON.parse(fs.readFileSync(AI_TIMES_F, 'utf8')); } catch {}
+const aiExp = id => aiTimes[id] || AI_SECS[id];
+function aiLearn(id, sec) { if (!(sec > 1)) return; aiTimes[id] = Math.round(aiTimes[id] ? aiTimes[id] * 0.6 + sec * 0.4 : sec); try { fs.writeFileSync(AI_TIMES_F, JSON.stringify(aiTimes)); } catch {} }
+function aiPct(E) {
+  const P = E.aiProg, total = P.ids.reduce((t, id) => t + aiExp(id), 0); let done = 0;
+  for (const id of P.ids) {
+    if (id === P.cur) { const x = (Date.now() - P.t0) / 1000 / aiExp(id); done += aiExp(id) * (x < 0.9 ? x : 0.9 + 0.09 * (1 - Math.exp(-(x - 0.9) * 3))); break; }
+    done += aiExp(id);
+  }
+  return Math.min(95, Math.max(1, Math.round(done / total * 100)));
 }
 // ---------- 1차·2차 편집 진행 퍼센트 ----------
 // 단계 무게(합 100): 자르기·이펙트·합치기가 오래 걸려요. 단계 안에서는 ffmpeg 가 만든 길이 / 예상 길이.

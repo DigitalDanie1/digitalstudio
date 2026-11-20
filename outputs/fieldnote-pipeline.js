@@ -822,7 +822,7 @@
         cls: G.running ? 'danger' : '',
         disabled: it => (!!ep.running && !G.running && !G.gate) || (locked && !G.running) || (G.gate && scrPanel && ytScrWaiting(ep)),
         isDone: it => G.done,
-        statusLine: () => G.running ? `실행 중… (${nameOf(G.running.id)}) 끝나면 자동으로 바뀌어요.` : G.failed ? '실패했어요. 아래 로그를 보고 다시 실행하세요.' : '',
+        statusLine: () => G.running ? `실행 중… (${esc(nameOf(G.running.id))}) 끝나면 자동으로 바뀌어요.` : G.failed ? '실패했어요. 아래 로그를 보고 다시 실행하세요.' : '',
         result: it => {
           const parts = [];
           if (G.failed && G.failed.error) parts.push(`<p class="pl-error"><b>${esc(G.failed.name)}</b> · ${esc(runnerFriendly(G.failed.error))}${!isVoice && /여기에 대사/.test(G.failed.error) ? ' <button type="button" class="pl-link" data-ya-goscript>대본 단계로 가기</button>' : ''}</p>`);
@@ -892,7 +892,8 @@
     const errOf = ids => { const f = ids.map(st).find(x => x.status === 'failed'); return f && f.error ? `<p class="pl-error"><b>${esc(f.name)}</b> · ${esc(runnerFriendly(f.error))}</p>` : ''; };
     const logs = ids => `<div class="pl-logs">${ids.map(id => `<button type="button" class="pl-link" data-pl-log="${id}" aria-expanded="${T.logOpen === id}">${esc(st(id).name || id)} 로그${T.logOpen === id ? ' 닫기' : ''}</button>`).join('')}</div>${ids.includes(T.logOpen) ? '<pre class="pl-log" id="plLog">불러오는 중…</pre>' : ''}`;
     const vid = (id, p, label) => { const o = out(id, p); return o ? ytVideoBox('plAi' + id, ep, o, label) : ''; };
-    const runLine = ids => () => runIn(ids) ? `<b>실행 중…</b> ${esc(st(ep.running).name || ep.running)}. Claude 가 영상을 보는 단계는 몇 분 걸려요. 끝나면 자동으로 바뀌어요.` : '';
+    const runLine = ids => () => { if (!runIn(ids)) return ''; const pct = Number.isFinite(ep.progress) ? ep.progress : null;
+      return `<b>${pct != null ? pct + '%' : '실행 중…'}</b> · ${esc(st(ep.running).name || ep.running)} 하는 중. Claude 가 영상을 보는 단계는 몇 분 걸려요 (%는 지난번 걸린 시간으로 어림). 끝나면 자동으로 바뀌어요.${pct != null ? `<div style="height:8px;border-radius:99px;background:var(--line);margin-top:6px;overflow:hidden"><div style="height:100%;width:${pct}%;background:var(--accent,#ff5b5b);transition:width .6s"></div></div>` : ''}`; };
     const stopOr = (ids, attrs) => () => runIn(ids) ? 'data-ya-act="stop"' : attrs;
     const card = (i, o) => ({ id: 'ai' + i, name: names[i], title: names[i], run: () => {}, ...o });
     const CUT = ['research', 'download', 'aicut'], cutDone = ok('aicut'), lookOk = !!ep && AI_LOOKS.includes(ep.look);
@@ -1353,7 +1354,7 @@
       <article class="pl-card" aria-live="polite"><div class="pl-steplabel">${v + 1} / ${N} 단계 ${lastLabel}</div>
         <h2>${esc(val(s.title, it))}</h2><p class="pl-desc">${esc(val(s.desc, it))}</p>
         ${c === 'youtube' && !AI_CH[it.idea ? ytCh(it.idea) : ytTab()] ? ytOutHtml(it) : ''}${val(s.body || '', it) || ''}${err}
-        ${btn}${statusLine ? `<p class="small pl-status">${esc(statusLine)}</p>` : ''}
+        ${btn}${statusLine ? `<p class="small pl-status">${statusLine}</p>` : ''}
         <div class="pl-result" aria-label="이 단계의 결과"><div class="pl-result-h">결과</div>${res || '<span class="small">아직 없어요. 위 버튼을 누르면 여기에 나와요.</span>'}</div>
         ${finish}
         <div class="pl-nav"><button type="button" class="pl-nav-btn" data-pl-prev ${v > 0 ? '' : 'disabled'}>← 이전</button>${next}</div>
