@@ -576,7 +576,7 @@ async function aisubs(E, ctx) {
     const speech = rows.filter(r => r.kind === 'sp').map(r => ({ s: r.s, e: r.e, en: r.en || '', ko: r.ko || '' }));
     const ai = rows.filter(r => r.kind === 'ai').map(r => [r.s, r.e, r.ko || r.en]);
     const mine = rows.filter(r => r.kind === 'my').map(r => [r.s, r.e, r.ko || r.en]);
-    const caps = [...speech.map(x => [x.s, x.e, x.ko || x.en, x.ko && x.en ? x.en : '']), ...ai.map(q => [q[0], q[1], q[2], ''])].sort((a, b) => a[0] - b[0]);
+    const caps = [...speech.map(x => [x.s, x.e, x.ko || x.en, x.ko && x.en ? x.en : '']), ...ai.map(q => [q[0], q[1], q[2], q[3] || ''])].sort((a, b) => a[0] - b[0]);
     const j = { frame: base.frame, fx: base.fx, credits: base.credits, captions: caps, mine };
     if (base.ranks) j.ranks = base.ranks; if (base.note) j.note = base.note;
     writeJson(E.p('편집/AI자막.json'), { opt: { en: o.en, ko: o.ko, ai: o.ai }, speech, ai, mine, edited: true });
@@ -593,7 +593,8 @@ async function aisubs(E, ctx) {
   const prog = progOf(E, 'aisubs', [['segs', '원문 자막 정리'], ['ko', '한국어 번역'], ['ai', '해설·후크 자막'], ['render', '자막 입혀 그리기'], ['done', '끝']]);
   const segs = (o.en || o.ko) ? segsOf(E, info, plan) : [], d = plan.duration;
   if ((o.en || o.ko) && !segs.length) ctx.log('  영상 원문 자막이 없어요 (내 파일이거나 유튜브 자막이 없는 영상). 원문·번역 자막은 건너뛰어요.');
-  if (!o.ai && !segs.length && !o.mine.length) throw new StepError('넣을 자막이 없어요. 원문 자막이 없는 영상이라 "AI 해설·후크 자막"이나 "내 자막"을 켜 주세요.');
+  const aiLang = ['ko', 'en', 'both'].includes(o.aiLang) ? o.aiLang : 'ko';
+  if (!o.ai && !segs.length && !o.mine.length) throw new StepError((o.en || o.ko) ? '이 영상은 음성 자막(원문)이 없어요 (내 파일이거나 유튜브 자막이 없는 영상). "기술 설명 자막"을 켜 주세요.' : '넣을 자막을 하나 이상 골라 주세요.');
   // 1) 원문 -> 한국어 (S 하나에 한 줄, 1:1). 프레임은 안 보고 말만 옮겨서 빨라요.
   let ko = new Map();
   if (o.ko && segs.length) {
@@ -624,28 +625,35 @@ JSON 하나만 답해라: {"ko":[[1,"한국어"],[2,"한국어"]]}`,
     const j = await askClaude(E, ctx, `${skills(ctx, ['shorts-blueprint'])}${common(E, st, info, plan, segs.length > 0)}
 이미 정한 위 제목·라벨·팝업: ${JSON.stringify({ frame: base.frame, fx: base.fx })}
 ${st.check}
-이번 할 일: 해설·후크 자막. 인트로와 아웃트로가 제일 중요하다. 둘 다 후크다.
+이번 할 일: 기술 설명 자막 (해설 + 후크). 인트로와 아웃트로가 제일 중요하다. 둘 다 후크다.
+기술 설명 자막은 MAT STORY 레퍼런스처럼, 보는 사람이 그 기술·하이라이트를 하나하나 따라가게 만든다:
+- 원속도 구간: 지금 무슨 일이 일어나는지 반말 구어체 한 줄 ("일부러 다리를 내줬어.", "스나이더가 다리 잡았지?", "이게 미끼야.").
+- 슬로우 구간(SLOW): 기술을 단계로 쪼갠다. 단계마다 번호를 붙인다: "① 확 낮추기" → "② 허리 감고 들기" → "③ 그대로 넘기기". 단계 이름은 동작 그대로 짧게 (8~12자).
+- 숫자·결과는 정확히 (경기 시간, 점수). 모르는 건 쓰지 않는다.
+- 강조할 핵심 단어 하나만 [[단어]] (노란색이 된다).
 - 인트로(intro 컷 ${JSON.stringify(hookCuts[0] || [0, 2])}): 0초에 바로 시작. 결과/숫자/반전을 먼저 던진다. 인사, 설명, "오늘은" 금지.
 - 아웃트로(outro 컷): 영상 끝(${d}초)까지. 다시 보게 만드는 한 줄 또는 댓글을 부르는 질문.
 ${st.caps}
 - 한 자막 최대 2줄, 줄당 16자 이내, 줄바꿈은 \\n. 강조할 단어 하나만 [[단어]]. 자막끼리 겹치지 않게.
 ${fixed.length ? `- 아래 시각에는 영상 원문 자막(말)이 이미 나온다. 그 시각과 겹치게 쓰지 마라:\n${fixed.map(x => `  [${x.s}-${x.e}] ${x.en || x.ko}`).join('\n')}` : ''}
-JSON 하나만 답해라: {"captions":[[시작,끝,"텍스트"]],"facts":["쓴 사실과 근거 한 줄씩"]}`,
+${aiLang === 'ko' ? '' : `- 언어: ${aiLang === 'en' ? '영어로만 쓴다 (자연스러운 영어 쇼츠 말투, 한 줄 32자 이내, 최대 2줄). 세 번째 칸에 영어.' : '한국어와 영어 둘 다. 세 번째 칸 한국어, 네 번째 칸 같은 뜻의 자연스러운 영어 (한 줄 32자 이내, 최대 2줄, [[ ]] 없이).'}`}
+JSON 하나만 답해라: {"captions":[[시작,끝,"${aiLang === 'en' ? '영어' : '한국어'}"${aiLang === 'both' ? ',"영어"' : ''}]],"facts":["쓴 사실과 근거 한 줄씩"]}`,
       x => { const c = x.captions || []; if (!c.length) return '자막이 없어요.';
+        const lim = aiLang === 'en' ? 34 : 18; if (aiLang === 'both' && c.some(q => !String(q[3] || '').trim())) return '영어 칸(네 번째)이 빈 자막이 있어요.';
         for (const [i, q] of c.entries()) { if (!(q[0] >= 0 && q[1] > q[0] && q[1] <= d + 0.6)) return `자막 ${i + 1}번 시각이 0~${d}초 밖이에요.`;
-          if (String(q[2]).split(/\n|\\n/).some(l => l.replace(/\[\[|\]\]/g, '').length > 18)) return `자막 ${i + 1}번 한 줄이 16자를 넘어요.`;
+          if (String(q[2]).split(/\n|\\n/).some(l => l.replace(/\[\[|\]\]/g, '').length > lim)) return `자막 ${i + 1}번 한 줄이 ${lim - 2}자를 넘어요.`;
           const hit = fixed.find(f => q[0] < f.e - 0.05 && q[1] > f.s + 0.05); if (hit) return `자막 ${i + 1}번이 원문 자막 [${hit.s}-${hit.e}] 과 겹쳐요.`; }
         if (c[0][0] > 0.3) return '첫 자막(인트로 후크)이 0초에 시작해야 해요.';
         if (c[c.length - 1][1] < d - 1.5) return '마지막 자막(아웃트로 후크)이 영상 끝까지 가야 해요.'; return ''; });
-    ai = j.captions.map(q => [+q[0], +q[1], String(q[2])]);
+    ai = j.captions.map(q => [+q[0], +q[1], String(q[2]), aiLang === 'both' ? String(q[3] || '') : '']);
     speech = speech.filter(x => !ai.some(q => x.s < q[1] - 0.05 && x.e > q[0] + 0.05));   // 후크가 이기는 자리의 말 자막은 빼요
   }
   // 3) 하나로: [시작, 끝, 큰 글(한국어 또는 영어), 작은 영어 줄]
-  const caps = [...speech.filter(x => x.ko || x.en).map(x => [x.s, x.e, x.ko || x.en, x.ko && x.en ? x.en : '']), ...ai.map(q => [q[0], q[1], q[2], ''])].sort((a, b) => a[0] - b[0]);
+  const caps = [...speech.filter(x => x.ko || x.en).map(x => [x.s, x.e, x.ko || x.en, x.ko && x.en ? x.en : '']), ...ai.map(q => [q[0], q[1], q[2], q[3] || ''])].sort((a, b) => a[0] - b[0]);
   for (const [k, c] of caps.entries()) { const nx = caps[k + 1]; if (c[1] - c[0] < 1.2) c[1] = r1(Math.min(c[0] + 1.2, nx ? nx[0] : c[0] + 1.2)); }
   const j = { frame: base.frame, fx: base.fx, credits: base.credits, captions: caps, mine: o.mine.filter(m => m[0] < d) };
   if (base.ranks) j.ranks = base.ranks; if (base.note) j.note = base.note;
-  writeJson(E.p('편집/AI자막.json'), { opt: { en: o.en, ko: o.ko, ai: o.ai }, speech, ai, mine: j.mine });
+  writeJson(E.p('편집/AI자막.json'), { opt: { en: o.en, ko: o.ko, ai: o.ai, aiLang }, speech, ai, mine: j.mine });
   if (E.s.steps.aibrand) E.s.steps.aibrand = { status: 'todo' };
   writeJson(E.p('편집/AI완성.json'), j);
   ctx.log(`자막: 원문 ${speech.filter(x => x.en).length}줄 · 번역 ${speech.filter(x => x.ko).length}줄 · 해설/후크 ${ai.length}줄 · 내 자막 ${j.mine.length}줄`);
@@ -662,6 +670,8 @@ const bgr = hex => `&H00${hex.slice(4, 6)}${hex.slice(2, 4)}${hex.slice(0, 2)}&`
 const esc = s => String(s ?? '').replace(/\\n/g, '\n').replace(/[{}\\]/g, '').replace(/\r?\n/g, '\\N');
 // 작은 영어 원문 줄: 한 줄 38자 안팎으로 접어요 (ASS 는 자동 줄바꿈을 끔)
 const wrapEn = t => { const ls = ['']; for (const w of String(t).split(/\s+/)) { if (ls[ls.length - 1] && (ls[ls.length - 1] + ' ' + w).length > 38) ls.push(w); else ls[ls.length - 1] = (ls[ls.length - 1] + ' ' + w).trim(); } return ls.slice(0, 3).map(esc).join('\\N'); };
+// 영어로만 된 큰 자막은 글씨를 줄여요 (한 줄 30자 안팎이 화면에 들어가게)
+const latin = t => /[가-힣]/.test(String(t)) ? '' : '{\\fs54}';
 const enTail = en => en ? `\\N{\\fs40\\b0\\bord4\\c&HDCDCDC&}${wrapEn(en)}` : '';
 // 내 자막: 노란 글씨, 영상 위쪽 (다른 자막과 안 겹치게)
 const mineEv = (fin, add, y) => { for (const [a, b, t] of fin.mine || []) add(a, b, 8, 'Cap', `{\\an8\\pos(540,${y})\\fs58\\c&H00E6FF&\\bord6}${esc(t)}`); };
@@ -675,7 +685,7 @@ export function buildAss(fin, plan, st, src) {
   add(0, end, 5, 'Title', `{\\an5\\pos(540,354)\\c${R}}${esc(fin.frame?.l2)}`);
   if (st.watermark) add(0, end, 4, 'Mark', `{\\an3\\pos(1050,1424)}${st.watermark[0]} {\\c${Y}}${st.watermark[1]}`);
   for (const [a, b, t] of fin.credits || []) add(a, b, 4, 'Credit', `{\\an8\\pos(540,1466)}영상: ${esc(t)}`);
-  for (const [a, b, t, en] of fin.captions || []) add(a, b, 3, 'Cap', `{\\an2\\pos(540,1345)}${hi(t)}${enTail(en)}`);
+  for (const [a, b, t, en] of fin.captions || []) add(a, b, 3, 'Cap', `{\\an2\\pos(540,1345)}${latin(t)}${hi(t)}${enTail(en)}`);
   mineEv(fin, add, VY + 40);
   for (const [a, b, f] of fin.fx || []) {
     if (f.type === 'label') { add(a, b, 6, 'Label', `{\\an7\\pos(44,505)}${esc(f.k)}`); if (f.s) add(a, b, 6, 'Sub', `{\\an7\\pos(44,598)}${esc(f.s)}`); }
@@ -732,14 +742,14 @@ function buildAssLay(fin, plan, st, src) {
     ranks.forEach((r, k) => { const no = n - k, y = 1120 + (no - 1) * 84;   // 1위가 맨 위
       add(0, end, 5, 'Rank', `{\\an4\\pos(110,${y})}${no}.`);
       add(r[0], end, 5, 'Rank', `{\\an4\\pos(180,${y})\\fscx120\\fscy120\\t(0,150,\\fscx100\\fscy100)}${esc(r[2])}`); });
-    for (const [a, b, t, en] of caps) add(a, b, 3, 'Cap', `{\\an2\\pos(540,${L.vy + L.vh - 24})}${hi(t)}${enTail(en)}`);
+    for (const [a, b, t, en] of caps) add(a, b, 3, 'Cap', `{\\an2\\pos(540,${L.vy + L.vh - 24})}${latin(t)}${hi(t)}${enTail(en)}`);
     for (const [a, b, t] of fin.credits || []) add(a, b, 4, 'Credit', `{\\an2\\pos(540,1880)}영상: ${esc(t)}`);
   } else if (st.lay === 'post') {
     if (st.name) add(0, end, 5, 'Name', `{\\an4\\pos(212,150)}${esc(st.name)}`);
     if (st.handle) add(0, end, 5, 'Name', `{\\an4\\pos(212,212)}${esc(st.handle)}`);
     add(0, end, 5, 'Title', `{\\an5\\pos(540,350)}${esc(fin.frame?.l1)}`);
     add(0, end, 5, 'Title', `{\\an5\\pos(540,445)}${esc(fin.frame?.l2)}`);
-    for (const [a, b, t, en] of caps) add(a, b, 3, 'Cap', `{\\an2\\pos(540,${L.vy + L.vh - 30})}${hi(t, '&HFFFFFF&', Y)}${enTail(en)}`);
+    for (const [a, b, t, en] of caps) add(a, b, 3, 'Cap', `{\\an2\\pos(540,${L.vy + L.vh - 30})}${latin(t)}${hi(t, '&HFFFFFF&', Y)}${enTail(en)}`);
     if (fin.note) {
       add(0, end, 4, 'Draw', `{\\an7\\pos(80,1415)\\1c&HE6E6E6&\\bord0\\p1}m 55 0 b 85 0 110 25 110 55 b 110 85 85 110 55 110 b 25 110 0 85 0 55 b 0 25 25 0 55 0`);
       add(0, end, 5, 'NoteName', `{\\an4\\pos(232,1440)}${esc(st.name || '')}`);
@@ -755,7 +765,7 @@ function buildAssLay(fin, plan, st, src) {
         let s0 = a; for (const w of words) { const d = (b - a) * (w.replace(/\[\[|\]\]/g, '').length + 1) / tot, hot = /\[\[/.test(w);
           add(s0, s0 + d, 3, 'Word', `{\\an5\\pos(540,1150)\\fscx125\\fscy125\\t(0,90,\\fscx100\\fscy100)${hot ? `\\c${Y}` : ''}}${esc(w.replace(/\[\[|\]\]/g, ''))}`); s0 += d; }
       }
-    } else for (const [a, b, t, en] of caps) add(a, b, 3, 'Cap', `{\\an2\\pos(540,${st.explain ? 1560 : 1250})}${hi(t, st.explain ? Y : R)}${enTail(en)}`);
+    } else for (const [a, b, t, en] of caps) add(a, b, 3, 'Cap', `{\\an2\\pos(540,${st.explain ? 1560 : 1250})}${latin(t)}${hi(t, st.explain ? Y : R)}${enTail(en)}`);
     if (st.name) add(0, end, 4, 'Mark', `{\\an5\\pos(540,1470)}${esc(st.name)}`);
     for (const [a, b, t] of fin.credits || []) add(a, b, 4, 'Credit', `{\\an7\\pos(30,30)}영상: ${esc(t)}`);
   }

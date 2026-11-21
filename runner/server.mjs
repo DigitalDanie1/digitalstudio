@@ -13,7 +13,7 @@ import { STEP_DEFS, STEP_FN, outputsFor, listAssets, checkScript, cleanPasted, p
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // 작업판이 쓰는 기능 수준. 3 = 새 9칸 순서 (/look, /ranges, deferRanges, 단계 clip·subs·fx)
-const API_LEVEL = 23;   // 23 = Claude 가 지금 하는 일 실시간 (편집/진행_claude.json, stream-json) · 22 = 그리는 중인 화면 실시간 (진행_<단계>_live.jpg) · 21 = 자막 편집기 (GET /segs, run body.subs.edit) · 20 = 사이트에서 실행기 업데이트 (POST /update: GitHub 최신 runner 파일 받아서 검사 후 바꾸고 다시 켜기), 레퍼런스 분석 줄 세우기 (queued) · 19 = 모든 AI 단계 실시간 보기 (편집/진행_<단계>.json) · 18 = 1차 컷 실시간 보기 (편집/AI컷_진행.json) · 17 = 레퍼런스 쇼츠 분석 (POST /ref/analyze, GET /ref/status, GET /ref/<id>: 컷·후크·이펙트·이목 장치를 먼저 보여 주고 고르면 그대로 적용) · 16 = 자막 원문·번역·해설·내 자막 나눠 켜기 (run body.subs), 썸네일 내 카피 (run body.thumb) · 15 = 실행기 다시 켜기 (POST /restart, health.disk) · 14 = 내 영상 올리기 (POST /upload) · 13 = 레퍼런스 쇼츠 룩 (look ref-<영상ID>, view.refStyle) · 12 = 한 구간·하이라이트 길이 최대 3분(30초·1분·2분·3분), 쇼츠 최대 3분 · 11 = 하이라이트 '지난 작업' 초기화(/hl/reset, 돌고 있으면 멈추고 휴지통 한 폴더로) · 10 = AI 편집 단계(aicut·aistyle·aisubs, 맥의 Claude Code) · 9 = 유튜브 초기화(/reset, 에피소드·하이라이트 전부 휴지통 한 폴더로) · 8 = 미리보기 견본(/preview, 고른 룩·이펙트를 실제 영상 4초로) · 7 = 에피소드 완전히 지우기(/episode/delete, 휴지통으로) · 6 = 하이라이트 찾기(/hl/*) ·  4 = 7칸 순서 (/edit 1차·2차 편집, /draft, /feedback, 슬로우 구간 x0.5, 매트 스토리 룩) · 5 = 최종 결과물 레퍼런스(이펙트 팩: /fxpack, status.fxPacks)
+const API_LEVEL = 24;   // 24 = 자막: 기술 설명(tech)·영상 음성(speech) + 언어(ko|en|both) · 23 = Claude 가 지금 하는 일 실시간 (편집/진행_claude.json, stream-json) · 22 = 그리는 중인 화면 실시간 (진행_<단계>_live.jpg) · 21 = 자막 편집기 (GET /segs, run body.subs.edit) · 20 = 사이트에서 실행기 업데이트 (POST /update: GitHub 최신 runner 파일 받아서 검사 후 바꾸고 다시 켜기), 레퍼런스 분석 줄 세우기 (queued) · 19 = 모든 AI 단계 실시간 보기 (편집/진행_<단계>.json) · 18 = 1차 컷 실시간 보기 (편집/AI컷_진행.json) · 17 = 레퍼런스 쇼츠 분석 (POST /ref/analyze, GET /ref/status, GET /ref/<id>: 컷·후크·이펙트·이목 장치를 먼저 보여 주고 고르면 그대로 적용) · 16 = 자막 원문·번역·해설·내 자막 나눠 켜기 (run body.subs), 썸네일 내 카피 (run body.thumb) · 15 = 실행기 다시 켜기 (POST /restart, health.disk) · 14 = 내 영상 올리기 (POST /upload) · 13 = 레퍼런스 쇼츠 룩 (look ref-<영상ID>, view.refStyle) · 12 = 한 구간·하이라이트 길이 최대 3분(30초·1분·2분·3분), 쇼츠 최대 3분 · 11 = 하이라이트 '지난 작업' 초기화(/hl/reset, 돌고 있으면 멈추고 휴지통 한 폴더로) · 10 = AI 편집 단계(aicut·aistyle·aisubs, 맥의 Claude Code) · 9 = 유튜브 초기화(/reset, 에피소드·하이라이트 전부 휴지통 한 폴더로) · 8 = 미리보기 견본(/preview, 고른 룩·이펙트를 실제 영상 4초로) · 7 = 에피소드 완전히 지우기(/episode/delete, 휴지통으로) · 6 = 하이라이트 찾기(/hl/*) ·  4 = 7칸 순서 (/edit 1차·2차 편집, /draft, /feedback, 슬로우 구간 x0.5, 매트 스토리 룩) · 5 = 최종 결과물 레퍼런스(이펙트 팩: /fxpack, status.fxPacks)
 let VERSION = 'dev';
 try { VERSION = fs.readFileSync(path.join(HERE, 'version.txt'), 'utf8').trim() || 'dev'; } catch {}
 const PORT = +(process.env.FIELDNOTE_RUNNER_PORT || 4777);
@@ -58,7 +58,7 @@ function loadAll() {
 function view(E) {
   return {
     ep: E.s.ep, title: E.s.title, note: E.s.note || '', ideaId: E.s.ideaId || '', format: E.s.format, channel: E.s.channel || '',
-    look: E.s.look || '', lookUsed: lookKeyOf(E), vtype: E.s.vtype || '', subsOpt: E.s.subsOpt ? { en: E.s.subsOpt.en, ko: E.s.subsOpt.ko, ai: E.s.subsOpt.ai, mine: E.s.subsOpt.mineText || '' } : null, thumbText: E.s.thumbText || null, refStyle: E.s.refStyle && E.s.refStyle.look === E.s.look ? { name: E.s.refStyle.name, desc: E.s.refStyle.desc, base: E.s.refStyle.base } : null,
+    look: E.s.look || '', lookUsed: lookKeyOf(E), vtype: E.s.vtype || '', subsOpt: E.s.subsOpt ? { en: E.s.subsOpt.en, ko: E.s.subsOpt.ko, ai: E.s.subsOpt.ai, tech: E.s.subsOpt.tech, speech: E.s.subsOpt.speech, techLang: E.s.subsOpt.techLang, speechLang: E.s.subsOpt.speechLang, mine: E.s.subsOpt.mineText || '' } : null, thumbText: E.s.thumbText || null, refStyle: E.s.refStyle && E.s.refStyle.look === E.s.look ? { name: E.s.refStyle.name, desc: E.s.refStyle.desc, base: E.s.refStyle.base } : null,
     fxPack: E.s.fxPack || '', fxPackUsed: fxPackOf(E).id, fxTimes: E.s.fxTimes || '', fxLabels: E.s.fxLabels || [],
     sources: E.s.sources.map(x => ({ url: x.url, ranges: x.ranges })),
     steps: STEP_DEFS.map(d => {
@@ -534,7 +534,10 @@ const routes = {
     if (typeof body.vtype === 'string' && /^[a-z0-9]{1,20}$/.test(body.vtype)) E.s.vtype = body.vtype;   // AI 편집: 영상 종류
     if (ids.includes('aisubs') && body.subs && typeof body.subs === 'object') {   // AI 자막: 원문(en)·번역(ko)·해설/후크(ai) 켜고 끄기 + 내 자막
       let mine; try { mine = parseMine(body.subs.mine); } catch (e) { throw new HttpError(400, e.message); }
-      E.s.subsOpt = { en: body.subs.en !== false, ko: body.subs.ko !== false, ai: body.subs.ai !== false, mine, mineText: String(body.subs.mine || '').slice(0, 4000) };
+      const b = body.subs, L = x => ['ko', 'en', 'both'].includes(x) ? x : null;
+      // 새 방식: tech(기술 설명 자막) + techLang, speech(영상 음성 자막) + speechLang (ko|en|both)
+      if ('tech' in b || 'speech' in b) E.s.subsOpt = { ai: !!b.tech, aiLang: L(b.techLang) || 'ko', en: !!b.speech && (L(b.speechLang) || 'both') !== 'ko', ko: !!b.speech && (L(b.speechLang) || 'both') !== 'en', tech: !!b.tech, speech: !!b.speech, techLang: L(b.techLang) || 'ko', speechLang: L(b.speechLang) || 'both', mine, mineText: String(b.mine || '').slice(0, 4000) };
+      else E.s.subsOpt = { en: b.en !== false, ko: b.ko !== false, ai: b.ai !== false, mine, mineText: String(b.mine || '').slice(0, 4000) };
       if (Array.isArray(body.subs.edit)) {   // 자막 편집기: [{s, e, kind: sp|ai|my, ko, en}]
         if (body.subs.edit.length > 400) throw new HttpError(400, '자막이 너무 많아요 (400줄까지).');
         E.s.subsOpt.edit = body.subs.edit.map(r => ({ s: Math.max(0, Math.round(+r.s * 10) / 10 || 0), e: Math.round(+r.e * 10) / 10 || 0, kind: ['sp', 'ai', 'my'].includes(r.kind) ? r.kind : 'ai', ko: String(r.ko || '').slice(0, 120), en: String(r.en || '').slice(0, 200) }));
