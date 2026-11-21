@@ -909,7 +909,7 @@
   const ytRefLooks = ch => (typeof window.ytRefShorts === 'function' ? window.ytRefShorts(ch) : []).filter(r => !YT_AI_LOOKS.some(l => l.ref.includes(r.id))).map(r => ({ id: 'ref-' + r.id, vid: r.id, title: r.title, from: r.from }));
   // 자막·썸네일 입력 칸 초안 (화면이 다시 그려져도 남게): 에피소드별
   const YD = {};
-  function ytSubDraft(ep) { const k = 's:' + (ep ? ep.ep : ''); if (!YD[k]) { const o = (ep && ep.subsOpt) || {}; YD[k] = { tech: o.tech != null ? !!o.tech : true, techLang: o.techLang || 'ko', speech: !!o.speech, speechLang: o.speechLang || 'both', mine: '' }; } return YD[k]; }
+  function ytSubDraft(ep) { const k = 's:' + (ep ? ep.ep : ''); if (!YD[k]) { const o = (ep && ep.subsOpt) || {}; YD[k] = { tech: o.tech != null ? !!o.tech : true, techLang: o.techLang || 'ko', speech: o.speech != null ? !!o.speech : true, speechLang: o.speechLang || 'both', srcLang: o.srcLang || '', capStyle: o.capStyle || 'mat', top1: o.top1 || '', top2: o.top2 || '', mine: '' }; } return YD[k]; }
   function ytThumbDraft(ep) { const k = 't:' + (ep ? ep.ep : ''); if (!YD[k]) { const o = (ep && ep.thumbText) || {}; YD[k] = { top: o.top || '', bot: o.bot || '' }; } return YD[k]; }
   window.ytAiExtra = (ep, ids) => { const x = {}; if (ids.includes('aisubs')) x.subs = { ...ytSubDraft(ep) }; if (ids.includes('aithumb')) x.thumb = { ...ytThumbDraft(ep) }; return x; };
   // 만든 자막 목록 (편집/AI자막.json) 은 실행기에서 받아 와서 기억해요
@@ -1219,11 +1219,34 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
       return `<details class="pl-peek" open><summary>자막 목록 ${rows.length}줄 (완성 영상 시각)</summary><table class="pl-subt" style="width:100%;font-size:13px;border-collapse:collapse"><thead><tr><th style="text-align:left">시각</th><th style="text-align:left">종류</th><th style="text-align:left">영어 원문</th><th style="text-align:left">한국어 / 자막</th></tr></thead><tbody>${rows.map(r => `<tr style="border-top:1px solid var(--line)"><td style="white-space:nowrap;padding:4px 6px 4px 0">${fmtT(r[0])}-${fmtT(r[1])}</td><td style="white-space:nowrap;padding-right:6px">${tag[r[2]]}</td><td style="color:var(--muted)">${esc(r[3] || '')}</td><td>${esc(String(r[4] || '').replace(/\\n|\n/g, ' / '))}</td></tr>`).join('')}</tbody></table></details>`; };
     // 자막: ① 기술 설명 자막 (Claude 가 기술·하이라이트를 하나하나) ② 영상 음성 자막 (영상 속 말 그대로) · 각각 한국어 / 영어 / 한+영
     const LANGS = [['ko', '한국어'], ['en', '영어'], ['both', '한국어 + 영어']];
+    const radios = (lk, list, label) => `<div role="radiogroup" aria-label="${label}" style="display:flex;gap:6px;flex-wrap:wrap">${list.map(([v, l]) => `<label class="pl-chip ${SO[lk] === v ? 'on' : ''}" style="cursor:pointer"><input type="radio" name="plSub_${lk}" data-pl-sub="${lk}" value="${v}" ${SO[lk] === v ? 'checked' : ''} style="margin-right:5px">${l}</label>`).join('')}</div>`;
+    // 자막 모양: 레퍼런스 쇼츠 6개를 보고 만든 위 제목 + 아래 자막 조합 (실행기 ai.mjs CAP_STYLES 와 같은 값)
+    const FR = (ep && ep.aiFrame) || {}, T1 = SO.top1 || FR.l1 || '위 제목 첫 줄', T2 = SO.top2 || FR.l2 || '둘째 줄';
+    const capMock = (k, c) => { const bx = (o, txt) => `<span style="color:#${o.c};${o.box ? `background:#${o.box};padding:1px 5px;` : ''}">${esc(txt).replace(/\[\[(.+?)\]\]/g, `<span style="color:#${o.acc || 'FFD400'}">$1</span>`)}</span>`, q = c.cap.q || '';
+      return `<div style="width:96px;height:170px;background:#000;border-radius:6px;overflow:hidden;display:flex;flex-direction:column;font-weight:800;font-size:9px;line-height:1.35;text-align:center">
+        <div style="height:42px;background:${c.top === 'white' ? '#fff' : '#000'};display:flex;flex-direction:column;justify-content:center;gap:2px">${c.noTitle ? '' : `<div>${bx(c.l1, T1)}</div><div>${bx(c.l2, T2)}</div>`}</div>
+        <div style="flex:1;background:linear-gradient(160deg,#4a5a6a,#2a3440);display:flex;align-items:flex-end;justify-content:center;padding:0 4px 8px"><span style="color:#${c.cap.c};${c.cap.box ? `background:#${c.cap.box};padding:1px 4px;` : `text-shadow:0 0 2px #${c.cap.outline || '000'},0 0 2px #${c.cap.outline || '000'};`}font-size:${Math.round(c.cap.size / 7)}px">${q}말 자막이 여기${q}</span></div>
+        <div style="height:20px"></div></div>`; };
+    const CAPS = { mat: { name: 'MAT STORY (기본)', top: 'black', l1: { c: 'FFD23A' }, l2: { c: 'E8202A' }, cap: { c: 'FFFFFF', outline: '000000', size: 74 } },
+      z46wpridXII: { name: '흰 제목 + 초록 박스 / 노란 박스 자막', top: 'black', l1: { c: 'FFFFFF', box: '000000' }, l2: { c: '3DFF4F', box: '000000' }, cap: { c: 'FFE14A', box: '1E1E1E', size: 64 } },
+      '6JcQ_cJ7v_c': { name: '제목 없이 / 형광 초록 자막', top: 'black', noTitle: true, cap: { c: '5CFF3A', outline: '000000', size: 80 } },
+      EqHagvvlJjc: { name: '흰 제목 + 노란 강조 / 박스 속 *작은 자막*', top: 'black', l1: { c: 'FFFFFF' }, l2: { c: 'FFFFFF', acc: 'FFD400' }, cap: { c: 'FFFFFF', box: '000000', size: 54, q: '*' } },
+      '60BaSr0QNRU': { name: '흰 배경 + 빨간 띠 제목 / 흰 자막', top: 'white', l1: { c: '000000' }, l2: { c: 'FFFFFF', box: 'E8202A' }, cap: { c: 'FFFFFF', outline: '000000', size: 74 } },
+      '2J9edQXs-0E': { name: '노랑·빨강 제목 / "따옴표" 자막', top: 'black', l1: { c: 'FFD23A' }, l2: { c: 'FF3030' }, cap: { c: 'FFFFFF', outline: '000000', size: 70, q: '"' } },
+      f7uw6Z2gVRA: { name: '흰 제목 + 민트 박스 / 민트 자막', top: 'black', l1: { c: 'FFFFFF' }, l2: { c: '000000', box: '5CF0B0' }, cap: { c: '8CFFC0', outline: '1A1A1A', size: 72 } } };
+    const capPick = runnerApi >= 25 ? `<div style="border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin:0 0 10px">
+      <b>위 고정 제목</b> <span class="small">(영상 내내 위에 떠 있는 두 줄. 비우면 스타일 단계에서 AI 가 쓴 그대로 · [[단어]] 는 강조색)</span>
+      <div class="pl-ya-form" style="margin-top:6px"><input class="pl-input" id="plSubTop1" data-pl-sub="top1" maxlength="30" placeholder="${esc(FR.l1 || '첫 줄')}" value="${esc(SO.top1)}"><input class="pl-input" id="plSubTop2" data-pl-sub="top2" maxlength="30" placeholder="${esc(FR.l2 || '둘째 줄')}" value="${esc(SO.top2)}"></div>
+      <p style="margin:12px 0 6px"><b>자막 모양</b> <span class="small">(레퍼런스 쇼츠 6개를 보고 만든 위 제목 + 아래 자막 조합. 아래 그림은 대략의 모양, 링크는 원본 쇼츠)</span></p>
+      <div role="radiogroup" aria-label="자막 모양" style="display:flex;gap:10px;flex-wrap:wrap">${Object.entries(CAPS).map(([k, c]) => `<label style="cursor:pointer;width:118px;border:2px solid ${SO.capStyle === k ? 'var(--accent,#3b82f6)' : 'var(--line)'};border-radius:10px;padding:8px;display:flex;flex-direction:column;align-items:center;gap:6px" data-cap-card>
+        <input type="radio" name="plSub_capStyle" data-pl-sub="capStyle" value="${k}" ${SO.capStyle === k ? 'checked' : ''} style="position:absolute;opacity:0">${capMock(k, c)}<span class="small" style="text-align:center;line-height:1.3">${esc(c.name)}</span>${k === 'mat' ? '' : `<a class="small" href="https://www.youtube.com/shorts/${k}" target="_blank" rel="noopener">원본 보기</a>`}</label>`).join('')}</div></div>` : '';
     const opt = (k, title, hint, lk) => `<div style="border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin:0 0 10px">
       <div style="display:flex;gap:10px;align-items:baseline"><input type="checkbox" id="plSub_${k}" data-pl-sub="${k}" ${SO[k] ? 'checked' : ''} style="width:18px;height:18px;flex:none;position:relative;top:3px"><label for="plSub_${k}" style="cursor:pointer"><b>${title}</b> <span class="small">${hint}</span></label></div>
       <div role="radiogroup" aria-label="${title} 언어" style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 0 28px">${LANGS.map(([v, l]) => `<label class="pl-chip ${SO[lk] === v ? 'on' : ''}" style="cursor:pointer"><input type="radio" name="plSub_${lk}" data-pl-sub="${lk}" value="${v}" ${SO[lk] === v ? 'checked' : ''} style="margin-right:5px">${l}</label>`).join('')}</div></div>`;
     const subForm = `${opt('tech', '기술 설명 자막', '자동. 레퍼런스처럼 하이라이트·기술을 하나하나 짚어 줘요 (원속도는 상황 한 줄, 슬로우는 ① ② ③ 단계).', 'techLang')}
-      ${opt('speech', '영상 음성 자막', '자동. 영상 속 말(중계·인터뷰)을 그대로, 말하는 시각에 맞춰요. 유튜브 자막이 있는 영상만 돼요.', 'speechLang')}
+      ${opt('speech', '영상 음성 자막 (아래)', runnerApi >= 25 ? '자동. 맥에서 Whisper 가 영상 소리를 직접 받아 적어요 (한국어·영어 영상, 내 파일도). 말이 거의 없는 영상은 아래를 기술 설명 자막으로 채워요. 처음 한 번은 Whisper 설치·모델(약 1GB) 받느라 몇 분 더 걸려요.' : '자동. 영상 속 말(중계·인터뷰)을 그대로, 말하는 시각에 맞춰요. 유튜브 자막이 있는 영상만 돼요.', 'speechLang')}
+      ${runnerApi >= 25 ? `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:-4px 0 12px 14px"><span class="small">영상 속 말 언어</span>${radios('srcLang', [['', '자동 (제목 보고)'], ['korean', '한국어'], ['english', '영어']], '영상 속 말 언어')}</div>` : ''}
+      ${capPick}
       <p class="small">둘 다 켜면 말이 나오는 곳은 음성 자막, 나머지는 기술 설명이 들어가요. "한국어 + 영어"는 큰 한국어 아래 작은 영어 줄로 나와요. 자막이 필요 없으면 아래 "자막 없이 다음 단계로".</p>
       ${!subDone && !subSkip ? '<p><button type="button" class="pl-link" data-pl-subskip>자막 없이 다음 단계로 →</button></p>' : ''}`;
     const c4 = card(3, {
@@ -1849,7 +1872,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
     else if (t.dataset.plUrlinput) T.url[t.dataset.plUrlinput] = t.value;
     else if (t.hasAttribute('data-pl-caption')) { const p = c === 'insta' && window.InstaToon.current(); if (p) { p.caption = t.value; persist(); } }
     else if (t.id === 'plYlFile') ylUpload(t.files && t.files[0]);
-    else if (t.dataset.plSub) { const { it } = evalSteps('youtube'), d = ytSubDraft(it.ep); d[t.dataset.plSub] = t.type === 'checkbox' ? t.checked : t.value; if (t.type === 'radio') t.closest('[role=radiogroup]')?.querySelectorAll('label').forEach(l => l.classList.toggle('on', l.contains(t))); }
+    else if (t.dataset.plSub) { const { it } = evalSteps('youtube'), d = ytSubDraft(it.ep); d[t.dataset.plSub] = t.type === 'checkbox' ? t.checked : t.value; if (t.type === 'radio') t.closest('[role=radiogroup]')?.querySelectorAll('label').forEach(l => { l.classList.toggle('on', l.contains(t)); if (l.hasAttribute('data-cap-card')) l.style.borderColor = l.contains(t) ? 'var(--accent,#3b82f6)' : 'var(--line)'; }); }
     else if (t.dataset.plTh) { const { it } = evalSteps('youtube'); ytThumbDraft(it.ep)[t.dataset.plTh] = t.value; }
     else if (t.dataset.yl) { if (t.dataset.yl === 'url') ylSetUrl(t.value); else if (t.dataset.yl === 'title') { YL.title = t.value; YL.edited = true; } else YL.view = t.value; }
     else if (t.dataset.yaNew === 'fxtimes') { const { it } = evalSteps('youtube'); ytPipe.fxTimes = t.value; ytPipe.fxIdea = it.idea ? it.idea.id : ''; if (!ytPipe.fxPack) ytPipe.fxPack = ytFxPick(it, it.ep); document.querySelector('#plRoot [data-ya-act="fxpack"]')?.removeAttribute('disabled'); ytOutRefresh(); ytPrevSync(); }

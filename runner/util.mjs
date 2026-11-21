@@ -55,7 +55,7 @@ export const exists = p => { try { fs.accessSync(p); return true; } catch { retu
 export function run(cmd, args, ctx = {}, opts = {}) {
   return new Promise((resolve, reject) => {
     if (ctx.aborted?.()) return reject(new StopError('멈췄어요'));
-    const child = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, PATH: `${path.join(HOME, '.local/bin')}:/usr/bin:/bin:/usr/sbin:/sbin:${process.env.PATH || ''}` } });
+    const child = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'], cwd: opts.cwd, env: { ...process.env, PATH: `${opts.path ? opts.path + ':' : ''}${path.join(HOME, '.local/bin')}:/usr/bin:/bin:/usr/sbin:/sbin:${process.env.PATH || ''}` } });
     ctx.setChild?.(child);
     let out = '', err = '';
     child.stdout.on('data', d => { opts.onOut?.(d); out += d; if (out.length > 4e6) out = out.slice(-2e6); if (opts.tee) ctx.log?.(String(d).trim().split(/\r?\n/).pop()); });

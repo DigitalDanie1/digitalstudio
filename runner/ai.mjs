@@ -3,6 +3,7 @@
 // 인트로·아웃트로는 모든 단계에서 후크로 다뤄요: 컷(첫 컷 intro, 마지막 컷 outro) / 스타일(위 제목) / 자막(0초 후크, 마지막 줄 후크).
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { HOME, FFMPEG, YTDLP, FONT_DIR, FONT_NAME, StepError, StopError, run, ff, probe, lastLines, exists, parseVtt } from './util.mjs';
 
 // 자동실행(launchd)은 PATH 가 짧아서 Claude Code 가 깔리는 곳을 직접 찾아요
@@ -230,6 +231,46 @@ export function speechSegs(cues, cuts) {
   }
   return out.map((x, i) => ({ id: i + 1, ...x }));
 }
+// ---------- 소리 받아 적기 (Whisper) ----------
+// 처음 한 번: ~/.fieldnote/whisper 에 @huggingface/transformers 설치 + 모델(whisper-large-v3-turbo, 약 1.1GB) 받기. iCloud 바깥이라 동기화 안 돼요.
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const WH_DIR = path.join(HOME, '.fieldnote', 'whisper'), WH_MODEL = 'onnx-community/whisper-large-v3-turbo';
+const NODE_DIR = path.dirname(process.execPath);
+async function ensureWhisper(ctx) {
+  if (exists(path.join(WH_DIR, 'node_modules/@huggingface/transformers/dist/transformers.node.mjs'))) return;
+  fs.mkdirSync(WH_DIR, { recursive: true });
+  if (!exists(path.join(WH_DIR, 'package.json'))) fs.writeFileSync(path.join(WH_DIR, 'package.json'), '{"name":"fieldnote-whisper","private":true}');
+  const npm = [path.join(NODE_DIR, 'npm'), '/opt/homebrew/bin/npm', '/usr/local/bin/npm'].find(exists);
+  if (!npm) throw new StepError('음성 받아 적기에 필요한 npm 을 못 찾았어요. node 를 nodejs.org 에서 설치하면 같이 들어와요.');
+  ctx.log('음성 받아 적기(Whisper)를 처음 설치해요 (몇 분, 한 번만)…');
+  try { await run(npm, ['install', '@huggingface/transformers@3', '--no-audit', '--no-fund', '--onnxruntime-node-install-cuda=skip'], ctx, { cwd: WH_DIR, path: NODE_DIR }); }
+  catch (e) { if (e instanceof StopError) throw e; throw new StepError('Whisper 설치를 못 했어요: ' + (lastLines(e.err) || e.message)); }
+}
+const HALLU = /^(감사합니다\.?|시청해\s?주셔서 감사합니다\.?|구독과 좋아요.*|MBC 뉴스.*|thank you( for watching)?\.?|thanks for watching!?|you|\.+)$/i;
+const cleanAsr = t => String(t || '').replace(/>>/g, ' ').replace(/[\[(](noise|applause|music|laughter|cheering|박수|음악|웃음)[\])]/gi, ' ').replace(/[♪♫]/g, ' ').replace(/\s+/g, ' ').trim();
+// 컷에 쓰인 원본 구간만 받아 적어요 (구간마다 앞뒤 1초 여유, 가까운 구간은 합쳐서). 결과는 분석/whisper_*.json 에 남겨 다시 안 해요.
+async function whisperCues(E, ctx, info, plan, lang, prog) {
+  await ensureWhisper(ctx);
+  const rs = plan.cuts.map(c => [Math.max(0, +c.a - 1), +c.b + 1]).sort((a, b) => a[0] - b[0]), merged = [];
+  for (const r of rs) { const m = merged[merged.length - 1]; if (m && r[0] <= m[1] + 3) m[1] = Math.max(m[1], r[1]); else merged.push([...r]); }
+  const cues = [];
+  fs.mkdirSync(E.p('분석'), { recursive: true });
+  for (const [k, [a, b]] of merged.entries()) {
+    const out = E.p('분석', `whisper_${lang}_${r1(a)}_${r1(b)}.json`);
+    if (!exists(out)) {
+      const raw = E.p('분석', 'whisper.raw');
+      ctx.log(`  소리 받아 적는 중 ${k + 1}/${merged.length} (원본 ${r1(a)}~${r1(b)}초, ${lang === 'korean' ? '한국어' : lang === 'english' ? '영어' : lang})…`);
+      prog && prog({ info: [['받아 적기', `${k + 1}/${merged.length} 구간`]] });
+      await ff(['-ss', String(a), '-t', String(b - a), '-i', info.file, '-vn', '-ac', '1', '-ar', '16000', '-f', 'f32le', raw], ctx);
+      try { await run(process.execPath, [path.join(HERE, 'whisper.mjs'), WH_DIR, path.join(WH_DIR, 'models'), WH_MODEL, raw, out, lang], ctx, { onOut: d => { const m = /PROGRESS (\S+) (\d+)/.exec(String(d)); if (m) ctx.log(`  Whisper 모델 받는 중: ${m[1]} ${m[2]}%`); } }); }
+      catch (e) { if (e instanceof StopError) throw e; throw new StepError('소리를 받아 적지 못했어요: ' + (lastLines(e.err) || e.message)); }
+      finally { fs.rmSync(raw, { force: true }); }
+    }
+    for (const c of readJson(out).chunks || []) { const t = cleanAsr(c.t); if (t && !HALLU.test(t)) cues.push({ start: r1(a + c.s), end: r1(a + Math.max(c.e, c.s + 0.4)), text: t }); }
+  }
+  return cues.sort((x, y) => x.start - y.start);
+}
+
 // 자막 편집기용: 원문 자막 덩어리 (Claude 없이 바로)
 export function aiSegs(E) { const plan = readJson(E.p('편집/AI컷.json')); return { dur: plan.duration, segs: segsOf(E, source(E), plan).map(g => ({ s: g.s, e: g.e, t: g.t })) }; }
 const segsOf = (E, info, plan) => { const f = info.subFile && E.p(info.subFile); return f && exists(f) ? speechSegs(parseVtt(fs.readFileSync(f, 'utf8')), plan.cuts) : []; };
@@ -541,7 +582,7 @@ async function aistyle(E, ctx) {
 - credits: [[0, ${plan.duration}, "원본 채널명"]]
 JSON 하나만 답해라: {"frame":{"l1":"","l2":""},"fx":[[시작,끝,{"type":"label","k":"","s":""}],[시작,끝,{"type":"pop","text":"","sub":"","y":660}]${st.lay && st.lay !== 'mat' ? ',[시작,끝,{"type":"ring","x":0.5,"y":0.5}],[시작,끝,{"type":"arrow","x":0.5,"y":0.5}]' : ''}]${st.extraJson || ''},"credits":[[0,${plan.duration},"${info.channel || ''}"]],"facts":["쓴 사실과 근거 한 줄씩"]}`, checkFinal(plan, false, st));
   j.captions = [];
-  writeJson(E.p('편집/AI완성.json'), j);
+  writeJson(E.p('편집/AI완성.json'), j); writeJson(E.p('편집/AI스타일.json'), j);   // 자막 단계는 늘 이 원본에서 시작
   fs.rmSync(E.p('편집/AI완성.mp4'), { force: true });
   for (const id of ['aisubs', 'aibrand']) if (E.s.steps[id]) E.s.steps[id] = { status: 'todo' };
   let rs = ''; try { rs = fs.readFileSync(E.p('조사/research.md'), 'utf8').replace(/\s+/g, ' ').slice(0, 240); } catch {}
@@ -566,9 +607,11 @@ export function parseMine(text) {
   }
   return out;
 }
+// 위 고정 제목: 작업판에서 적은 두 줄이 있으면 그걸로 (비우면 스타일 단계에서 AI 가 쓴 그대로)
+const topOf = (base, o) => ({ ...(base.frame || {}), ...(o.top1 ? { l1: o.top1 } : {}), ...(o.top2 ? { l2: o.top2 } : {}) });
 async function aisubs(E, ctx) {
   const st = styleOf(E), info = source(E), plan = readJson(E.p('편집/AI컷.json'));
-  let base; try { base = readJson(E.p('편집/AI완성.json')); } catch { throw new StepError('스타일 입히기를 먼저 해 주세요.'); }
+  let base; try { base = readJson(E.p(exists(E.p('편집/AI스타일.json')) ? '편집/AI스타일.json' : '편집/AI완성.json')); } catch { throw new StepError('스타일 입히기를 먼저 해 주세요.'); }
   const o = { en: true, ko: true, ai: true, mine: [], ...(E.s.subsOpt || {}) };
   if (Array.isArray(o.edit)) {   // 작업판 자막 편집기에서 내가 고친 그대로: Claude 없이 바로 그려요
     const prog = progOf(E, 'aisubs', [['render', '내가 고친 자막 입혀 그리기'], ['done', '끝']]), d = plan.duration;
@@ -577,7 +620,7 @@ async function aisubs(E, ctx) {
     const ai = rows.filter(r => r.kind === 'ai').map(r => [r.s, r.e, r.ko || r.en]);
     const mine = rows.filter(r => r.kind === 'my').map(r => [r.s, r.e, r.ko || r.en]);
     const caps = [...speech.map(x => [x.s, x.e, x.ko || x.en, x.ko && x.en ? x.en : '']), ...ai.map(q => [q[0], q[1], q[2], q[3] || ''])].sort((a, b) => a[0] - b[0]);
-    const j = { frame: base.frame, fx: base.fx, credits: base.credits, captions: caps, mine };
+    const j = { frame: topOf(base, o), capStyle: CAP_STYLES[o.capStyle] ? o.capStyle : 'mat', fx: base.fx, credits: base.credits, captions: caps, mine };
     if (base.ranks) j.ranks = base.ranks; if (base.note) j.note = base.note;
     writeJson(E.p('편집/AI자막.json'), { opt: { en: o.en, ko: o.ko, ai: o.ai }, speech, ai, mine, edited: true });
     if (E.s.steps.aibrand) E.s.steps.aibrand = { status: 'todo' };
@@ -590,30 +633,39 @@ async function aisubs(E, ctx) {
     prog({ stage: 'done' });
     return;
   }
-  const prog = progOf(E, 'aisubs', [['segs', '원문 자막 정리'], ['ko', '한국어 번역'], ['ai', '해설·후크 자막'], ['render', '자막 입혀 그리기'], ['done', '끝']]);
-  const segs = (o.en || o.ko) ? segsOf(E, info, plan) : [], d = plan.duration;
-  if ((o.en || o.ko) && !segs.length) ctx.log('  영상 원문 자막이 없어요 (내 파일이거나 유튜브 자막이 없는 영상). 원문·번역 자막은 건너뛰어요.');
-  const aiLang = ['ko', 'en', 'both'].includes(o.aiLang) ? o.aiLang : 'ko';
-  if (!o.ai && !segs.length && !o.mine.length) throw new StepError((o.en || o.ko) ? '이 영상은 음성 자막(원문)이 없어요 (내 파일이거나 유튜브 자막이 없는 영상). "기술 설명 자막"을 켜 주세요.' : '넣을 자막을 하나 이상 골라 주세요.');
-  // 1) 원문 -> 한국어 (S 하나에 한 줄, 1:1). 프레임은 안 보고 말만 옮겨서 빨라요.
-  let ko = new Map();
-  if (o.ko && segs.length) {
-    prog({ stage: 'ko', info: [['원문 자막', segs.length + '줄']], rows: { head: ['시각', '영어 원문', '한국어'], rows: segs.map(g => [`${g.s}-${g.e}`, g.t, '…']) } });
-    ctx.log(`Claude 가 원문 ${segs.length}줄을 한국어로 옮겨요 (한 줄에 한 줄, 시각은 원문 그대로)…`);
-    const j = await askClaude(E, ctx, `너는 한국어 ${st.genre} 쇼츠의 번역가다. 원본: "${info.title}" (${info.channel}). 등장인물: ${JSON.stringify(plan.who || '')}
-아래는 영상에서 나오는 말을 자동자막으로 받은 것이다. 번호마다 그 줄에 있는 말만 한국어로 옮긴다.
-- 한 줄에 한 줄. 앞뒤 줄의 말을 끌어오거나 합치거나 요약하지 마라. 문장이 중간에 끊겨 있으면 끊긴 그대로 자연스럽게.
-- 자동자막의 틀린 단어(이름, 기술 이름)는 앞뒤 뜻으로 바로잡는다. 없는 말을 지어내지 마라.
-- 말투: ${st.tone}
-- 최대 2줄, 줄당 18자 이내, 줄바꿈은 \\n.
-${segs.map(x => `${x.id}. ${x.t}`).join('\n')}
-JSON 하나만 답해라: {"ko":[[1,"한국어"],[2,"한국어"]]}`,
-      x => { const m = new Map((x.ko || []).map(r => [+r[0], String(r[1] || '')])); const miss = segs.filter(g => !m.get(g.id)); if (miss.length) return `빠진 번호가 있어요: ${miss.slice(0, 8).map(g => g.id).join(', ')}`;
-        const long = segs.find(g => m.get(g.id).split(/\n|\\n/).some(l => l.length > 20)); return long ? `${long.id}번 한 줄이 18자를 넘어요.` : ''; });
-    ko = new Map(j.ko.map(r => [+r[0], String(r[1])]));
+  const prog = progOf(E, 'aisubs', [['segs', '소리 받아 적기'], ['ko', '번역'], ['ai', '기술 설명 자막'], ['render', '자막 입혀 그리기'], ['done', '끝']]);
+  const d = plan.duration, wantSpeech = o.en || o.ko;
+  // 0) 영상 속 말: Whisper 로 원본 소리를 직접 받아 적어요 (한국어 영상·내 파일도). 안 되면 유튜브 영어 자막으로.
+  const lang = ['korean', 'english', 'japanese'].includes(o.srcLang) ? o.srcLang : (/[가-힣]/.test(info.title || '') ? 'korean' : 'english');
+  const L = lang === 'korean' ? 'ko' : lang === 'english' ? 'en' : 'other';
+  let segs = [];
+  if (wantSpeech) {
+    try { segs = speechSegs(await whisperCues(E, ctx, info, plan, lang, prog), plan.cuts); ctx.log(`  받아 적은 말: ${segs.length}덩어리 (${L === 'ko' ? '한국어' : L === 'en' ? '영어' : lang})`); }
+    catch (e) { if (e instanceof StopError) throw e; ctx.log('  ' + e.message + ' · 유튜브 영어 자막으로 대신해요.'); segs = L === 'ko' ? [] : segsOf(E, info, plan); }
   }
-  let speech = segs.map(g => ({ s: g.s, e: g.e, en: o.en ? g.t : '', ko: ko.get(g.id) || '' }));
-  if (segs.length) prog({ info: [['원문 자막', segs.length + '줄'], ['번역', ko.size ? ko.size + '줄' : '끔']], rows: { head: ['시각', '영어 원문', '한국어'], rows: segs.map(g => [`${g.s}-${g.e}`, g.t, ko.get(g.id) || '']) } });
+  const talk = segs.reduce((t, g) => t + (g.e - g.s), 0);
+  if (wantSpeech && talk < 1.5 && !o.ai) { o.ai = true; ctx.log('  말이 거의 없는 영상이에요. 하단은 기술 설명 자막으로 채워요.'); }
+  const aiLang = ['ko', 'en', 'both'].includes(o.aiLang) ? o.aiLang : 'ko';
+  if (!o.ai && !segs.length && !o.mine.length) throw new StepError('넣을 자막을 하나 이상 골라 주세요.');
+  // 1) 번역: 원문 한 줄에 한 줄 (시각은 원문 그대로). 원문 언어가 이미 맞으면 안 옮겨요.
+  // 원문 언어 줄도 같이 받아요: 음성 인식이 잘못 들은 이름·기술 이름만 바로잡은 원문
+  const need = [...(o.ko ? ['ko'] : []), ...(o.en ? ['en'] : [])];
+  const tr = { ko: new Map(), en: new Map() };
+  if (need.length && segs.length) {
+    prog({ stage: 'ko', info: [['받아 적은 말', segs.length + '줄']], rows: { head: ['시각', '원문'], rows: segs.map(g => [`${g.s}-${g.e}`, g.t]) } });
+    ctx.log(`Claude 가 받아 적은 말 ${segs.length}줄을 다듬고 ${need.map(x => x === 'ko' ? '한국어' : '영어').join('·')} 자막으로 만들어요 (한 줄에 한 줄, 시각은 말 그대로)…`);
+    const j = await askClaude(E, ctx, `너는 ${st.genre} 쇼츠의 자막 번역가다. 원본: "${info.title}" (${info.channel}). 등장인물: ${JSON.stringify(plan.who || '')}
+아래는 영상에서 나오는 말을 음성 인식으로 받아 적은 것이다 (원문 언어: ${lang}). 번호마다 그 줄에 있는 말만 옮긴다.
+- 한 줄에 한 줄. 앞뒤 줄의 말을 끌어오거나 합치거나 요약하지 마라. 문장이 중간에 끊겨 있으면 끊긴 그대로 자연스럽게.
+- 받아 적기가 틀린 단어(이름, 기술 이름)는 앞뒤 뜻으로 바로잡는다. 없는 말을 지어내지 마라.
+${need.includes('ko') ? (L === 'ko' ? '- 한국어(ko): 원문 그대로 둔다. 잘못 들은 단어만 바로잡고, 줄당 18자 안팎에서 \\n 으로 나눈다.\n' : `- 한국어(ko): 말투 ${st.tone} 최대 2줄, 줄당 18자 이내, 줄바꿈은 \\n.\n`) : ''}${need.includes('en') ? (L === 'en' ? '- 영어(en): 원문 그대로 둔다. 잘못 들은 단어(이름·기술 이름)만 바로잡는다.\n' : '- 영어(en): 자연스러운 구어 영어, 최대 2줄, 줄당 32자 이내, 줄바꿈은 \\n.\n') : ''}${segs.map(x => `${x.id}. ${x.t}`).join('\n')}
+JSON 하나만 답해라: {${need.map(k => `"${k}":[[1,"..."],[2,"..."]]`).join(',')}}`,
+      x => { for (const k of need) { const m = new Map((x[k] || []).map(r => [+r[0], String(r[1] || '')])); const miss = segs.filter(g => !m.get(g.id)); if (miss.length) return `${k} 에 빠진 번호가 있어요: ${miss.slice(0, 8).map(g => g.id).join(', ')}`;
+          if (k === (L === 'ko' ? 'ko' : 'en') && L !== 'other') continue; const lim = k === 'ko' ? 20 : 36, long = segs.find(g => m.get(g.id).split(/\n|\\n/).some(l => l.length > lim)); if (long) return `${k} ${long.id}번 한 줄이 너무 길어요.`; } return ''; });
+    for (const k of need) tr[k] = new Map(j[k].map(r => [+r[0], String(r[1])]));
+  }
+  let speech = segs.map(g => ({ s: g.s, e: g.e, en: o.en ? tr.en.get(g.id) || (L === 'en' ? g.t : '') : '', ko: o.ko ? tr.ko.get(g.id) || (L === 'ko' ? g.t : '') : '' }));
+  if (segs.length) prog({ info: [['받아 적은 말', segs.length + '줄'], ['자막 언어', need.join('·')]], rows: { head: ['시각', '원문', '자막'], rows: segs.map((g, i) => [`${g.s}-${g.e}`, g.t, [speech[i].ko, speech[i].en].filter(Boolean).join(' / ')]) } });
   // 2) Claude 해설·후크 자막: 말 자막이 없는 곳에만 (인트로·아웃트로 컷 안에서는 말 자막보다 앞서요)
   let ai = [];
   if (o.ai) {
@@ -651,9 +703,9 @@ JSON 하나만 답해라: {"captions":[[시작,끝,"${aiLang === 'en' ? '영어'
   // 3) 하나로: [시작, 끝, 큰 글(한국어 또는 영어), 작은 영어 줄]
   const caps = [...speech.filter(x => x.ko || x.en).map(x => [x.s, x.e, x.ko || x.en, x.ko && x.en ? x.en : '']), ...ai.map(q => [q[0], q[1], q[2], q[3] || ''])].sort((a, b) => a[0] - b[0]);
   for (const [k, c] of caps.entries()) { const nx = caps[k + 1]; if (c[1] - c[0] < 1.2) c[1] = r1(Math.min(c[0] + 1.2, nx ? nx[0] : c[0] + 1.2)); }
-  const j = { frame: base.frame, fx: base.fx, credits: base.credits, captions: caps, mine: o.mine.filter(m => m[0] < d) };
+  const j = { frame: topOf(base, o), capStyle: CAP_STYLES[o.capStyle] ? o.capStyle : 'mat', fx: base.fx, credits: base.credits, captions: caps, mine: o.mine.filter(m => m[0] < d) };
   if (base.ranks) j.ranks = base.ranks; if (base.note) j.note = base.note;
-  writeJson(E.p('편집/AI자막.json'), { opt: { en: o.en, ko: o.ko, ai: o.ai, aiLang }, speech, ai, mine: j.mine });
+  writeJson(E.p('편집/AI자막.json'), { opt: { en: o.en, ko: o.ko, ai: o.ai, aiLang, lang }, speech, ai, mine: j.mine });
   if (E.s.steps.aibrand) E.s.steps.aibrand = { status: 'todo' };
   writeJson(E.p('편집/AI완성.json'), j);
   ctx.log(`자막: 원문 ${speech.filter(x => x.en).length}줄 · 번역 ${speech.filter(x => x.ko).length}줄 · 해설/후크 ${ai.length}줄 · 내 자막 ${j.mine.length}줄`);
@@ -665,27 +717,59 @@ JSON 하나만 답해라: {"captions":[[시작,끝,"${aiLang === 'en' ? '영어'
   prog({ stage: 'done' });
 }
 
+// ---------- 자막 모양 (레퍼런스 쇼츠 6개 + MAT 기본) ----------
+// top: 위 칸 배경 / l1·l2: 위 고정 제목 두 줄 (c 글자색, box 박스색, acc [[강조]] 색) / cap: 아래 말·설명 자막 (c, box 또는 outline, size, q 따옴표)
+// 위 칸 틀은 MAT 틀에서만 바뀌고, 아래 자막 색·박스는 모든 틀에 적용돼요.
+export const CAP_STYLES = {
+  mat: { name: 'MAT STORY (기본)' },
+  z46wpridXII: { name: '흰 제목 + 초록 박스 / 노란 박스 자막', top: 'black', l1: { c: 'FFFFFF', box: '000000' }, l2: { c: '3DFF4F', box: '000000' }, cap: { c: 'FFE14A', box: '1E1E1E', size: 64 } },
+  '6JcQ_cJ7v_c': { name: '제목 없이 / 형광 초록 자막', top: 'black', noTitle: true, cap: { c: '5CFF3A', outline: '000000', size: 80 } },
+  EqHagvvlJjc: { name: '흰 제목 + 노란 강조 / 박스 속 *작은 자막*', top: 'black', l1: { c: 'FFFFFF' }, l2: { c: 'FFFFFF', acc: 'FFD400' }, cap: { c: 'FFFFFF', box: '000000', size: 54, q: '*' } },
+  '60BaSr0QNRU': { name: '흰 배경 + 빨간 띠 제목 / 흰 자막', top: 'white', l1: { c: '000000' }, l2: { c: 'FFFFFF', box: 'E8202A' }, cap: { c: 'FFFFFF', outline: '000000', size: 74 } },
+  '2J9edQXs-0E': { name: '노랑·빨강 제목 / "따옴표" 자막', top: 'black', l1: { c: 'FFD23A' }, l2: { c: 'FF3030' }, cap: { c: 'FFFFFF', outline: '000000', size: 70, q: '"' } },
+  f7uw6Z2gVRA: { name: '흰 제목 + 민트 박스 / 민트 자막', top: 'black', l1: { c: 'FFFFFF' }, l2: { c: '000000', box: '5CF0B0' }, cap: { c: '8CFFC0', outline: '1A1A1A', size: 72 } },
+};
+const capQ = (cs, t) => cs?.cap?.q ? cs.cap.q + t + cs.cap.q : t;
+
 // ---------- 그리기 (ASS) ----------
 const bgr = hex => `&H00${hex.slice(4, 6)}${hex.slice(2, 4)}${hex.slice(0, 2)}&`;
 const esc = s => String(s ?? '').replace(/\\n/g, '\n').replace(/[{}\\]/g, '').replace(/\r?\n/g, '\\N');
 // 작은 영어 원문 줄: 한 줄 38자 안팎으로 접어요 (ASS 는 자동 줄바꿈을 끔)
 const wrapEn = t => { const ls = ['']; for (const w of String(t).split(/\s+/)) { if (ls[ls.length - 1] && (ls[ls.length - 1] + ' ' + w).length > 38) ls.push(w); else ls[ls.length - 1] = (ls[ls.length - 1] + ' ' + w).trim(); } return ls.slice(0, 3).map(esc).join('\\N'); };
 // 영어로만 된 큰 자막은 글씨를 줄여요 (한 줄 30자 안팎이 화면에 들어가게)
+// 영어로만 된 긴 큰 자막은 32자 안팎에서 접어요 (이미 줄바꿈이 있으면 그대로)
+const wrapMain = t => { t = String(t); if (/[가-힣]/.test(t) || /\n|\\n/.test(t) || t.length <= 32) return t; const ls = ['']; for (const w of t.split(/\s+/)) { if (ls[ls.length - 1] && (ls[ls.length - 1] + ' ' + w).length > 32) ls.push(w); else ls[ls.length - 1] = (ls[ls.length - 1] + ' ' + w).trim(); } return ls.slice(0, 3).join('\n'); };
 const latin = t => /[가-힣]/.test(String(t)) ? '' : '{\\fs54}';
 const enTail = en => en ? `\\N{\\fs40\\b0\\bord4\\c&HDCDCDC&}${wrapEn(en)}` : '';
 // 내 자막: 노란 글씨, 영상 위쪽 (다른 자막과 안 겹치게)
 const mineEv = (fin, add, y) => { for (const [a, b, t] of fin.mine || []) add(a, b, 8, 'Cap', `{\\an8\\pos(540,${y})\\fs58\\c&H00E6FF&\\bord6}${esc(t)}`); };
 const ts = x => { x = Math.max(0, x); const h = Math.floor(x / 3600), m = Math.floor(x % 3600 / 60), s = x % 60; return `${h}:${String(m).padStart(2, '0')}:${s.toFixed(2).padStart(5, '0')}`; };
+// 고른 자막 모양의 ASS 스타일 줄들 (Title·Title2·T1·T2·Cap)
+const capSty = (S, cs) => { const t = cs.l1 || { c: 'FFFFFF' }, t2 = cs.l2 || { c: 'FFFFFF' }, c = cs.cap, oc = c.box ? bgr(c.box) : c.outline ? bgr(c.outline) : '&H00000000&';
+  return [S('Title', 84, bgr(t.c), 0), S('Title2', 84, bgr(t2.c), 0), S('T1', 80, bgr(t.c), 14, 3, bgr(t.box || '000000')), S('T2', 80, bgr(t2.c), 14, 3, bgr(t2.box || '000000')),
+    c.box ? S('Cap', c.size, bgr(c.c), 14, 3, oc) : S('Cap', c.size, bgr(c.c), 7).replace(/,&H00000000&,&H00000000&,-1/, `,${oc},&H00000000&,-1`)]; };
 export function buildAss(fin, plan, st, src) {
-  if (st.lay && st.lay !== 'mat') return buildAssLay(fin, plan, st, src || { w: 1920, h: 1080, cb: 0 });
-  const Y = bgr(st.yellow), R = bgr(st.red), hi = s => esc(s).replace(/\[\[(.+?)\]\]/g, `{\\c${Y}}$1{\\c&HFFFFFF&}`);
+  if (st.lay && st.lay !== 'mat') {   // 다른 틀: 아래 자막 색·박스·따옴표만 고른 모양으로
+    const c2 = CAP_STYLES[fin.capStyle] && fin.capStyle !== 'mat' ? CAP_STYLES[fin.capStyle] : null;
+    const ass = buildAssLay(c2 ? { ...fin, captions: (fin.captions || []).map(q => [q[0], q[1], capQ(c2, q[2]), q[3]]) } : fin, plan, st, src || { w: 1920, h: 1080, cb: 0 });
+    if (!c2) return ass;
+    const S = (n, size, col, outline, border = 1, back = '&H00000000&') => `Style: ${n},${FONT},${size},${col},&H000000FF&,${border === 3 ? back : '&H00000000&'},${back},-1,0,0,0,100,100,0,0,${border},${outline},0,5,0,0,0,1`;
+    return ass.replace(/^Style: Cap,.*$/m, capSty(S, c2)[4]);
+  }
+  const cs = CAP_STYLES[fin.capStyle] && fin.capStyle !== 'mat' ? CAP_STYLES[fin.capStyle] : null;
+  const Y = bgr(st.yellow), R = bgr(st.red), capC = cs ? bgr(cs.cap.c) : '&H00FFFFFF&', hi = (s, base = capC, acc = Y) => esc(s).replace(/\[\[(.+?)\]\]/g, `{\\c${acc}}$1{\\c${base}}`);
   const end = plan.duration, ev = [];
   const add = (a, b, layer, style, text) => ev.push(`Dialogue: ${layer},${ts(a)},${ts(b)},${style},,0,0,0,,${text}`);
-  add(0, end, 5, 'Title', `{\\an5\\pos(540,262)\\c${Y}}${esc(fin.frame?.l1)}`);
-  add(0, end, 5, 'Title', `{\\an5\\pos(540,354)\\c${R}}${esc(fin.frame?.l2)}`);
+  if (!cs) {
+    add(0, end, 5, 'Title', `{\\an5\\pos(540,262)\\c${Y}}${hi(fin.frame?.l1, Y, '&H00FFFFFF&')}`);
+    add(0, end, 5, 'Title', `{\\an5\\pos(540,354)\\c${R}}${hi(fin.frame?.l2, R, Y)}`);
+  } else if (!cs.noTitle) {
+    if (fin.frame?.l1) add(0, end, 5, cs.l1.box ? 'T1' : 'Title', `{\\an5\\pos(540,262)}${hi(fin.frame.l1, bgr(cs.l1.c), bgr(cs.l1.acc || 'FFD400'))}`);
+    if (fin.frame?.l2) add(0, end, 5, cs.l2.box ? 'T2' : 'Title2', `{\\an5\\pos(540,${cs.l2.box ? 364 : 354})}${hi(fin.frame.l2, bgr(cs.l2.c), bgr(cs.l2.acc || 'FFD400'))}`);
+  }
   if (st.watermark) add(0, end, 4, 'Mark', `{\\an3\\pos(1050,1424)}${st.watermark[0]} {\\c${Y}}${st.watermark[1]}`);
   for (const [a, b, t] of fin.credits || []) add(a, b, 4, 'Credit', `{\\an8\\pos(540,1466)}영상: ${esc(t)}`);
-  for (const [a, b, t, en] of fin.captions || []) add(a, b, 3, 'Cap', `{\\an2\\pos(540,1345)}${latin(t)}${hi(t)}${enTail(en)}`);
+  for (const [a, b, t, en] of fin.captions || []) add(a, b, 3, 'Cap', `{\\an2\\pos(540,1345)}${cs ? (latin(t) && `{\\fs${Math.round(cs.cap.size * 0.75)}}`) : latin(t)}${hi(capQ(cs, wrapMain(t)))}${enTail(en)}`);
   mineEv(fin, add, VY + 40);
   for (const [a, b, f] of fin.fx || []) {
     if (f.type === 'label') { add(a, b, 6, 'Label', `{\\an7\\pos(44,505)}${esc(f.k)}`); if (f.s) add(a, b, 6, 'Sub', `{\\an7\\pos(44,598)}${esc(f.s)}`); }
@@ -700,7 +784,7 @@ export function buildAss(fin, plan, st, src) {
   const S = (n, size, col, outline, border = 1, back = '&H00000000&') => `Style: ${n},${FONT},${size},${col},&H000000FF&,${border === 3 ? back : '&H00000000&'},${back},-1,0,0,0,100,100,0,0,${border},${outline},0,5,0,0,0,1`;
   return `[Script Info]\nScriptType: v4.00+\nPlayResX: ${W}\nPlayResY: ${H}\nWrapStyle: 2\nScaledBorderAndShadow: yes\n\n[V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-${[S('Title', 84, '&H00FFFFFF&', 0), S('Cap', 74, '&H00FFFFFF&', 7), S('Label', 50, '&H00FFFFFF&', 14, 3, R), S('Sub', 36, '&H00FFFFFF&', 12, 3, '&H80303030&'),
+${[...(cs ? capSty(S, cs) : [S('Title', 84, '&H00FFFFFF&', 0), S('Cap', 74, '&H00FFFFFF&', 7)]), S('Label', 50, '&H00FFFFFF&', 14, 3, R), S('Sub', 36, '&H00FFFFFF&', 12, 3, '&H80303030&'),
     S('Pop', 230, '&H00FFFFFF&', 12), S('PopSub', 62, '&H00FFFFFF&', 7), S('Badge', 44, '&H00000000&', 10, 3, Y), S('Mark', 46, '&H00FFFFFF&', 3), S('Credit', 34, '&H00FFFFFF&', 0)].join('\n')}
 
 [Events]
@@ -804,7 +888,8 @@ async function render(E, ctx, st, plan, fin, outRel) {
   const bgm = exists(bgmDir) ? fs.readdirSync(bgmDir).filter(f => /\.(mp3|m4a|wav|aac)$/i.test(f)).sort()[0] : null;
   const d = plan.duration, q = p => p.replace(/\\/g, '/').replace(/:/g, '\\:').replace(/'/g, "\\'");
   const sub = `subtitles=filename='${q(assF)}':fontsdir='${q(process.env.FIELDNOTE_AI_FONT_DIR || FONT_DIR)}'`, li = bgm ? 2 : 1;
-  const vf = logo ? `[${li}:v]scale=110:-1,format=rgba[lg];[0:v][lg]overlay=x=70:y=118[vl];[vl]${sub}[vo]` : `[0:v]${sub}[vo]`;
+  const sub2 = lay === LAY.mat && CAP_STYLES[fin.capStyle]?.top === 'white' ? `drawbox=x=0:y=0:w=${W}:h=${VY}:color=white:t=fill,${sub}` : sub;   // 흰 위 칸 자막 모양
+  const vf = logo ? `[${li}:v]scale=110:-1,format=rgba[lg];[0:v][lg]overlay=x=70:y=118[vl];[vl]${sub2}[vo]` : `[0:v]${sub2}[vo]`;
   // BGM 도 슬로우 구간에서는 꺼요
   const slowOff = plan.cuts.filter(c => (+c.speed || 1) < 1 && c.out).map(c => `volume=0:enable='between(t,${c.out[0]},${c.out[1]})'`).join(',');
   const af = bgm ? `;[1:a]volume=0.22,atrim=0:${d},${slowOff ? slowOff + ',' : ''}afade=t=out:st=${Math.max(0, d - 1.5)}:d=1.5[b];[0:a][b]amix=inputs=2:duration=first:normalize=0[ao]` : ';[0:a]anull[ao]';
