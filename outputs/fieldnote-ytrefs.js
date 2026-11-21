@@ -79,6 +79,12 @@ window.ytRefShorts=function(ch){
  for(const r of list(ch)){if(r.kind==='video')push(r.videoId,r.memo,'내 레퍼런스');else if(r.top)push(r.top.videoId,r.top.title,r.handle||'채널')}
  return out;
 };
+// 레퍼런스 분석 탭에서 쇼츠 링크 하나를 바로 추가 (스타일 선택 목록에도 같이 떠요)
+window.ytRefAddVideo=function(ch,raw){
+ const p=parseRef(raw);if(!p||p.kind!=='video')return {error:'쇼츠·영상 링크만 넣을 수 있어요.'};
+ const a=list(ch);if(!a.some(r=>r.kind==='video'&&r.videoId===p.videoId)){store()[ch]=[{id:uid(),url:normUrl(raw,p),kind:'video',videoId:p.videoId,memo:'',added:new Date().toISOString()},...a];persist()}
+ return {videoId:p.videoId};
+};
 window.ytRefsPage=function(){
  const ch=chId();
  return head('유투브 썸네일 / 편집 레퍼런스','참고할 채널·영상 링크를 모아 두고, 썸네일과 편집 스타일을 비교하세요.',false)

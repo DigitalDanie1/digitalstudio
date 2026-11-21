@@ -2,7 +2,7 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { HOME, StepError, StopError, sanitize, exists, parseRanges, isLocalSource, localPath, run, probe, FFMPEG, YTDLP, lastLines, fmtTime, MAX_RANGE } from './util.mjs';
@@ -13,7 +13,7 @@ import { STEP_DEFS, STEP_FN, outputsFor, listAssets, checkScript, cleanPasted, p
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // 작업판이 쓰는 기능 수준. 3 = 새 9칸 순서 (/look, /ranges, deferRanges, 단계 clip·subs·fx)
-const API_LEVEL = 19;   // 19 = 모든 AI 단계 실시간 보기 (편집/진행_<단계>.json) · 18 = 1차 컷 실시간 보기 (편집/AI컷_진행.json) · 17 = 레퍼런스 쇼츠 분석 (POST /ref/analyze, GET /ref/status, GET /ref/<id>: 컷·후크·이펙트·이목 장치를 먼저 보여 주고 고르면 그대로 적용) · 16 = 자막 원문·번역·해설·내 자막 나눠 켜기 (run body.subs), 썸네일 내 카피 (run body.thumb) · 15 = 실행기 다시 켜기 (POST /restart, health.disk) · 14 = 내 영상 올리기 (POST /upload) · 13 = 레퍼런스 쇼츠 룩 (look ref-<영상ID>, view.refStyle) · 12 = 한 구간·하이라이트 길이 최대 3분(30초·1분·2분·3분), 쇼츠 최대 3분 · 11 = 하이라이트 '지난 작업' 초기화(/hl/reset, 돌고 있으면 멈추고 휴지통 한 폴더로) · 10 = AI 편집 단계(aicut·aistyle·aisubs, 맥의 Claude Code) · 9 = 유튜브 초기화(/reset, 에피소드·하이라이트 전부 휴지통 한 폴더로) · 8 = 미리보기 견본(/preview, 고른 룩·이펙트를 실제 영상 4초로) · 7 = 에피소드 완전히 지우기(/episode/delete, 휴지통으로) · 6 = 하이라이트 찾기(/hl/*) ·  4 = 7칸 순서 (/edit 1차·2차 편집, /draft, /feedback, 슬로우 구간 x0.5, 매트 스토리 룩) · 5 = 최종 결과물 레퍼런스(이펙트 팩: /fxpack, status.fxPacks)
+const API_LEVEL = 20;   // 20 = 사이트에서 실행기 업데이트 (POST /update: GitHub 최신 runner 파일 받아서 검사 후 바꾸고 다시 켜기), 레퍼런스 분석 줄 세우기 (queued) · 19 = 모든 AI 단계 실시간 보기 (편집/진행_<단계>.json) · 18 = 1차 컷 실시간 보기 (편집/AI컷_진행.json) · 17 = 레퍼런스 쇼츠 분석 (POST /ref/analyze, GET /ref/status, GET /ref/<id>: 컷·후크·이펙트·이목 장치를 먼저 보여 주고 고르면 그대로 적용) · 16 = 자막 원문·번역·해설·내 자막 나눠 켜기 (run body.subs), 썸네일 내 카피 (run body.thumb) · 15 = 실행기 다시 켜기 (POST /restart, health.disk) · 14 = 내 영상 올리기 (POST /upload) · 13 = 레퍼런스 쇼츠 룩 (look ref-<영상ID>, view.refStyle) · 12 = 한 구간·하이라이트 길이 최대 3분(30초·1분·2분·3분), 쇼츠 최대 3분 · 11 = 하이라이트 '지난 작업' 초기화(/hl/reset, 돌고 있으면 멈추고 휴지통 한 폴더로) · 10 = AI 편집 단계(aicut·aistyle·aisubs, 맥의 Claude Code) · 9 = 유튜브 초기화(/reset, 에피소드·하이라이트 전부 휴지통 한 폴더로) · 8 = 미리보기 견본(/preview, 고른 룩·이펙트를 실제 영상 4초로) · 7 = 에피소드 완전히 지우기(/episode/delete, 휴지통으로) · 6 = 하이라이트 찾기(/hl/*) ·  4 = 7칸 순서 (/edit 1차·2차 편집, /draft, /feedback, 슬로우 구간 x0.5, 매트 스토리 룩) · 5 = 최종 결과물 레퍼런스(이펙트 팩: /fxpack, status.fxPacks)
 let VERSION = 'dev';
 try { VERSION = fs.readFileSync(path.join(HERE, 'version.txt'), 'utf8').trim() || 'dev'; } catch {}
 const PORT = +(process.env.FIELDNOTE_RUNNER_PORT || 4777);
@@ -236,7 +236,15 @@ function createEpisode(body, nameBase = '') {
 
 // ---------- 하이라이트 찾기 ----------
 const HL = createHighlights({ dataDir: HL_DATA });
-const refJobs = new Map();   // 레퍼런스 분석 작업: id -> {status, stage, error, kind}
+const refJobs = new Map();   // 레퍼런스 분석 작업: id -> {status: queued|running|done|failed, stage, error, kind}. 한 번에 하나씩 차례대로
+function refNext() {
+  if ([...refJobs.values()].some(J => J.status === 'running')) return;
+  const next = [...refJobs.entries()].filter(([, J]) => J.status === 'queued').sort((a, b) => a[1].at - b[1].at)[0];
+  if (!next) return;
+  const [id, J] = next; J.status = 'running'; J.stage = '시작';
+  const ctx = { log: l => { if (l) J.stage = String(l).trim().slice(0, 120); }, aborted: () => J.aborted, setChild: c => { J.child = c; } };
+  analyzeRef(id, J.ch, ctx).then(() => { J.status = 'done'; }, e => { J.status = 'failed'; J.error = e instanceof StepError || e instanceof StopError ? e.message : '예상 못 한 오류: ' + e.message; if (!(e instanceof StepError || e instanceof StopError)) console.error(e); }).finally(refNext);
+}
 const readJsonSafe = (f, d = null) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return d; } };
 const getHL = id => { const J = HL.get(id); if (!J) throw new HttpError(404, '이 하이라이트 작업을 찾을 수 없어요.'); return J; };
 const hlErr = e => { if (e instanceof StepError) throw new HttpError(400, e.message); throw e; };
@@ -356,19 +364,17 @@ const routes = {
   'POST /ref/analyze': ({ body }) => {
     const id = String(body.id || ''), ch = String(body.channel || 'yt-wrestling');
     if (!/^[\w-]{11}$/.test(id)) throw new HttpError(400, '쇼츠 ID 가 이상해요.');
-    const busy = [...refJobs.entries()].find(([, J]) => J.status === 'running');
-    if (busy) throw new HttpError(409, busy[0] === id ? '이 레퍼런스를 분석하는 중이에요.' : '다른 레퍼런스를 분석하는 중이에요. 끝난 뒤에 눌러 주세요.');
-    const J = { status: 'running', stage: '시작', error: '', kind: refKind(ch), aborted: false, child: null };
-    refJobs.set(id, J);
-    const ctx = { log: l => { if (l) J.stage = String(l).trim().slice(0, 120); }, aborted: () => J.aborted, setChild: c => { J.child = c; } };
-    analyzeRef(id, ch, ctx).then(() => { J.status = 'done'; }, e => { J.status = 'failed'; J.error = e instanceof StepError || e instanceof StopError ? e.message : '예상 못 한 오류: ' + e.message; if (!(e instanceof StepError || e instanceof StopError)) console.error(e); });
-    return { json: { ok: true } };
+    const cur = refJobs.get(id);
+    if (cur && (cur.status === 'running' || cur.status === 'queued')) return { json: { ok: true, status: cur.status } };
+    const J = { status: 'queued', stage: '차례를 기다려요', error: '', kind: refKind(ch), ch, aborted: false, child: null, at: Date.now() };
+    refJobs.set(id, J); refNext();
+    return { json: { ok: true, status: J.status } };
   },
   'GET /ref/status': ({ q }) => {
     const kind = refKind(String(q.get('channel') || 'yt-wrestling')), out = {};
     for (const id of String(q.get('ids') || '').split(',').filter(x => /^[\w-]{11}$/.test(x)).slice(0, 60)) {
       const J = refJobs.get(id), a = readRefAnalysis(id, kind);
-      out[id] = J && J.status === 'running' ? { status: 'running', stage: J.stage } : a ? { status: 'done', name: a.name, desc: a.desc } : J && J.status === 'failed' && J.kind === kind ? { status: 'failed', error: J.error } : { status: 'none' };
+      out[id] = J && (J.status === 'running' || J.status === 'queued') ? { status: J.status, stage: J.stage } : a ? { status: 'done', name: a.name, desc: a.desc } : J && J.status === 'failed' && J.kind === kind ? { status: 'failed', error: J.error } : { status: 'none' };
     }
     return { json: { refs: out } };
   },
@@ -404,6 +410,29 @@ const routes = {
   'GET /health': () => { let disk = ''; try { disk = fs.readFileSync(path.join(HERE, 'version.txt'), 'utf8').trim(); } catch {}
     return { json: { ok: true, api: API_LEVEL, version: VERSION, disk, auto: !!process.env.XPC_SERVICE_NAME && process.env.XPC_SERVICE_NAME.includes('digitalstudio'), ffmpeg: exists(FFMPEG), data: DATA, ai: !!process.env.ANTHROPIC_API_KEY } }; },
   // 실행기 다시 켜기: 새 파일을 받은 뒤 사이트 버튼으로. 자동실행(launchd KeepAlive)이 곧바로 새 버전으로 다시 켜요.
+  // 사이트의 '실행기 업데이트': GitHub main 의 runner 파일을 받아 문법 검사 후 바꾸고 다시 켜요 (자동실행이면 launchd 가 새 버전으로 다시 띄워요)
+  'POST /update': async () => {
+    if ([...episodes.values()].some(E => E.running) || HL.anyRunning() || [...refJobs.values()].some(J => J.status === 'running')) throw new HttpError(409, '작업이 돌고 있어요. 끝난 뒤에 업데이트해 주세요.');
+    if (typeof fetch !== 'function') throw new HttpError(500, '이 맥의 node 가 너무 예전 버전이라 업데이트를 못 받아요.');
+    const REPO = 'DigitalDanie1/digitalstudio', get = async (u, json) => { const r = await fetch(u, { headers: { 'User-Agent': 'fieldnote-runner' } }); if (!r.ok) throw new HttpError(502, `GitHub 에서 못 받았어요 (${r.status}): ${u.split('/').slice(-2).join('/')}`); return json ? r.json() : r.text(); };
+    const sha = String((await get(`https://api.github.com/repos/${REPO}/commits/main`, true)).sha || '');
+    if (!/^[0-9a-f]{40}$/.test(sha)) throw new HttpError(502, 'GitHub 최신 버전을 못 읽었어요.');
+    const to = sha.slice(0, 7), auto = !!process.env.XPC_SERVICE_NAME && process.env.XPC_SERVICE_NAME.includes('digitalstudio');
+    if (to === VERSION) return { json: { ok: true, same: true, version: VERSION } };
+    const FILES = ['server.mjs', 'steps.mjs', 'ai.mjs', 'util.mjs', 'images.mjs', 'highlights.mjs', 'README.md', '실행기 켜기.command', '자동실행 켜기.command', '자동실행 끄기.command'];
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'fieldnote-update-'));
+    try {
+      for (const f of FILES) {
+        fs.writeFileSync(path.join(tmp, f), await get(`https://raw.githubusercontent.com/${REPO}/${sha}/runner/${encodeURIComponent(f)}`));
+        if (f.endsWith('.mjs')) { const c = spawnSync(process.execPath, ['--check', path.join(tmp, f)], { encoding: 'utf8' }); if (c.status !== 0) throw new HttpError(500, `${f} 검사에서 걸렸어요. 업데이트를 멈췄어요: ${lastLines(c.stderr || '')}`); }
+      }
+      for (const f of FILES) { fs.copyFileSync(path.join(tmp, f), path.join(HERE, f)); if (f.endsWith('.command')) fs.chmodSync(path.join(HERE, f), 0o755); }
+      fs.writeFileSync(path.join(HERE, 'version.txt'), to + '\n');
+    } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+    console.log(`실행기 업데이트: ${VERSION} -> ${to}`);
+    if (auto) setTimeout(bye, 300);
+    return { json: { ok: true, from: VERSION, to, restarting: auto } };
+  },
   'POST /restart': () => {
     if ([...episodes.values()].some(E => E.running)) throw new HttpError(409, '작업이 돌고 있어요. 끝난 뒤에 다시 켜 주세요.');
     setTimeout(bye, 300); return { json: { ok: true } };

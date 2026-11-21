@@ -919,6 +919,7 @@
     fetch(`${RUNNER}/file?ep=${encodeURIComponent(ep.ep)}&path=${encodeURIComponent(o.path)}`).then(r => r.json()).then(d => { SJ[k] = { speech: d.speech || [], ai: d.ai || [], mine: d.mine || [] }; repaint('youtube', true); }).catch(() => { SJ[k] = { speech: [], ai: [], mine: [] }; });
     return null; }
   // 레퍼런스 쇼츠 분석 (실행기 api 17): 고르기 전에 편집·강조·이펙트·이목 장치를 먼저 보여 주고, 고르면 그 분석이 그대로 스타일 입히기·자막에 들어가요
+  const refPaint = () => { repaint('youtube', true); if (typeof view !== 'undefined' && view === 'ytRefAnalyze' && typeof render === 'function') render(); };
   const RA = { st: {}, det: {}, open: '', key: '', at: 0, timer: null };
   const RK = { hook: '후크', cut: '컷', zoom: '줌', slow: '슬로우', text: '자막', effect: '이펙트', reveal: '반전', loop: '루프' };
   function refPoll(ch, ids) {
@@ -929,17 +930,21 @@
     RA.key = key; RA.at = Date.now();
     runnerFetch(`/ref/status?channel=${encodeURIComponent(ch)}&ids=${ids.join(',')}`).then(d => {
       const refs = d.refs || {}, before = JSON.stringify(RA.st);
-      for (const [id, s] of Object.entries(refs)) { if (RA.st[id] && RA.st[id].status === 'running' && s.status === 'done') { delete RA.det[id]; RA.open = id; } RA.st[id] = s; }
-      clearTimeout(RA.timer); if (Object.values(refs).some(x => x.status === 'running')) RA.timer = setTimeout(() => { RA.at = 0; repaint('youtube', true); }, 5000);
-      if (JSON.stringify(RA.st) !== before) repaint('youtube', true);
+      for (const [id, s] of Object.entries(refs)) { if (RA.st[id] && /^(running|queued)$/.test(RA.st[id].status) && s.status === 'done') { delete RA.det[id]; RA.open = id; } RA.st[id] = s; }
+      clearTimeout(RA.timer); if (Object.values(refs).some(x => x.status === 'running' || x.status === 'queued')) RA.timer = setTimeout(() => { RA.at = 0; refPaint(); }, 5000);
+      if (JSON.stringify(RA.st) !== before) refPaint();
     }).catch(() => {});
   }
   function refDetail(ch, id) {
     if (RA.det[id] === 0) return; RA.det[id] = 0;
-    runnerFetch(`/ref/${id}?channel=${encodeURIComponent(ch)}`).then(d => { RA.det[id] = d.analysis; repaint('youtube', true); }).catch(e => { RA.det[id] = { err: e.message }; repaint('youtube', true); });
+    runnerFetch(`/ref/${id}?channel=${encodeURIComponent(ch)}`).then(d => { RA.det[id] = d.analysis; refPaint(); }).catch(e => { RA.det[id] = { err: e.message }; refPaint(); });
   }
   const refImg = (id, p, w = 72) => p ? `<img src="${RUNNER}/ref/${id}/file?path=${encodeURIComponent(p)}" alt="" loading="lazy" style="width:${w}px;aspect-ratio:9/16;object-fit:cover;border-radius:6px;border:1px solid var(--line);flex:none">` : '';
-  function refPanel(id, ch, pick) {
+  function refStart(id, ch, btn) {
+    if (btn) btn.disabled = true;
+    return runnerFetch('/ref/analyze', { id, channel: ch }).then(d => { RA.st[id] = { status: d.status || 'running', stage: d.status === 'queued' ? '차례를 기다려요' : '시작' }; RA.at = 0; refPaint(); }).catch(e => { if (btn) btn.disabled = false; toast('분석을 시작하지 못했어요: ' + e.message); throw e; });
+  }
+  function refPanel(id, ch, pick, standalone) {
     const a = RA.det[id];
     if (a === undefined || a === 0) { refDetail(ch, id); return '<p class="small" style="margin-top:12px">분석 불러오는 중…</p>'; }
     if (a.err) return `<p class="pl-error" style="margin-top:12px">분석을 못 불러왔어요: ${esc(a.err)}</p>`;
@@ -950,7 +955,7 @@
     const bar = `<div style="position:relative;height:22px;border-radius:6px;background:var(--line);margin:8px 0 4px;overflow:hidden"><i style="position:absolute;left:0;top:0;bottom:0;width:${pos(a.hook.t[1] || 0)}%;background:#${esc(a.style.yellow)}33"></i>${(a.cuts.times || []).map(t => `<i title="컷 ${t}초" style="position:absolute;left:${pos(t)}%;top:0;bottom:0;width:2px;background:rgba(255,255,255,.75)"></i>`).join('')}${a.timeline.map(e => `<i title="${esc(e.t + '초 · ' + e.what)}" style="position:absolute;left:calc(${pos(e.t)}% - 5px);top:6px;width:10px;height:10px;border-radius:50%;background:#${esc(a.style.red)};border:1px solid #000"></i>`).join('')}</div><div class="small">노란 칸 = 첫 후크 · 흰 줄 = 컷 · 빨간 점 = 이목을 끄는 순간 (0초 ~ ${a.dur}초)</div>`;
     const rows = a.timeline.map(e => `<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line)">${refImg(id, e.img, 54)}<div style="min-width:0"><div><b>${e.t}초</b> <span class="pl-tag" style="font-size:11px;border:1px solid var(--line);border-radius:99px;padding:0 7px">${esc(RK[e.kind] || e.kind)}</span> ${esc(e.what)}</div>${e.why ? `<div class="small">왜 눈이 가나: ${esc(e.why)}</div>` : ''}</div></div>`).join('');
     return `<div style="margin-top:14px;border:1px solid var(--line);border-radius:12px;padding:16px">
-<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><b style="font-size:16px">${esc(a.name)} · 레퍼런스 분석</b><span class="small">강조색 ${sw(a.style.yellow)} ${sw(a.style.red)} · 화면 틀 ${esc((YT_AI_LOOKS.find(l => l.id === a.style.lay) || { name: { 'yt-mat': '매트 룩', mat: '매트', full: '꽉 찬 화면', post: '게시물' }[a.style.lay] || a.style.lay }).name)} <button type="button" class="pl-link" data-ya-refopen="${esc(id)}">닫기</button></span></div>
+<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><b style="font-size:16px">${esc(a.name)} · 레퍼런스 분석</b><span class="small">강조색 ${sw(a.style.yellow)} ${sw(a.style.red)} · 화면 틀 ${esc((YT_AI_LOOKS.find(l => l.id === a.style.lay) || { name: { 'yt-mat': '매트 룩', mat: '매트', full: '꽉 찬 화면', post: '게시물' }[a.style.lay] || a.style.lay }).name)} <button type="button" class="pl-link" ${standalone ? 'data-ra-open' : 'data-ya-refopen'}="${esc(id)}">닫기</button></span></div>
 <p style="margin:6px 0 0">${esc(a.summary)}</p>
 ${sec(`① 첫 후크 (${a.hook.t[0]}~${a.hook.t[1]}초)`, `<div style="display:flex;gap:12px;margin-top:8px;align-items:flex-start">${refImg(id, a.hook.img, 90)}<div><div>${esc(a.hook.what)}</div><div class="small" style="margin-top:4px">왜 멈추나: ${esc(a.hook.why)}</div></div></div>`)}
 ${sec('② 편집 (컷 리듬)', `<div style="margin-top:6px">컷 <b>${a.cuts.count}개</b> · 평균 <b>${a.cuts.avg}초</b> · 길이 ${a.dur}초</div>${bar}<div style="margin-top:4px">${esc(a.rhythm)}</div>`)}
@@ -959,7 +964,7 @@ ${sec('④ 강조 (글자·자막)', li(a.emphasis))}
 ${sec('⑤ 이펙트', li(a.effects))}
 ${sec('⑥ 따라할 이목 장치', li(a.attention))}
 ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="small" style="margin-top:6px">이 스타일로 정하면 ①~⑦ 이 그대로 스타일 입히기(위 제목·이펙트)와 자막 규칙에 들어가요.</p>')}
-<div style="margin-top:14px">${pick !== 'ref-' + id ? `<button type="button" class="btn primary" data-ya-lookpick="ref-${esc(id)}">이 레퍼런스 스타일 고르기</button>` : '<p class="small"><b>골랐어요.</b> 위의 "이 스타일로 정하기"를 누르면 적용돼요.</p>'}</div></div>`;
+<div style="margin-top:14px">${standalone ? '<p class="small">작업판의 <b>편집 / 쇼츠 스타일 선택</b>에서 이 레퍼런스를 고르면 위 분석이 그대로 적용돼요.</p>' : pick !== 'ref-' + id ? `<button type="button" class="btn primary" data-ya-lookpick="ref-${esc(id)}">이 레퍼런스 스타일 고르기</button>` : '<p class="small"><b>골랐어요.</b> 위의 "이 스타일로 정하기"를 누르면 적용돼요.</p>'}</div></div>`;
   }
   // 1차 컷 실시간 보기: 실행기가 쓰는 편집/AI컷_진행.json 을 돌고 있는 동안 몇 초마다 받아요
   const CP = {};
@@ -1016,6 +1021,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
       ${d.rows ? `<div style="max-height:260px;overflow:auto"><table style="width:100%;font-size:13px;border-collapse:collapse"><thead><tr>${d.rows.head.map(h => `<th style="text-align:left;position:sticky;top:0;background:var(--card)">${esc(h)}</th>`).join('')}</tr></thead><tbody>${d.rows.rows.map(r => `<tr style="border-top:1px solid var(--line)">${r.map((c, i) => `<td style="padding:3px 8px 3px 0;${i === 0 ? 'white-space:nowrap' : ''}">${clean(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>` : ''}
       ${tail ? `<pre class="small" style="white-space:pre-wrap;margin:8px 0 0;opacity:.85">${tail}</pre>` : ''}</details>`;
   }
+  window.ytRefA = { RA, RK, poll: refPoll, panel: refPanel, start: refStart, img: refImg };
   function ytAiCards(it, ep, off) {
     const names = ['1차 컷 (영상 종류)', '스타일 선택', '스타일 입히기', '자막', '인트로·아웃트로', '썸네일', '다운로드'];
     const chId = it.idea ? ytCh(it.idea) : ytTab(), sport = chId === 'yt-wrestling', myLook = AI_CH[chId] || 'yt-mat';
@@ -1065,7 +1071,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
       disabled: () => off || !cutDone || same || !!ep.running || (isRef(pick) && refWait(pick)),
       isDone: () => cutDone && lookOk,
       result: () => lookOk ? `<b>${esc(isRef(ep.look) && ep.refStyle ? ep.refStyle.name + ' (레퍼런스)' : aiLookName(ep.look))}</b>로 정했어요.${isRef(ep.look) && !ep.refStyle ? ' <span class="small">스타일 입히기 때 이 쇼츠를 받아 보고 스타일을 정해요.</span>' : ''}${choices.length > 1 ? ' <span class="small">다른 스타일을 고르면 바꿀 수 있어요.</span>' : ''}` : '',
-      body: () => (cutDone || ((sport || refLooks.length) && it.idea)) ? `<div class="pl-looks" role="radiogroup" aria-label="편집 스타일">${choices.filter(id => !isRef(id)).map(id => { const l = YT_AI_LOOKS.find(x => x.id === id) || ytLooks().find(x => x.id === id) || { name: id, desc: '' }; return `<button type="button" role="radio" aria-checked="${pick === id}" class="pl-topic ${pick === id ? 'on' : ''}"${choices.length > 1 ? ` data-ya-lookpick="${esc(id)}"` : ''}>${ytLookMock(id)}<span class="pl-lk-txt"><b>${esc(l.name)}${id === myLook && choices.length > 1 ? ' · 기본' : ''}</b><span class="small">${esc(l.desc)}</span></span></button>`; }).join('')}</div>${sport ? `<p class="small">레퍼런스 쇼츠: ${YT_AI_LOOKS.map(l => `<a href="${esc(l.ref)}" target="_blank" rel="noopener">${esc(l.name)}</a>`).join(' · ')}</p>` : ''}${refLooks.length ? `<p class="small" style="margin-top:12px"><b>썸네일·편집 레퍼런스 탭의 쇼츠</b> · 고르면 스타일 입히기 때 Claude 가 그 쇼츠를 받아 보고, 가장 가까운 화면 틀에 색·제목·이펙트·자막 방식을 맞춰요. <a href="#ytRefs">레퍼런스 추가하기</a></p><div class="pl-looks" role="radiogroup" aria-label="레퍼런스 쇼츠 스타일">${(refPoll(chId, refLooks.map(r => r.vid)), refLooks).map(r => { const mine = ep && ep.look === r.id && ep.refStyle, s = RA.st[r.vid] || {}; return `<div style="display:grid;gap:4px"><button type="button" role="radio" aria-checked="${pick === r.id}" class="pl-topic ${pick === r.id ? 'on' : ''}" data-ya-lookpick="${esc(r.id)}"><span class="lm" aria-hidden="true"><img src="https://i.ytimg.com/vi/${esc(r.vid)}/oar2.jpg" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover"></span><span class="pl-lk-txt"><b>${esc(mine ? ep.refStyle.name : r.title ? r.title.slice(0, 40) : '레퍼런스 쇼츠')}</b><span class="small">${esc(mine ? ep.refStyle.desc : s.status === 'done' ? s.desc : s.status === 'running' ? '분석 중… ' + (s.stage || '') : s.status === 'failed' ? '분석 실패: ' + s.error : r.from + ' · 아직 분석 전')}</span></span></button><div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><a class="small" href="https://www.youtube.com/shorts/${esc(r.vid)}" target="_blank" rel="noopener">쇼츠 보기 ↗</a>${runnerApi >= 17 ? (s.status === 'done' ? `<button type="button" class="pl-link" data-ya-refopen="${esc(r.vid)}">${RA.open === r.vid ? '분석 닫기' : '분석 보기'}</button><button type="button" class="pl-link" data-ya-refan="${esc(r.vid)}" data-ya-confirm="이 레퍼런스를 다시 분석할까요? (2~5분)">다시 분석</button>` : s.status === 'running' ? '' : `<button type="button" class="pl-link" data-ya-refan="${esc(r.vid)}">${s.status === 'failed' ? '다시 분석' : '분석하기'}</button>`) : ''}</div></div>`; }).join('')}</div>${RA.open && refLooks.some(r => r.vid === RA.open) ? refPanel(RA.open, chId, pick) : ''}${isRef(pick) && !same && refWait(pick) ? '<p class="pl-error" role="alert">이 레퍼런스는 아직 분석 전이에요. <b>분석하기</b>로 편집·강조·이펙트·이목 장치를 먼저 확인한 뒤 정하세요.</p>' : ''}` : ''}` : '',
+      body: () => (cutDone || ((sport || refLooks.length) && it.idea)) ? `<div class="pl-looks" role="radiogroup" aria-label="편집 스타일">${choices.filter(id => !isRef(id)).map(id => { const l = YT_AI_LOOKS.find(x => x.id === id) || ytLooks().find(x => x.id === id) || { name: id, desc: '' }; return `<button type="button" role="radio" aria-checked="${pick === id}" class="pl-topic ${pick === id ? 'on' : ''}"${choices.length > 1 ? ` data-ya-lookpick="${esc(id)}"` : ''}>${ytLookMock(id)}<span class="pl-lk-txt"><b>${esc(l.name)}${id === myLook && choices.length > 1 ? ' · 기본' : ''}</b><span class="small">${esc(l.desc)}</span></span></button>`; }).join('')}</div>${sport ? `<p class="small">레퍼런스 쇼츠: ${YT_AI_LOOKS.map(l => `<a href="${esc(l.ref)}" target="_blank" rel="noopener">${esc(l.name)}</a>`).join(' · ')}</p>` : ''}${refLooks.length ? `<p class="small" style="margin-top:12px"><b>썸네일·편집 레퍼런스 탭의 쇼츠</b> · 고르면 스타일 입히기 때 Claude 가 그 쇼츠를 받아 보고, 가장 가까운 화면 틀에 색·제목·이펙트·자막 방식을 맞춰요. <a href="#ytRefs">레퍼런스 추가하기</a></p><div class="pl-looks" role="radiogroup" aria-label="레퍼런스 쇼츠 스타일">${(refPoll(chId, refLooks.map(r => r.vid)), refLooks).map(r => { const mine = ep && ep.look === r.id && ep.refStyle, s = RA.st[r.vid] || {}; return `<div style="display:grid;gap:4px"><button type="button" role="radio" aria-checked="${pick === r.id}" class="pl-topic ${pick === r.id ? 'on' : ''}" data-ya-lookpick="${esc(r.id)}"><span class="lm" aria-hidden="true"><img src="https://i.ytimg.com/vi/${esc(r.vid)}/oar2.jpg" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover"></span><span class="pl-lk-txt"><b>${esc(mine ? ep.refStyle.name : r.title ? r.title.slice(0, 40) : '레퍼런스 쇼츠')}</b><span class="small">${esc(mine ? ep.refStyle.desc : s.status === 'done' ? s.desc : s.status === 'running' ? '분석 중… ' + (s.stage || '') : s.status === 'queued' ? '분석 차례를 기다려요' : s.status === 'failed' ? '분석 실패: ' + s.error : r.from + ' · 아직 분석 전')}</span></span></button><div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><a class="small" href="https://www.youtube.com/shorts/${esc(r.vid)}" target="_blank" rel="noopener">쇼츠 보기 ↗</a>${runnerApi >= 17 ? (s.status === 'done' ? `<button type="button" class="pl-link" data-ya-refopen="${esc(r.vid)}">${RA.open === r.vid ? '분석 닫기' : '분석 보기'}</button><button type="button" class="pl-link" data-ya-refan="${esc(r.vid)}" data-ya-confirm="이 레퍼런스를 다시 분석할까요? (2~5분)">다시 분석</button>` : s.status === 'running' || s.status === 'queued' ? '' : `<button type="button" class="pl-link" data-ya-refan="${esc(r.vid)}">${s.status === 'failed' ? '다시 분석' : '분석하기'}</button>`) : ''}</div></div>`; }).join('')}</div>${RA.open && refLooks.some(r => r.vid === RA.open) ? refPanel(RA.open, chId, pick) : ''}${isRef(pick) && !same && refWait(pick) ? '<p class="pl-error" role="alert">이 레퍼런스는 아직 분석 전이에요. <b>분석하기</b>로 편집·강조·이펙트·이목 장치를 먼저 확인한 뒤 정하세요.</p>' : ''}` : ''}` : '',
     });
     const ST = ['aistyle'], styDone = ok('aistyle');
     const c3 = card(2, {
@@ -1250,7 +1256,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
     const pubs = db.ideas.filter(i => ideaPlatform(i) === 'YouTube' && ytCh(i) === ytTab() && i.publicationCheck);
     const pubHtml = pubs.length ? `<details class="pl-wpub"><summary>올린 영상 ${pubs.length}개</summary><ul>${pubs.map(i => { const u = typeof i.publicationCheck === 'string' ? i.publicationCheck : (i.publicationCheck && i.publicationCheck.url) || ''; return `<li>${/^https?:/.test(u) ? `<a class="pl-link" href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(i.title)} ↗</a>` : esc(i.title)}</li>`; }).join('')}</ul></details>` : '';
     const stale = typeof runnerStale !== 'undefined' && runnerStale ? `<p class="pl-error" role="alert"><b>맥 실행기에 새 버전이 들어와 있어요.</b> 다시 켜야 새 기능(내 영상 올리기 등)이 돼요. ${runnerStale.api >= 15 ? '<button type="button" class="pl-link" data-pl-ytrestart>실행기 다시 켜기</button>' : '이번 한 번만 맥에서 <code>~/Desktop/유투브/실행기/자동실행 켜기.command</code> 를 더블클릭하세요. 다음부터는 여기 버튼으로 돼요.'}</p>` : '';
-    return stale + `<div class="pl-wip" aria-label="작업 중인 영상"><div class="pl-wip-h"><b>작업 중 ${list.length}개</b><button type="button" class="pl-wip-reset" data-pl-ytreset title="유튜브 작업 기록을 모두 지워요 (영상 파일은 휴지통으로)">유튜브 초기화</button>${list.length ? '' : '<span class="small">작업 중인 영상이 없어요. 링크를 넣어 시작하세요.</span>'}</div><div class="pl-wip-row"><button type="button" class="pl-wc pl-wc-new" data-pl-ytchange>＋ 새 링크로 시작</button>${list.map(card).join('')}</div>${pubHtml}</div>`;
+    return stale + `<div class="pl-wip" aria-label="작업 중인 영상"><div class="pl-wip-h"><b>작업 중 ${list.length}개</b>${runnerApi >= 20 ? '<button type="button" class="pl-wip-reset" data-pl-ytupdate title="GitHub 의 최신 실행기 파일을 맥에 받고 다시 켜요">실행기 업데이트</button>' : ''}<button type="button" class="pl-wip-reset" data-pl-ytreset title="유튜브 작업 기록을 모두 지워요 (영상 파일은 휴지통으로)">유튜브 초기화</button>${list.length ? '' : '<span class="small">작업 중인 영상이 없어요. 링크를 넣어 시작하세요.</span>'}</div><div class="pl-wip-row"><button type="button" class="pl-wc pl-wc-new" data-pl-ytchange>＋ 새 링크로 시작</button>${list.map(card).join('')}</div>${pubHtml}</div>`;
   }
   // 이 브라우저의 기록 지우기 (× 와 '유튜브 초기화'가 같이 써요): 주제 + 그 주제의 YouTube 글·초안 + 선택·열림·단계 기록
   function ytCleanLocal(ids) {
@@ -1635,6 +1641,16 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
     if (t.dataset.plPick) { T.pick[c] = t.dataset.plPick; T.custom[c] = ''; repaint(c, true); return; }
     if (t.hasAttribute('data-pl-more')) { T.page[c] = (T.page[c] || 0) + 1; repaint(c, true); return; }
     if (t.dataset.plWip) { selectYt(t.dataset.plWip); T.view.youtube = null; T.err.youtube = ''; render(); return; }
+    if (t.hasAttribute('data-pl-ytupdate')) {
+      if (!confirm('맥 실행기를 GitHub 최신 버전으로 업데이트하고 다시 켤까요? (30초쯤 걸려요)')) return;
+      t.disabled = true; t.textContent = '업데이트 중…';
+      runnerFetch('/update', {}).then(d => {
+        if (d.same) { toast('이미 최신이에요 (' + d.version + ')'); t.disabled = false; t.textContent = '실행기 업데이트'; return; }
+        toast(d.restarting ? `업데이트했어요 (${d.from} → ${d.to}). 다시 켜는 중이에요…` : `파일을 받았어요 (${d.to}). 자동실행이 꺼져 있어서 맥에서 실행기를 직접 다시 켜야 해요.`);
+        setTimeout(() => runnerRefresh().then(() => { repaint('youtube', true); if (typeof render === 'function') render(); }), 6000);
+      }).catch(e => { t.disabled = false; t.textContent = '실행기 업데이트'; toast('업데이트 실패: ' + e.message); });
+      return;
+    }
     if (t.hasAttribute('data-pl-ytrestart')) { t.disabled = true; runnerFetch('/restart', {}).then(() => { toast('실행기를 다시 켜는 중이에요…'); setTimeout(() => runnerRefresh().then(() => repaint('youtube', true)), 4000); }).catch(e => { t.disabled = false; toast(e.message); }); return; }
     if (t.hasAttribute('data-pl-ytreset')) { ytResetAll(); return; }
     if (t.dataset.plWiphide) { ytWipPurge(t.dataset.plWiphide); return; }
@@ -1647,7 +1663,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
     if (t.dataset.yaLookpick) { const { it } = ctx(); ytPipe.look = t.dataset.yaLookpick; ytPipe.lookIdea = it.idea ? it.idea.id : ''; if (isRef(ytPipe.look) && (RA.st[ytPipe.look.slice(4)] || {}).status === 'done') RA.open = ytPipe.look.slice(4); repaint('youtube', true); return; }
     if (t.dataset.yaRefopen) { RA.open = RA.open === t.dataset.yaRefopen ? '' : t.dataset.yaRefopen; repaint('youtube', true); return; }
     if (t.dataset.yaRefan) { if (t.dataset.yaConfirm && !confirm(t.dataset.yaConfirm)) return; const { it } = ctx(), id = t.dataset.yaRefan; t.disabled = true;
-      runnerFetch('/ref/analyze', { id, channel: it.idea ? ytCh(it.idea) : ytTab() }).then(() => { RA.st[id] = { status: 'running', stage: '시작' }; RA.at = 0; toast('레퍼런스를 분석해요. 2~5분 걸려요.'); repaint('youtube', true); }).catch(e => { t.disabled = false; toast('분석을 시작하지 못했어요: ' + e.message); });
+      refStart(id, it.idea ? ytCh(it.idea) : ytTab(), t).then(() => toast('레퍼런스를 분석해요. 하나에 2~5분 걸려요.'), () => {});
       return; }
     if (t.hasAttribute('data-pl-ytchange')) { ytLinkReset(); adapter('youtube').fresh(); T.view.youtube = 0; repaint('youtube', true); return; }
     if (t.dataset.plYsrc) { const u = t.dataset.plYsrc, i = document.querySelector('#plRoot [data-ya-new="url"]'); ytPipe.url = u; if (i) i.value = u; return; }
