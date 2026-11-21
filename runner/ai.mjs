@@ -230,6 +230,20 @@ async function sheets(E, ctx, src, name, a, dur, fps, cols, rows, width) {
   return fs.readdirSync(out).filter(f => f.startsWith(name + '_')).sort().map((f, k) => `- ${path.join(out, f)}: 타일 ${cols}x${rows}, 왼쪽 위부터 가로로 읽기. 타일 i 의 원본 시각 = ${r1(a + k * per * step)} + i*${step} 초`).join('\n');
 }
 
+// 단계별 실시간 보기: 편집/진행_<단계>.json 에 지금 단계·정한 것·장면 사진을 그때그때 적어요 (작업판이 몇 초마다 읽어요)
+function progOf(E, id, stages) {
+  const P = { stages, stage: stages[0][0], info: [], images: [], rows: null }, f = E.p(`편집/진행_${id}.json`);
+  for (const x of (() => { try { return fs.readdirSync(E.p('편집')); } catch { return []; } })()) if (x.startsWith(`진행_${id}_`)) fs.rmSync(E.p('편집', x), { force: true });
+  const prog = (o = {}) => { if (o.info) { for (const [k, v] of o.info) { const i = P.info.findIndex(x => x[0] === k); if (i >= 0) P.info[i] = [k, v]; else P.info.push([k, v]); } delete o.info; }
+    if (o.image) { P.images.push(o.image); delete o.image; } Object.assign(P, o); try { writeJson(f, { ...P, t: Date.now() }); } catch {} };
+  // 영상의 한 장면을 사진으로 (t 초)
+  prog.snap = async (ctx, rel, t, cap) => { const n = P.images.length + 1, out = `편집/진행_${id}_${n}.jpg`;
+    try { await ff(['-ss', String(Math.max(0, t)), '-i', E.p(rel), '-frames:v', '1', '-vf', 'scale=360:-2', '-q:v', '4', E.p(out)], ctx); prog({ image: { path: out, cap } }); } catch (e) { if (e instanceof StopError) throw e; } };
+  prog();
+  return prog;
+}
+const fxTxt = fx => (fx || []).map(f => { const o = f[2] || {}; return `${r1(+f[0])}-${r1(+f[1])}초 ${o.type || ''} ${[o.k, o.s, o.text, o.sub].filter(Boolean).join(' ')}`.trim(); }).join(' / ');
+
 // ---------- 2. 하이라이트 1차 컷 ----------
 async function aicut(E, ctx) {
   if (isRefLook(E.s.look) && readRefAnalysis(E.s.look.slice(4), refKind(E.s.channel))) await refStyle(E, ctx);   // 분석한 레퍼런스를 골랐으면 컷 리듬도 따라요
@@ -474,8 +488,10 @@ async function refStyle(E, ctx) {
 }
 
 async function aistyle(E, ctx) {
+  const prog = progOf(E, 'aistyle', [['ref', '레퍼런스 스타일'], ['research', '조사 + 제목·라벨·팝업 정하기'], ['render', '스타일 입혀 그리기'], ['done', '끝']]);
   await refStyle(E, ctx);
   const st = styleOf(E), info = source(E), plan = readJson(E.p('편집/AI컷.json'));
+  prog({ stage: 'research', info: [['스타일', E.s.refStyle && E.s.refStyle.look === E.s.look ? E.s.refStyle.name + ' (레퍼런스)' : (st.name || E.s.look || '기본')]] });
   ctx.log('Claude 가 사실을 조사하고(source-check-research) 위 제목·선수 라벨·점수 팝업을 정해요…');
   fs.mkdirSync(E.p('조사'), { recursive: true });
   const j = await askClaude(E, ctx, `${skills(ctx, ['source-check-research', 'shorts-blueprint'])}${common(E, st, info, plan)}
@@ -492,7 +508,11 @@ JSON 하나만 답해라: {"frame":{"l1":"","l2":""},"fx":[[시작,끝,{"type":"
   writeJson(E.p('편집/AI완성.json'), j);
   fs.rmSync(E.p('편집/AI완성.mp4'), { force: true });
   for (const id of ['aisubs', 'aibrand']) if (E.s.steps[id]) E.s.steps[id] = { status: 'todo' };
+  let rs = ''; try { rs = fs.readFileSync(E.p('조사/research.md'), 'utf8').replace(/\s+/g, ' ').slice(0, 240); } catch {}
+  prog({ stage: 'render', info: [['위 제목', [j.frame && j.frame.l1, j.frame && j.frame.l2].filter(Boolean).join(' / ')], ['라벨·팝업', fxTxt(j.fx) || '없음'], ...(rs ? [['조사 메모', rs + '…']] : [])] });
   await render(E, ctx, st, plan, j, '편집/AI스타일본.mp4');
+  for (const [k, t] of [[1, 0.8], [2, plan.duration * 0.45], [3, plan.duration * 0.8]]) await prog.snap(ctx, '편집/AI스타일본.mp4', t, `${r1(t)}초`);
+  prog({ stage: 'done' });
 }
 
 // 자막 3갈래 (작업판에서 켜고 끔, E.s.subsOpt): en = 영상 원문(영어 자동자막, 말 시각 그대로) / ko = 그 말의 한국어 번역 (원문과 1:1)
@@ -513,12 +533,14 @@ async function aisubs(E, ctx) {
   const st = styleOf(E), info = source(E), plan = readJson(E.p('편집/AI컷.json'));
   let base; try { base = readJson(E.p('편집/AI완성.json')); } catch { throw new StepError('스타일 입히기를 먼저 해 주세요.'); }
   const o = { en: true, ko: true, ai: true, mine: [], ...(E.s.subsOpt || {}) };
+  const prog = progOf(E, 'aisubs', [['segs', '원문 자막 정리'], ['ko', '한국어 번역'], ['ai', '해설·후크 자막'], ['render', '자막 입혀 그리기'], ['done', '끝']]);
   const segs = (o.en || o.ko) ? segsOf(E, info, plan) : [], d = plan.duration;
   if ((o.en || o.ko) && !segs.length) ctx.log('  영상 원문 자막이 없어요 (내 파일이거나 유튜브 자막이 없는 영상). 원문·번역 자막은 건너뛰어요.');
   if (!o.ai && !segs.length && !o.mine.length) throw new StepError('넣을 자막이 없어요. 원문 자막이 없는 영상이라 "AI 해설·후크 자막"이나 "내 자막"을 켜 주세요.');
   // 1) 원문 -> 한국어 (S 하나에 한 줄, 1:1). 프레임은 안 보고 말만 옮겨서 빨라요.
   let ko = new Map();
   if (o.ko && segs.length) {
+    prog({ stage: 'ko', info: [['원문 자막', segs.length + '줄']], rows: { head: ['시각', '영어 원문', '한국어'], rows: segs.map(g => [`${g.s}-${g.e}`, g.t, '…']) } });
     ctx.log(`Claude 가 원문 ${segs.length}줄을 한국어로 옮겨요 (한 줄에 한 줄, 시각은 원문 그대로)…`);
     const j = await askClaude(E, ctx, `너는 한국어 ${st.genre} 쇼츠의 번역가다. 원본: "${info.title}" (${info.channel}). 등장인물: ${JSON.stringify(plan.who || '')}
 아래는 영상에서 나오는 말을 자동자막으로 받은 것이다. 번호마다 그 줄에 있는 말만 한국어로 옮긴다.
@@ -533,12 +555,14 @@ JSON 하나만 답해라: {"ko":[[1,"한국어"],[2,"한국어"]]}`,
     ko = new Map(j.ko.map(r => [+r[0], String(r[1])]));
   }
   let speech = segs.map(g => ({ s: g.s, e: g.e, en: o.en ? g.t : '', ko: ko.get(g.id) || '' }));
+  if (segs.length) prog({ info: [['원문 자막', segs.length + '줄'], ['번역', ko.size ? ko.size + '줄' : '끔']], rows: { head: ['시각', '영어 원문', '한국어'], rows: segs.map(g => [`${g.s}-${g.e}`, g.t, ko.get(g.id) || '']) } });
   // 2) Claude 해설·후크 자막: 말 자막이 없는 곳에만 (인트로·아웃트로 컷 안에서는 말 자막보다 앞서요)
   let ai = [];
   if (o.ai) {
     const hookCuts = plan.cuts.filter(c => c.role === 'intro' || c.role === 'outro').map(c => c.out);
     const inHook = (a, b) => hookCuts.some(([x, y]) => a < y && b > x);
     const fixed = speech.filter(x => !inHook(x.s, x.e));
+    prog({ stage: 'ai' });
     ctx.log(`Claude 가 해설·후크 자막을 써요 (shorts-blueprint 자막 규칙${fixed.length ? ', 말 자막 ' + fixed.length + '줄은 비워 둔 자리' : ''})…`);
     const j = await askClaude(E, ctx, `${skills(ctx, ['shorts-blueprint'])}${common(E, st, info, plan, segs.length > 0)}
 이미 정한 위 제목·라벨·팝업: ${JSON.stringify({ frame: base.frame, fx: base.fx })}
@@ -568,7 +592,11 @@ JSON 하나만 답해라: {"captions":[[시작,끝,"텍스트"]],"facts":["쓴 �
   if (E.s.steps.aibrand) E.s.steps.aibrand = { status: 'todo' };
   writeJson(E.p('편집/AI완성.json'), j);
   ctx.log(`자막: 원문 ${speech.filter(x => x.en).length}줄 · 번역 ${speech.filter(x => x.ko).length}줄 · 해설/후크 ${ai.length}줄 · 내 자막 ${j.mine.length}줄`);
+  prog({ stage: 'render', info: [['해설·후크', ai.length ? ai.length + '줄' : '끔'], ['내 자막', j.mine.length + '줄']],
+    rows: { head: ['시각', '종류', '영어 원문', '한국어 / 자막'], rows: [...speech.map(x => [x.s, '원문', x.en, x.ko]), ...ai.map(q => [q[0], '해설·후크', '', q[2]]), ...j.mine.map(q => [q[0], '내 자막', '', q[2]])].sort((a, b) => a[0] - b[0]).map(r => [r1(r[0]) + '초', r[1], r[2], String(r[3]).replace(/\\n|\n/g, ' / ')]) } });
   await render(E, ctx, st, plan, j, '편집/AI완성.mp4');
+  for (const c of caps.filter((_, k) => k % Math.max(1, Math.ceil(caps.length / 3)) === 0).slice(0, 3)) await prog.snap(ctx, '편집/AI완성.mp4', (c[0] + c[1]) / 2, `${r1(c[0])}초 자막`);
+  prog({ stage: 'done' });
 }
 
 // ---------- 그리기 (ASS) ----------
@@ -732,6 +760,8 @@ async function aibrand(E, ctx) {
   if (!hasLogo) ctx.log(`  채널 로고가 없어서 글자만 넣어요 (${logoPath} 에 넣으면 들어가요)`);
   const logoIn = d => hasLogo ? ['-loop', '1', '-t', String(d), '-i', logoPath] : ['-f', 'lavfi', '-t', String(d), '-i', 'color=c=black@0.0:s=16x16,format=rgba'];
   const fin = readJson(E.p('편집/AI완성.json'));
+  const prog = progOf(E, 'aibrand', [['hook', '후크 문장 쓰기'], ['intro', '인트로 그리기'], ['outro', '아웃트로 그리기'], ['join', '붙이기'], ['done', '끝']]);
+  prog({ info: [['로고', hasLogo ? '있음' : '없음 (글자로)']] });
   ctx.log('Claude 가 인트로·아웃트로 후크 문장을 써요…');
   const short = (t, n) => String(t || '').replace(/\[\[|\]\]/g, '').length <= n;
   const j = await askClaude(E, ctx, `${skills(ctx, ['shorts-blueprint'])}너는 한국어 ${st.genre} 쇼츠 채널${st.name ? ` "${st.name}"` : ''}${st.handle ? ` (${st.handle})` : ''}의 편집 작가다.
@@ -745,6 +775,7 @@ async function aibrand(E, ctx) {
 JSON 하나만 답해라: {"intro":{"l1":"","l2":""},"outro":{"l1":"","l2":"","cta":""}}`,
     x => !x.intro || !x.outro ? 'intro, outro 가 있어야 해요.' : !short(x.intro.l1, 12) || !short(x.intro.l2, 14) ? '인트로 문장이 너무 길어요.' : !short(x.outro.l1, 14) || !short(x.outro.l2, 14) || !short(x.outro.cta, 16) ? '아웃트로 문장이 너무 길어요.' : '');
   writeJson(E.p('편집/AI인트로아웃트로.json'), j);
+  prog({ stage: 'intro', info: [['인트로 후크', [j.intro.l1, j.intro.l2].join(' / ')], ['아웃트로 후크', [j.outro.l1, j.outro.l2, j.outro.cta].filter(Boolean).join(' / ')]] });
   const Y = bgr(st.yellow), R = bgr(st.red), hi = t => esc(t).replace(/\[\[(.+?)\]\]/g, `{\\c${Y}}$1{\\c&HFFFFFF&}`);
   const ass = (d, lines) => `[Script Info]\nScriptType: v4.00+\nPlayResX: ${W}\nPlayResY: ${H}\nWrapStyle: 2\nScaledBorderAndShadow: yes\n\n[V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
@@ -774,17 +805,22 @@ ${lines.map(([a, sty, txt]) => `Dialogue: 1,${ts(a)},${ts(d)},${sty},,0,0,0,,${t
   const outAss = E.p('편집/AI아웃트로.ass');
   fs.writeFileSync(outAss, ass(OUT_D, [[0, 'Mid', pop(540, 360, j.outro.l1, 100) + hi(j.outro.l1)], [0.15, 'Mid', pop(540, 470, j.outro.l2, 100) + `{\\c${Y}}` + hi(j.outro.l2)],
     [0.7, 'Mid', `{\\an5\\pos(540,1420)\\3c${st.cta ? bgr(st.cta) : R}\\bord10}` + esc(j.outro.cta)], ...(st.handle ? [[0.7, 'Small', `{\\an5\\pos(540,1540)}${esc(st.handle)}`]] : []), ...(!hasLogo && st.name ? [[0.3, 'Big', `{\\an5\\pos(540,930)}${esc(st.name)}`]] : [])]));
+  await prog.snap(ctx, '편집/AI인트로.mp4', IN_D * 0.6, '인트로');
+  prog({ stage: 'outro' });
   ctx.log('아웃트로 그리는 중…');
   await ff(['-sseof', '-0.2', '-i', E.p('편집/AI완성.mp4'), ...logoIn(OUT_D), '-f', 'lavfi', '-t', String(OUT_D), '-i', 'anullsrc=r=48000:cl=stereo', '-filter_complex',
     `[0:v]trim=end_frame=1,loop=loop=-1:size=1,trim=duration=${OUT_D},setpts=PTS-STARTPTS,crop=${W}:${layOf(st).vh}:0:${layOf(st).vy},scale=-2:${H},crop=${W}:${H},boxblur=24:2,eq=brightness=-0.32,fps=30,setsar=1[bg];` +
     `[1:v]${logoF(660, 0.3)}[lg];[bg][lg]overlay=x='(W-w)/2':y='930-h/2':eval=frame,subtitles=filename='${q(outAss)}':fontsdir='${fd}',fade=out:st=${OUT_D - 0.25}:d=0.25,format=yuv420p[v]`,
     '-map', '[v]', '-map', '2:a', '-t', String(OUT_D), '-c:v', 'libx264', '-crf', '19', '-preset', 'veryfast', '-c:a', 'aac', '-b:a', '160k', E.p('편집/AI아웃트로.mp4')], ctx);
+  await prog.snap(ctx, '편집/AI아웃트로.mp4', OUT_D * 0.7, '아웃트로');
+  prog({ stage: 'join' });
   ctx.log('인트로 + 본편 + 아웃트로 붙이는 중…');
   const norm = i => `[${i}:v]fps=30,scale=${W}:${H},setsar=1,format=yuv420p[v${i}];[${i}:a]aresample=48000,aformat=channel_layouts=stereo[a${i}]`;
   await ff(['-i', E.p('편집/AI인트로.mp4'), '-i', E.p('편집/AI완성.mp4'), '-i', E.p('편집/AI아웃트로.mp4'), '-filter_complex',
     `${norm(0)};${norm(1)};${norm(2)};[v0][a0][v1][a1][v2][a2]concat=n=3:v=1:a=1[v][a]`,
     '-map', '[v]', '-map', '[a]', '-c:v', 'libx264', '-crf', '19', '-preset', 'veryfast', '-c:a', 'aac', '-b:a', '160k', '-movflags', '+faststart', E.p('편집/AI최종.mp4')], ctx);
   ctx.log(`완성: 편집/AI최종.mp4 (인트로 ${IN_D}초 + 본편 ${plan.duration}초 + 아웃트로 ${OUT_D}초)`);
+  prog({ stage: 'done', info: [['길이', `인트로 ${IN_D}초 + 본편 ${plan.duration}초 + 아웃트로 ${OUT_D}초`]] });
 }
 
 // ---------- 7. 썸네일: 예쁘게 말고 3단 원색 대비 (상단 노랑 카피 / 중앙 액션|리액션 2분할 / 하단 빨강·파랑 반전 카피) ----------
@@ -797,6 +833,8 @@ async function aithumb(E, ctx) {
   const nos = t => String(t || '').replace(/\s/g, '').length;
   const st = styleOf(E), my = E.s.thumbText || {}, myTop = String(my.top || '').trim(), myBot = String(my.bot || '').trim();
   let prev = null; try { prev = readJson(E.p('편집/AI썸네일.json')); } catch {}
+  const prog = progOf(E, 'aithumb', [['pick', '카피·장면 고르기'], ['render', '그리기'], ['done', '끝']]);
+  if (myTop || myBot) prog({ info: [['내 카피', [myTop || '(Claude)', myBot || '(Claude)'].join(' / ')]] });
   let j;
   if ((myTop || myBot) && prev && prev.left && prev.right) {   // 내가 적은 카피만 바꿀 때: 장면은 그대로, Claude 없이 바로 다시 그려요
     j = { ...prev, top: myTop || prev.top, bot: myBot || prev.bot, mine: { top: !!myTop, bot: !!myBot } };
@@ -825,6 +863,7 @@ ${myTop ? `상단 카피는 내가 정했다. 그대로 쓴다: "${myTop}"\n` : 
   j.mine = { top: !!myTop, bot: !!myBot };
   }
   writeJson(E.p('편집/AI썸네일.json'), j);
+  prog({ stage: 'render', info: [['상단', j.top], ['하단', j.bot], ['색', j.color === 'blue' ? '파랑' : '빨강'], ['왼쪽 장면', `${r1(j.left.t)}초 ${j.left.why || ''}`], ['오른쪽 장면', `${r1(j.right.t)}초 ${j.right.why || ''}`]] });
   const fitT = (t, base, w) => { const n = [...String(t)].reduce((a, c) => a + (c === ' ' ? 0.35 : /[ -~]/.test(c) ? 0.6 : 1), 0); return Math.min(base, Math.floor(w / Math.max(1, n))); };
   const assF = E.p('편집/AI썸네일.ass');
   fs.writeFileSync(assF, `[Script Info]\nScriptType: v4.00+\nPlayResX: ${TW}\nPlayResY: ${TH}\nScaledBorderAndShadow: yes\n\n[V4+ Styles]
@@ -847,6 +886,7 @@ Dialogue: 1,0:00:00.00,0:00:05.00,B,,0,0,0,,{\\an5\\pos(${TW / 2},${TH - BOT / 2
     `subtitles=filename='${q(assF)}':fontsdir='${q(process.env.FIELDNOTE_AI_FONT_DIR || FONT_DIR)}'[v]`,
     '-map', '[v]', '-frames:v', '1', '-q:v', '2', E.p('편집/AI썸네일.jpg')], ctx);
   ctx.log(`완성: 편집/AI썸네일.jpg · 상단 "${j.top}" · 하단 "${j.bot}"`);
+  prog({ stage: 'done', image: { path: '편집/AI썸네일.jpg', cap: '썸네일' } });
 }
 
 export const AI_FN = { aicut, aistyle, aisubs, aibrand, aithumb };

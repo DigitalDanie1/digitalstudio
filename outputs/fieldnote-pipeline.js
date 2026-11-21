@@ -991,6 +991,31 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
       <ol style="display:flex;flex-wrap:wrap;gap:6px;list-style:none;padding:0;margin:8px 0">${ST.map((x, i) => `<li class="pl-chip ${i === cur ? 'on' : ''}" style="opacity:${i <= cur ? 1 : .45}">${i < cur ? '✓ ' : ''}${x[1]}</li>`).join('')}</ol>
       ${d.why ? `<p class="small"><b>고른 이유:</b> ${esc(d.why)}</p>` : ''}${bar}${cuts}${d.stage === 'done' ? '' : shots}</details>`;
   }
+  // 모든 AI 단계 실시간 보기: 편집/진행_<단계>.json + 로그 끝 몇 줄을 돌고 있는 동안 몇 초마다 받아요
+  const LP = {};
+  function ytLiveGet(ep, rel, live, kind) {
+    const k = ep.ep + '|' + rel, c = LP[k] || (LP[k] = { at: 0, d: null, busy: false });
+    if (!c.busy && (c.at === 0 || (live && Date.now() - c.at > 2500))) {
+      c.busy = true; c.at = Date.now();
+      fetch(`${RUNNER}/file?ep=${encodeURIComponent(ep.ep)}&path=${encodeURIComponent(rel)}&_=${Date.now()}`).then(r => r.ok ? (kind === 'text' ? r.text() : r.json()) : null)
+        .then(d => { c.busy = false; const same = JSON.stringify(d) === JSON.stringify(c.d); c.d = d; if (!same) repaint('youtube', true); }).catch(() => { c.busy = false; });
+      if (live) setTimeout(() => { if (ep.running) repaint('youtube', true); }, 3000);
+    }
+    return c.d;
+  }
+  function ytStepLive(ep, id, live) {
+    const d = ytLiveGet(ep, `편집/진행_${id}.json`, live), lg = live ? ytLiveGet(ep, `로그/${id}.log`, live, 'text') : null;
+    if (!d) return live ? '<p class="small">실시간 보기 준비 중…</p>' : '';
+    const img = r => `${RUNNER}/file?ep=${encodeURIComponent(ep.ep)}&path=${encodeURIComponent(r)}&v=${d.t}`;
+    const cur = d.stages.findIndex(x => x[0] === d.stage), clean = t => esc(String(t || '').replace(/\[\[|\]\]/g, ''));
+    const tail = lg ? String(lg).trim().split('\n').slice(-6).map(l => esc(l)).join('\n') : '';
+    return `<details class="pl-peek" ${live ? 'open' : ''}><summary><b>실시간 보기</b> · ${esc((d.stages[cur] || d.stages[0])[1])}${live && d.stage !== 'done' ? ' 중' : ''}</summary>
+      <ol style="display:flex;flex-wrap:wrap;gap:6px;list-style:none;padding:0;margin:8px 0">${d.stages.map((x, i) => `<li class="pl-chip ${i === cur ? 'on' : ''}" style="opacity:${i <= cur ? 1 : .45}">${i < cur || d.stage === 'done' ? '✓ ' : ''}${esc(x[1])}</li>`).join('')}</ol>
+      ${d.info.length ? `<dl style="display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;margin:6px 0;font-size:14px">${d.info.map(([k, v]) => `<dt class="small" style="margin:0">${esc(k)}</dt><dd style="margin:0">${clean(v)}</dd>`).join('')}</dl>` : ''}
+      ${d.images.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(${id === 'aithumb' ? 320 : 120}px,1fr));gap:8px;margin:8px 0">${d.images.map(m => `<figure style="margin:0"><a href="${img(m.path)}" target="_blank" rel="noopener"><img src="${img(m.path)}" alt="" loading="lazy" style="width:100%;border-radius:6px;display:block"></a><figcaption class="small">${esc(m.cap || '')}</figcaption></figure>`).join('')}</div>` : ''}
+      ${d.rows ? `<div style="max-height:260px;overflow:auto"><table style="width:100%;font-size:13px;border-collapse:collapse"><thead><tr>${d.rows.head.map(h => `<th style="text-align:left;position:sticky;top:0;background:var(--card)">${esc(h)}</th>`).join('')}</tr></thead><tbody>${d.rows.rows.map(r => `<tr style="border-top:1px solid var(--line)">${r.map((c, i) => `<td style="padding:3px 8px 3px 0;${i === 0 ? 'white-space:nowrap' : ''}">${clean(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>` : ''}
+      ${tail ? `<pre class="small" style="white-space:pre-wrap;margin:8px 0 0;opacity:.85">${tail}</pre>` : ''}</details>`;
+  }
   function ytAiCards(it, ep, off) {
     const names = ['1차 컷 (영상 종류)', '스타일 선택', '스타일 입히기', '자막', '인트로·아웃트로', '썸네일', '다운로드'];
     const chId = it.idea ? ytCh(it.idea) : ytTab(), sport = chId === 'yt-wrestling', myLook = AI_CH[chId] || 'yt-mat';
@@ -1049,7 +1074,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
       attrs: stopOr(ST, 'data-ya-steps="aistyle"'), cls: runIn(ST) ? 'danger' : '',
       disabled: () => off || !lookOk || !cutDone || busyElse(ST),
       isDone: () => styDone, statusLine: runLine(ST),
-      result: () => ep ? errOf(ST) + (styDone ? vid('aistyle', '편집/AI스타일본.mp4', '스타일본 (자막 전)') + (out('aistyle', '조사/research.md') ? `<p class="small">${ytFileLink(ep.ep, { path: '조사/research.md' })} · 제목·라벨에 쓴 사실의 근거</p>` : '') : '') + logs(ST) : '',
+      result: () => ep ? errOf(ST) + (runnerApi >= 19 && (runIn(ST) || styDone) ? ytStepLive(ep, ST[0], runIn(ST)) : '') + (styDone ? vid('aistyle', '편집/AI스타일본.mp4', '스타일본 (자막 전)') + (out('aistyle', '조사/research.md') ? `<p class="small">${ytFileLink(ep.ep, { path: '조사/research.md' })} · 제목·라벨에 쓴 사실의 근거</p>` : '') : '') + logs(ST) : '',
     });
     const SU = ['aisubs'], subDone = ok('aisubs');
     // 자막: 원문(영어)·번역(한국어)·해설/후크(AI)·내 자막을 나눠 켜고, 만든 뒤 줄별로 확인
@@ -1070,7 +1095,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
       attrs: stopOr(SU, 'data-ya-steps="aisubs"'), cls: runIn(SU) ? 'danger' : '',
       disabled: () => off || !styDone || busyElse(SU),
       isDone: () => subDone, statusLine: runLine(SU),
-      result: () => ep ? errOf(SU) + (subDone ? vid('aisubs', '편집/AI완성.mp4', '완성본') + subTable() : '') + logs(SU) : '',
+      result: () => ep ? errOf(SU) + (runnerApi >= 19 && (runIn(SU) || subDone) ? ytStepLive(ep, SU[0], runIn(SU)) : '') + (subDone ? vid('aisubs', '편집/AI완성.mp4', '완성본') + subTable() : '') + logs(SU) : '',
     });
     const BR = ['aibrand'], brDone = ok('aibrand');
     const c5 = card(4, {
@@ -1079,7 +1104,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
       attrs: stopOr(BR, 'data-ya-steps="aibrand"'), cls: runIn(BR) ? 'danger' : '',
       disabled: () => off || !subDone || busyElse(BR),
       isDone: () => brDone, statusLine: runLine(BR),
-      result: () => ep ? errOf(BR) + (brDone ? vid('aibrand', '편집/AI최종.mp4', '최종본 (인트로 + 본편 + 아웃트로)') + `<div class="pl-files">${['편집/AI인트로.mp4', '편집/AI아웃트로.mp4'].filter(p => out('aibrand', p)).map(p => ytFileLink(ep.ep, { path: p })).join(' ')}</div>` : '') + logs(BR) : '',
+      result: () => ep ? errOf(BR) + (runnerApi >= 19 && (runIn(BR) || brDone) ? ytStepLive(ep, BR[0], runIn(BR)) : '') + (brDone ? vid('aibrand', '편집/AI최종.mp4', '최종본 (인트로 + 본편 + 아웃트로)') + `<div class="pl-files">${['편집/AI인트로.mp4', '편집/AI아웃트로.mp4'].filter(p => out('aibrand', p)).map(p => ytFileLink(ep.ep, { path: p })).join(' ')}</div>` : '') + logs(BR) : '',
     });
     const TH = ['aithumb'], thDone = ok('aithumb'), thImg = out('aithumb', '편집/AI썸네일.jpg');
     const TT = ytThumbDraft(ep);
@@ -1092,7 +1117,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
       attrs: stopOr(TH, 'data-ya-steps="aithumb"'), cls: runIn(TH) ? 'danger' : '',
       disabled: () => off || !cutDone || busyElse(TH),
       isDone: () => thDone, statusLine: runLine(TH),
-      result: () => ep ? errOf(TH) + (thDone && thImg ? `<p><img src="${RUNNER}/file?ep=${encodeURIComponent(ep.ep)}&path=${encodeURIComponent(thImg.path)}&t=${thImg.mtime || ''}" alt="썸네일" style="width:100%;max-width:480px;border-radius:8px;border:1px solid var(--line)"></p>` : '') + logs(TH) : '',
+      result: () => ep ? errOf(TH) + (runnerApi >= 19 && (runIn(TH) || thDone) ? ytStepLive(ep, TH[0], runIn(TH)) : '') + (thDone && thImg ? `<p><img src="${RUNNER}/file?ep=${encodeURIComponent(ep.ep)}&path=${encodeURIComponent(thImg.path)}&t=${thImg.mtime || ''}" alt="썸네일" style="width:100%;max-width:480px;border-radius:8px;border:1px solid var(--line)"></p>` : '') + logs(TH) : '',
     });
     const dl = p => { const o = out('aibrand', p) || out('aisubs', p) || out('aithumb', p); return o ? `<a class="btn ghost ya-file" href="${RUNNER}/file?ep=${encodeURIComponent(ep.ep)}&path=${encodeURIComponent(o.path)}&dl=1">${esc(p.replace('편집/AI', '').replace(/\.(mp4|jpg)$/, ''))} 내려받기 ⬇</a>` : ''; };
     const fin = out('aibrand', '편집/AI최종.mp4');
