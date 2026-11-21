@@ -419,7 +419,7 @@ const routes = {
     if (!/^[0-9a-f]{40}$/.test(sha)) throw new HttpError(502, 'GitHub 최신 버전을 못 읽었어요.');
     const to = sha.slice(0, 7), auto = !!process.env.XPC_SERVICE_NAME && process.env.XPC_SERVICE_NAME.includes('digitalstudio');
     if (to === VERSION) return { json: { ok: true, same: true, version: VERSION } };
-    const FILES = ['server.mjs', 'steps.mjs', 'ai.mjs', 'util.mjs', 'images.mjs', 'highlights.mjs', 'README.md', '실행기 켜기.command', '자동실행 켜기.command', '자동실행 끄기.command'];
+    const FILES = ['server.mjs', 'steps.mjs', 'ai.mjs', 'util.mjs', 'images.mjs', 'highlights.mjs', 'styles.json', 'README.md', '실행기 켜기.command', '자동실행 켜기.command', '자동실행 끄기.command'];
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'fieldnote-update-'));
     try {
       for (const f of FILES) {
@@ -765,6 +765,13 @@ const server = http.createServer(async (req, res) => {
 });
 
 loadAll();
+// 알아서 업데이트: 자동실행(launchd)으로 켜져 있으면 1분 뒤, 그다음 10분마다 GitHub 최신 실행기를 확인해서 일이 없을 때 바꾸고 다시 켜요
+if (process.env.XPC_SERVICE_NAME && process.env.XPC_SERVICE_NAME.includes('digitalstudio')) {
+  const autoUpdate = async () => { try { const r = await routes['POST /update']({ body: {}, q: new URLSearchParams() }); if (r && r.json && r.json.to) console.log(`자동 업데이트: ${r.json.from} -> ${r.json.to}`); } catch (e) { if (e.status !== 409) console.log('자동 업데이트 못 함: ' + e.message); } };
+  setTimeout(autoUpdate, 60e3); setInterval(autoUpdate, 10 * 60e3);
+}
+// 실행기가 켜져 있는 동안 맥이 스스로 잠들지 않게 (화면은 꺼져도 돼요). 실행기를 끄면 같이 풀려요.
+if (process.platform === 'darwin') { try { spawn('/usr/bin/caffeinate', ['-i', '-s', '-w', String(process.pid)], { stdio: 'ignore', detached: true }).unref(); } catch {} }
 server.listen(PORT, '127.0.0.1', () => console.log(`실행기 주소 http://127.0.0.1:${PORT} · 에피소드 폴더 ${DATA}${process.env.ANTHROPIC_API_KEY ? ' · 대본 AI 켜짐' : ''}`));
 const bye = () => { shutdownImages(); try { if (pvJob) { pvJob.ctrl.aborted = true; pvJob.ctrl.child?.kill('SIGTERM'); } } catch {} HL.shutdown(); for (const E of episodes.values()) { E.ctrl.aborted = true; try { E.ctrl.child?.kill('SIGTERM'); } catch {} } setTimeout(() => process.exit(0), 300); };
 process.on('SIGINT', bye); process.on('SIGTERM', bye);
