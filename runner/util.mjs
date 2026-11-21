@@ -87,7 +87,17 @@ export async function probe(file, ctx) {
 }
 
 // ctx.onTime(초) 가 있으면 ffmpeg 진행(지금까지 만든 길이)을 알려 줘요 (작업판 퍼센트)
+// ctx.liveJpg 가 있으면 만드는 중인 화면을 그 jpg 로 계속 덮어써요 (작업판에서 영상이 만들어지는 걸 실시간으로)
+function withLive(args, jpg) {
+  const fi = args.indexOf('-filter_complex'), mi = args.indexOf('-map');
+  if (fi < 0 || mi < 0 || !/^\[\w+\]$/.test(args[mi + 1] || '')) return args;
+  const lab = args[mi + 1].slice(1, -1), out = [...args];
+  out[fi + 1] = `${args[fi + 1]};[${lab}]split=2[${lab}_m][${lab}_l];[${lab}_l]fps=3,scale=360:-2[${lab}_j]`;
+  out[mi + 1] = `[${lab}_m]`;
+  return [...out, '-map', `[${lab}_j]`, '-update', '1', '-q:v', '5', jpg];
+}
 export const ff = (args, ctx) => {
+  if (ctx?.liveJpg) args = withLive(args, ctx.liveJpg);
   if (!ctx?.onTime) return run(FFMPEG, ['-hide_banner', '-nostdin', '-y', '-loglevel', 'error', ...args], ctx);
   const onOut = d => { const all = [...String(d).matchAll(/out_time_(?:us|ms)=(\d+)/g)]; if (all.length) ctx.onTime(+all[all.length - 1][1] / 1e6); };
   return run(FFMPEG, ['-hide_banner', '-nostdin', '-y', '-loglevel', 'error', '-nostats', '-progress', 'pipe:1', ...args], ctx, { onOut });

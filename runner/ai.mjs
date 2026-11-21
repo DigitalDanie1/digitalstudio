@@ -244,6 +244,9 @@ function progOf(E, id, stages) {
   prog();
   return prog;
 }
+// 그리는 동안: 만드는 중인 화면(편집/진행_<단계>_live.jpg)과 몇 % 인지를 진행 파일에 적어요
+const liveCtx = (ctx, E, id, label, total, prog) => { let last = 0; const rel = `편집/진행_${id}_live.jpg`;
+  return { ...ctx, liveJpg: E.p(rel), onTime: t => { ctx.onTime?.(t); const now = Date.now(); if (now - last > 700) { last = now; prog({ live: { path: rel, label, pct: Math.min(100, Math.round(t / Math.max(0.1, total) * 100)) } }); } } }; };
 const fxTxt = fx => (fx || []).map(f => { const o = f[2] || {}; return `${r1(+f[0])}-${r1(+f[1])}초 ${o.type || ''} ${[o.k, o.s, o.text, o.sub].filter(Boolean).join(' ')}`.trim(); }).join(' / ');
 
 // ---------- 2. 하이라이트 1차 컷 ----------
@@ -327,8 +330,8 @@ JSON 하나만 답해라:
   prog({ stage: 'render', cuts: plan.cuts.map(c => ({ a: r1(+c.a), b: r1(+c.b), role: c.role || '', speed: +c.speed || 1, note: String(c.step || c.note || c.why || '').slice(0, 60) })) });
   for (const f of ['편집/AI완성.json', '편집/AI스타일본.mp4', '편집/AI완성.mp4']) fs.rmSync(E.p(f), { force: true });
   for (const id of ['aistyle', 'aisubs', 'aibrand', 'aithumb']) if (E.s.steps[id]) E.s.steps[id] = { status: 'todo' };
-  await renderCut(E, ctx, info);
-  prog({ stage: 'done' });
+  await renderCut(E, liveCtx(ctx, E, 'aicut', '1차 컷 그리는 중', plan.cuts.reduce((t, c) => t + (c.b - c.a) / Math.min(1, Math.max(0.1, +c.speed || 1)), 0), prog), info);
+  prog({ stage: 'done', live: null });
 }
 
 // 화면 틀: 영상 칸 y(vy)·높이(vh)·바탕. mat 이 기본 (1차 컷은 늘 이 틀로 만들고, 다른 틀은 스타일을 입힐 때 같은 컷으로 다시 그려요)
@@ -512,7 +515,8 @@ JSON 하나만 답해라: {"frame":{"l1":"","l2":""},"fx":[[시작,끝,{"type":"
   for (const id of ['aisubs', 'aibrand']) if (E.s.steps[id]) E.s.steps[id] = { status: 'todo' };
   let rs = ''; try { rs = fs.readFileSync(E.p('조사/research.md'), 'utf8').replace(/\s+/g, ' ').slice(0, 240); } catch {}
   prog({ stage: 'render', info: [['위 제목', [j.frame && j.frame.l1, j.frame && j.frame.l2].filter(Boolean).join(' / ')], ['라벨·팝업', fxTxt(j.fx) || '없음'], ...(rs ? [['조사 메모', rs + '…']] : [])] });
-  await render(E, ctx, st, plan, j, '편집/AI스타일본.mp4');
+  await render(E, liveCtx(ctx, E, 'aistyle', '스타일 입히는 중', plan.duration, prog), st, plan, j, '편집/AI스타일본.mp4');
+  prog({ live: null });
   for (const [k, t] of [[1, 0.8], [2, plan.duration * 0.45], [3, plan.duration * 0.8]]) await prog.snap(ctx, '편집/AI스타일본.mp4', t, `${r1(t)}초`);
   prog({ stage: 'done' });
 }
@@ -549,7 +553,8 @@ async function aisubs(E, ctx) {
     writeJson(E.p('편집/AI완성.json'), j);
     ctx.log(`내가 고친 자막으로 그려요: 원문 ${speech.length}줄 · 해설/후크 ${ai.length}줄 · 내 자막 ${mine.length}줄`);
     prog({ info: [['자막', `${rows.length}줄 (편집기에서 고친 그대로)`]] });
-    await render(E, ctx, st, plan, j, '편집/AI완성.mp4');
+    await render(E, liveCtx(ctx, E, 'aisubs', '자막 입히는 중', d, prog), st, plan, j, '편집/AI완성.mp4');
+    prog({ live: null });
     for (const c of caps.filter((_, k) => k % Math.max(1, Math.ceil(caps.length / 3)) === 0).slice(0, 3)) await prog.snap(ctx, '편집/AI완성.mp4', (c[0] + c[1]) / 2, `${r1(c[0])}초 자막`);
     prog({ stage: 'done' });
     return;
@@ -615,7 +620,8 @@ JSON 하나만 답해라: {"captions":[[시작,끝,"텍스트"]],"facts":["쓴 �
   ctx.log(`자막: 원문 ${speech.filter(x => x.en).length}줄 · 번역 ${speech.filter(x => x.ko).length}줄 · 해설/후크 ${ai.length}줄 · 내 자막 ${j.mine.length}줄`);
   prog({ stage: 'render', info: [['해설·후크', ai.length ? ai.length + '줄' : '끔'], ['내 자막', j.mine.length + '줄']],
     rows: { head: ['시각', '종류', '영어 원문', '한국어 / 자막'], rows: [...speech.map(x => [x.s, '원문', x.en, x.ko]), ...ai.map(q => [q[0], '해설·후크', '', q[2]]), ...j.mine.map(q => [q[0], '내 자막', '', q[2]])].sort((a, b) => a[0] - b[0]).map(r => [r1(r[0]) + '초', r[1], r[2], String(r[3]).replace(/\\n|\n/g, ' / ')]) } });
-  await render(E, ctx, st, plan, j, '편집/AI완성.mp4');
+  await render(E, liveCtx(ctx, E, 'aisubs', '자막 입히는 중', plan.duration, prog), st, plan, j, '편집/AI완성.mp4');
+  prog({ live: null });
   for (const c of caps.filter((_, k) => k % Math.max(1, Math.ceil(caps.length / 3)) === 0).slice(0, 3)) await prog.snap(ctx, '편집/AI완성.mp4', (c[0] + c[1]) / 2, `${r1(c[0])}초 자막`);
   prog({ stage: 'done' });
 }
@@ -821,7 +827,7 @@ ${lines.map(([a, sty, txt]) => `Dialogue: 1,${ts(a)},${ts(d)},${sty},,0,0,0,,${t
     `[0:v]crop=${W}:${VH}:0:${VY},scale=w='${H}*16/9*(1+0.05*t)':h=-2:eval=frame,crop=${W}:${H},eq=brightness=-0.13:saturation=1.25,fade=in:st=0:d=0.18:color=white,fps=30,setsar=1[bg];` +
     `[1:v]${logoF(470, 0.45)}[lg];[bg][lg]overlay=x='(W-w)/2':y='1290-h/2':eval=frame,subtitles=filename='${q(inAss)}':fontsdir='${fd}',format=yuv420p[v];` +
     `[0:a]aresample=48000,aformat=channel_layouts=stereo,afade=t=out:st=${IN_D - 0.3}:d=0.3[a]`,
-    '-map', '[v]', '-map', '[a]', '-t', String(IN_D), '-c:v', 'libx264', '-crf', '19', '-preset', 'veryfast', '-c:a', 'aac', '-b:a', '160k', E.p('편집/AI인트로.mp4')], ctx);
+    '-map', '[v]', '-map', '[a]', '-t', String(IN_D), '-c:v', 'libx264', '-crf', '19', '-preset', 'veryfast', '-c:a', 'aac', '-b:a', '160k', E.p('편집/AI인트로.mp4')], liveCtx(ctx, E, 'aibrand', '인트로 그리는 중', IN_D, prog));
   // 아웃트로: 본편 마지막 장면을 흐리게 멈추고 후크 + 큰 로고 + 구독 유도
   const outAss = E.p('편집/AI아웃트로.ass');
   fs.writeFileSync(outAss, ass(OUT_D, [[0, 'Mid', pop(540, 360, j.outro.l1, 100) + hi(j.outro.l1)], [0.15, 'Mid', pop(540, 470, j.outro.l2, 100) + `{\\c${Y}}` + hi(j.outro.l2)],
@@ -832,16 +838,16 @@ ${lines.map(([a, sty, txt]) => `Dialogue: 1,${ts(a)},${ts(d)},${sty},,0,0,0,,${t
   await ff(['-sseof', '-0.2', '-i', E.p('편집/AI완성.mp4'), ...logoIn(OUT_D), '-f', 'lavfi', '-t', String(OUT_D), '-i', 'anullsrc=r=48000:cl=stereo', '-filter_complex',
     `[0:v]trim=end_frame=1,loop=loop=-1:size=1,trim=duration=${OUT_D},setpts=PTS-STARTPTS,crop=${W}:${layOf(st).vh}:0:${layOf(st).vy},scale=-2:${H},crop=${W}:${H},boxblur=24:2,eq=brightness=-0.32,fps=30,setsar=1[bg];` +
     `[1:v]${logoF(660, 0.3)}[lg];[bg][lg]overlay=x='(W-w)/2':y='930-h/2':eval=frame,subtitles=filename='${q(outAss)}':fontsdir='${fd}',fade=out:st=${OUT_D - 0.25}:d=0.25,format=yuv420p[v]`,
-    '-map', '[v]', '-map', '2:a', '-t', String(OUT_D), '-c:v', 'libx264', '-crf', '19', '-preset', 'veryfast', '-c:a', 'aac', '-b:a', '160k', E.p('편집/AI아웃트로.mp4')], ctx);
+    '-map', '[v]', '-map', '2:a', '-t', String(OUT_D), '-c:v', 'libx264', '-crf', '19', '-preset', 'veryfast', '-c:a', 'aac', '-b:a', '160k', E.p('편집/AI아웃트로.mp4')], liveCtx(ctx, E, 'aibrand', '아웃트로 그리는 중', OUT_D, prog));
   await prog.snap(ctx, '편집/AI아웃트로.mp4', OUT_D * 0.7, '아웃트로');
   prog({ stage: 'join' });
   ctx.log('인트로 + 본편 + 아웃트로 붙이는 중…');
   const norm = i => `[${i}:v]fps=30,scale=${W}:${H},setsar=1,format=yuv420p[v${i}];[${i}:a]aresample=48000,aformat=channel_layouts=stereo[a${i}]`;
   await ff(['-i', E.p('편집/AI인트로.mp4'), '-i', E.p('편집/AI완성.mp4'), '-i', E.p('편집/AI아웃트로.mp4'), '-filter_complex',
     `${norm(0)};${norm(1)};${norm(2)};[v0][a0][v1][a1][v2][a2]concat=n=3:v=1:a=1[v][a]`,
-    '-map', '[v]', '-map', '[a]', '-c:v', 'libx264', '-crf', '19', '-preset', 'veryfast', '-c:a', 'aac', '-b:a', '160k', '-movflags', '+faststart', E.p('편집/AI최종.mp4')], ctx);
+    '-map', '[v]', '-map', '[a]', '-c:v', 'libx264', '-crf', '19', '-preset', 'veryfast', '-c:a', 'aac', '-b:a', '160k', '-movflags', '+faststart', E.p('편집/AI최종.mp4')], liveCtx(ctx, E, 'aibrand', '인트로 + 본편 + 아웃트로 붙이는 중', IN_D + OUT_D + plan.duration, prog));
   ctx.log(`완성: 편집/AI최종.mp4 (인트로 ${IN_D}초 + 본편 ${plan.duration}초 + 아웃트로 ${OUT_D}초)`);
-  prog({ stage: 'done', info: [['길이', `인트로 ${IN_D}초 + 본편 ${plan.duration}초 + 아웃트로 ${OUT_D}초`]] });
+  prog({ stage: 'done', live: null, info: [['길이', `인트로 ${IN_D}초 + 본편 ${plan.duration}초 + 아웃트로 ${OUT_D}초`]] });
 }
 
 // ---------- 7. 썸네일: 예쁘게 말고 3단 원색 대비 (상단 노랑 카피 / 중앙 액션|리액션 2분할 / 하단 빨강·파랑 반전 카피) ----------

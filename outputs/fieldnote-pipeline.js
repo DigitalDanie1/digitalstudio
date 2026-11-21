@@ -970,11 +970,11 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
   const CP = {};
   function ytCutProg(ep, live) {
     const c = CP[ep.ep] || (CP[ep.ep] = { at: 0, d: null, busy: false });
-    if (!c.busy && (c.at === 0 || (live && Date.now() - c.at > 2500))) {
+    if (!c.busy && (c.at === 0 || (live && Date.now() - c.at > (c.d && c.d.live ? 900 : 2500)))) {
       c.busy = true; c.at = Date.now();
       fetch(`${RUNNER}/file?ep=${encodeURIComponent(ep.ep)}&path=${encodeURIComponent('편집/AI컷_진행.json')}&_=${Date.now()}`).then(r => r.ok ? r.json() : null)
         .then(d => { c.busy = false; if (d && (!c.d || d.t !== c.d.t)) { c.d = d; repaint('youtube'); } }).catch(() => { c.busy = false; });
-      if (live) setTimeout(() => { if (ep.running === 'aicut') repaint('youtube'); }, 3000);
+      if (live) setTimeout(() => { if (ep.running === 'aicut') repaint('youtube'); }, c.d && c.d.live ? 1000 : 3000);
     }
     return c.d;
   }
@@ -992,7 +992,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
     const sh = (d.stage === 'pick' || !d.fine.length ? d.sheets : d.fine) || [];
     const shots = sh.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin-top:8px">${sh.slice(0, 24).map(r => `<a href="${img(r)}" target="_blank" rel="noopener"><img src="${img(r)}" alt="" loading="lazy" style="width:100%;border-radius:4px;display:block"></a>`).join('')}</div><p class="small">${d.stage === 'pick' ? 'Claude 가 지금 보고 있는 전체 영상 장면 (2초 간격)' : 'Claude 가 자세히 보는 고른 장면 (0.2초 간격)'} · 누르면 크게</p>` : '';
     const cuts = d.cuts ? `<table style="width:100%;font-size:13px;border-collapse:collapse;margin-top:8px"><thead><tr><th style="text-align:left">#</th><th style="text-align:left">역할</th><th style="text-align:left">원본 구간</th><th style="text-align:left">속도</th><th style="text-align:left">메모</th></tr></thead><tbody>${d.cuts.map((k, i) => `<tr style="border-top:1px solid var(--line)"><td>${i + 1}</td><td><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${col[k.role] || (k.speed < 1 ? col.slow : '#5ad19a')};margin-right:6px"></span>${esc(k.role)}</td><td>${fmt(k.a)}-${fmt(k.b)} (${(k.b - k.a).toFixed(1)}초)</td><td>${k.speed < 1 ? 'x' + k.speed : '보통'}</td><td>${esc(k.note || '')}</td></tr>`).join('')}</tbody></table>` : '';
-    return `<details class="pl-peek" ${live ? 'open' : ''}><summary><b>컷 실시간 보기</b> · ${esc((ST[cur] || ST[0])[1])}${live ? ' 중' : ''}</summary>
+    return `<details class="pl-peek" ${live ? 'open' : ''}><summary><b>컷 실시간 보기</b> · ${esc((ST[cur] || ST[0])[1])}${live ? ' 중' : ''}</summary>${ytLiveFrame(ep, d, live)}
       <ol style="display:flex;flex-wrap:wrap;gap:6px;list-style:none;padding:0;margin:8px 0">${ST.map((x, i) => `<li class="pl-chip ${i === cur ? 'on' : ''}" style="opacity:${i <= cur ? 1 : .45}">${i < cur ? '✓ ' : ''}${x[1]}</li>`).join('')}</ol>
       ${d.why ? `<p class="small"><b>고른 이유:</b> ${esc(d.why)}</p>` : ''}${bar}${cuts}${d.stage === 'done' ? '' : shots}</details>`;
   }
@@ -1000,13 +1000,21 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
   const LP = {};
   function ytLiveGet(ep, rel, live, kind) {
     const k = ep.ep + '|' + rel, c = LP[k] || (LP[k] = { at: 0, d: null, busy: false });
-    if (!c.busy && (c.at === 0 || (live && Date.now() - c.at > 2500))) {
+    if (!c.busy && (c.at === 0 || (live && Date.now() - c.at > (c.d && c.d.live ? 900 : 2500)))) {
       c.busy = true; c.at = Date.now();
       fetch(`${RUNNER}/file?ep=${encodeURIComponent(ep.ep)}&path=${encodeURIComponent(rel)}&_=${Date.now()}`).then(r => r.ok ? (kind === 'text' ? r.text() : r.json()) : null)
         .then(d => { c.busy = false; const same = JSON.stringify(d) === JSON.stringify(c.d); c.d = d; if (!same) repaint('youtube'); }).catch(() => { c.busy = false; });
-      if (live) setTimeout(() => { if (ep.running) repaint('youtube'); }, 3000);
+      if (live) setTimeout(() => { if (ep.running) repaint('youtube'); }, c.d && c.d.live ? 1000 : 3000);
     }
     return c.d;
+  }
+  // 지금 그리고 있는 영상 화면 (실행기가 만드는 중인 프레임을 계속 덮어써요)
+  function ytLiveFrame(ep, d, live) {
+    if (!d || !d.live || !live) return '';
+    const u = `${RUNNER}/file?ep=${encodeURIComponent(ep.ep)}&path=${encodeURIComponent(d.live.path)}&v=${d.t}`;
+    return `<div style="display:flex;gap:14px;align-items:flex-start;margin:8px 0;flex-wrap:wrap"><img src="${u}" alt="지금 만들어지고 있는 화면" style="width:220px;aspect-ratio:9/16;object-fit:contain;background:#000;border-radius:10px;display:block">
+      <div style="flex:1;min-width:180px"><p style="margin:0 0 6px"><b>지금 만들어지는 화면</b> · ${esc(d.live.label || '')}</p><div style="height:10px;background:var(--line);border-radius:5px;overflow:hidden"><div style="height:100%;width:${+d.live.pct || 0}%;background:#ff5a5a"></div></div>
+      <p class="small" style="margin-top:6px">${+d.live.pct || 0}% · 영상의 앞에서부터 한 장면씩 그려지는 걸 1초마다 보여 줘요.</p></div></div>`;
   }
   function ytStepLive(ep, id, live) {
     const d = ytLiveGet(ep, `편집/진행_${id}.json`, live), lg = live ? ytLiveGet(ep, `로그/${id}.log`, live, 'text') : null;
@@ -1014,7 +1022,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
     const img = r => `${RUNNER}/file?ep=${encodeURIComponent(ep.ep)}&path=${encodeURIComponent(r)}&v=${d.t}`;
     const cur = d.stages.findIndex(x => x[0] === d.stage), clean = t => esc(String(t || '').replace(/\[\[|\]\]/g, ''));
     const tail = lg ? String(lg).trim().split('\n').slice(-6).map(l => esc(l)).join('\n') : '';
-    return `<details class="pl-peek" ${live ? 'open' : ''}><summary><b>실시간 보기</b> · ${esc((d.stages[cur] || d.stages[0])[1])}${live && d.stage !== 'done' ? ' 중' : ''}</summary>
+    return `<details class="pl-peek" ${live ? 'open' : ''}><summary><b>실시간 보기</b> · ${esc((d.stages[cur] || d.stages[0])[1])}${live && d.stage !== 'done' ? ' 중' : ''}</summary>${ytLiveFrame(ep, d, live)}
       <ol style="display:flex;flex-wrap:wrap;gap:6px;list-style:none;padding:0;margin:8px 0">${d.stages.map((x, i) => `<li class="pl-chip ${i === cur ? 'on' : ''}" style="opacity:${i <= cur ? 1 : .45}">${i < cur || d.stage === 'done' ? '✓ ' : ''}${esc(x[1])}</li>`).join('')}</ol>
       ${d.info.length ? `<dl style="display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;margin:6px 0;font-size:14px">${d.info.map(([k, v]) => `<dt class="small" style="margin:0">${esc(k)}</dt><dd style="margin:0">${clean(v)}</dd>`).join('')}</dl>` : ''}
       ${d.images.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(${id === 'aithumb' ? 320 : 120}px,1fr));gap:8px;margin:8px 0">${d.images.map(m => `<figure style="margin:0"><a href="${img(m.path)}" target="_blank" rel="noopener"><img src="${img(m.path)}" alt="" loading="lazy" style="width:100%;border-radius:6px;display:block"></a><figcaption class="small">${esc(m.cap || '')}</figcaption></figure>`).join('')}</div>` : ''}
