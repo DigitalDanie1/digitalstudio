@@ -43,6 +43,10 @@
       "destination": "/outputs/fieldnote-highlight.js"
     },
     {
+      "source": "/fieldnote-refan.js",
+      "destination": "/outputs/fieldnote-refan.js"
+    },
+    {
       "source": "/instatoon.js",
       "destination": "/outputs/instatoon.js"
     },
