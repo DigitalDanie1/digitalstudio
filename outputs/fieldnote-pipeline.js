@@ -961,6 +961,36 @@ ${sec('⑥ 따라할 이목 장치', li(a.attention))}
 ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="small" style="margin-top:6px">이 스타일로 정하면 ①~⑦ 이 그대로 스타일 입히기(위 제목·이펙트)와 자막 규칙에 들어가요.</p>')}
 <div style="margin-top:14px">${pick !== 'ref-' + id ? `<button type="button" class="btn primary" data-ya-lookpick="ref-${esc(id)}">이 레퍼런스 스타일 고르기</button>` : '<p class="small"><b>골랐어요.</b> 위의 "이 스타일로 정하기"를 누르면 적용돼요.</p>'}</div></div>`;
   }
+  // 1차 컷 실시간 보기: 실행기가 쓰는 편집/AI컷_진행.json 을 돌고 있는 동안 몇 초마다 받아요
+  const CP = {};
+  function ytCutProg(ep, live) {
+    const c = CP[ep.ep] || (CP[ep.ep] = { at: 0, d: null, busy: false });
+    if (!c.busy && (c.at === 0 || (live && Date.now() - c.at > 2500))) {
+      c.busy = true; c.at = Date.now();
+      fetch(`${RUNNER}/file?ep=${encodeURIComponent(ep.ep)}&path=${encodeURIComponent('편집/AI컷_진행.json')}&_=${Date.now()}`).then(r => r.ok ? r.json() : null)
+        .then(d => { c.busy = false; if (d && (!c.d || d.t !== c.d.t)) { c.d = d; repaint('youtube', true); } }).catch(() => { c.busy = false; });
+      if (live) setTimeout(() => { if (ep.running === 'aicut') repaint('youtube', true); }, 3000);
+    }
+    return c.d;
+  }
+  function ytCutLive(ep, live) {
+    const d = ytCutProg(ep, live); if (!d) return live ? '<p class="small">실시간 보기 준비 중…</p>' : '';
+    const img = r => `${RUNNER}/file?ep=${encodeURIComponent(ep.ep)}&path=${encodeURIComponent(r)}&v=${d.t}`;
+    const ST = [['scan', '전체 훑기'], ['pick', '장면 고르기'], ['fine', '0.2초로 자세히'], ['plan', '컷 계획'], ['render', '1차 컷 그리기'], ['done', '끝']];
+    const cur = ST.findIndex(x => x[0] === d.stage), D = d.dur || 1, pct = x => (Math.max(0, Math.min(D, x)) / D * 100).toFixed(2);
+    const fmt = x => Math.floor(x / 60) + ':' + String(Math.floor(x % 60)).padStart(2, '0');
+    const col = { intro: '#ff5a5a', outro: '#7b8cff', slow: '#ffd600' };
+    const bar = `<div style="position:relative;height:26px;background:var(--line);border-radius:6px;overflow:hidden;margin:6px 0 2px" aria-label="원본 영상 전체에서 고른 곳">
+      ${(d.picks || (d.window ? [d.window] : [])).map(w => `<div title="고른 장면 ${fmt(w[0])}-${fmt(w[1])}" style="position:absolute;top:0;bottom:0;left:${pct(w[0])}%;width:${Math.max(0.6, pct(w[1]) - pct(w[0]))}%;background:rgba(255,255,255,.18)"></div>`).join('')}
+      ${(d.cuts || []).map((k, i) => `<div title="${i + 1}. ${esc(k.role)} ${fmt(k.a)}-${fmt(k.b)}${k.speed < 1 ? ' 슬로우 x' + k.speed : ''}" style="position:absolute;top:5px;bottom:5px;left:${pct(k.a)}%;width:${Math.max(0.5, pct(k.b) - pct(k.a))}%;background:${col[k.role] || (k.speed < 1 ? col.slow : '#5ad19a')};border-radius:2px"></div>`).join('')}
+    </div><div class="small" style="display:flex;justify-content:space-between"><span>0:00</span><span>원본 ${fmt(D)}</span></div>`;
+    const sh = (d.stage === 'pick' || !d.fine.length ? d.sheets : d.fine) || [];
+    const shots = sh.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin-top:8px">${sh.slice(0, 24).map(r => `<a href="${img(r)}" target="_blank" rel="noopener"><img src="${img(r)}" alt="" loading="lazy" style="width:100%;border-radius:4px;display:block"></a>`).join('')}</div><p class="small">${d.stage === 'pick' ? 'Claude 가 지금 보고 있는 전체 영상 장면 (2초 간격)' : 'Claude 가 자세히 보는 고른 장면 (0.2초 간격)'} · 누르면 크게</p>` : '';
+    const cuts = d.cuts ? `<table style="width:100%;font-size:13px;border-collapse:collapse;margin-top:8px"><thead><tr><th style="text-align:left">#</th><th style="text-align:left">역할</th><th style="text-align:left">원본 구간</th><th style="text-align:left">속도</th><th style="text-align:left">메모</th></tr></thead><tbody>${d.cuts.map((k, i) => `<tr style="border-top:1px solid var(--line)"><td>${i + 1}</td><td><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${col[k.role] || (k.speed < 1 ? col.slow : '#5ad19a')};margin-right:6px"></span>${esc(k.role)}</td><td>${fmt(k.a)}-${fmt(k.b)} (${(k.b - k.a).toFixed(1)}초)</td><td>${k.speed < 1 ? 'x' + k.speed : '보통'}</td><td>${esc(k.note || '')}</td></tr>`).join('')}</tbody></table>` : '';
+    return `<details class="pl-peek" ${live ? 'open' : ''}><summary><b>컷 실시간 보기</b> · ${esc((ST[cur] || ST[0])[1])}${live ? ' 중' : ''}</summary>
+      <ol style="display:flex;flex-wrap:wrap;gap:6px;list-style:none;padding:0;margin:8px 0">${ST.map((x, i) => `<li class="pl-chip ${i === cur ? 'on' : ''}" style="opacity:${i <= cur ? 1 : .45}">${i < cur ? '✓ ' : ''}${x[1]}</li>`).join('')}</ol>
+      ${d.why ? `<p class="small"><b>고른 이유:</b> ${esc(d.why)}</p>` : ''}${bar}${cuts}${d.stage === 'done' ? '' : shots}</details>`;
+  }
   function ytAiCards(it, ep, off) {
     const names = ['1차 컷 (영상 종류)', '스타일 선택', '스타일 입히기', '자막', '인트로·아웃트로', '썸네일', '다운로드'];
     const chId = it.idea ? ytCh(it.idea) : ytTab(), sport = chId === 'yt-wrestling', myLook = AI_CH[chId] || 'yt-mat';
@@ -995,7 +1025,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
       disabled: () => !it.idea || off || runnerOnline === null || old || busyElse(CUT),
       isDone: () => cutDone,
       statusLine: runLine(CUT),
-      result: () => ep ? errOf(CUT) + (cutDone ? `<p><b>1차 컷이 나왔어요.</b> 인트로·아웃트로가 후크인지 보고, 아니면 "AI 가 다시 자르기"를 누르세요.</p>` + vid('aicut', '편집/AI1차컷.mp4', '1차 컷') : '') + logs(CUT) : '',
+      result: () => ep ? errOf(CUT) + (runnerApi >= 18 && (runIn(CUT) || cutDone) ? ytCutLive(ep, runIn(CUT)) : '') + (cutDone ? `<p><b>1차 컷이 나왔어요.</b> 인트로·아웃트로가 후크인지 보고, 아니면 "AI 가 다시 자르기"를 누르세요.</p>` + vid('aicut', '편집/AI1차컷.mp4', '1차 컷') : '') + logs(CUT) : '',
       body: () => (off ? '<p class="pl-error" role="alert"><b>실행기가 꺼져 있어요.</b></p>' : old ? oldMsg : '') + (it.idea ? vtChips() : ''),
     });
     const refWait = id => runnerApi >= 17 && (RA.st[id.slice(4)] || {}).status !== 'done';

@@ -238,9 +238,15 @@ async function aicut(E, ctx) {
   if (!dur) throw new StepError('영상 길이를 못 읽었어요.');
   const tr = transcript(E, info), trTxt = tr ? '영어 중계 자막(원본 시각):\n' + tr : '(중계 자막 없음)';
   let win = [0, dur], picks = null;
+  // 작업판에서 컷이 어떻게 되고 있는지 실시간으로 보게: 단계·본 장면 시트·고른 구간·컷 계획을 그때그때 적어요
+  const P = { dur: r1(dur), stage: 'scan', sheets: [], fine: [], window: null, picks: null, why: '', cuts: null };
+  const prog = o => { Object.assign(P, o); try { writeJson(E.p('편집/AI컷_진행.json'), { ...P, t: Date.now() }); } catch {} };
+  const shots = pre => { try { return fs.readdirSync(E.p('분석')).filter(f => f.startsWith(pre)).sort().map(f => '분석/' + f); } catch { return []; } };
+  prog({});
   if (dur > 60) {
     ctx.log('전체 영상을 2초 간격으로 훑어봐요…');
     const coarse = await sheets(E, ctx, info.file, 'coarse', 0, dur, 0.5, 6, 5, 320);
+    prog({ stage: 'pick', sheets: shots('coarse_') });
     if (st.multi) {
       const pk = await askClaude(E, ctx, `너는 ${st.genre} 쇼츠 편집자다. 아래 영상에서 TOP 랭킹 쇼츠에 넣을 장면을 고른다.
 영상: "${info.title}" (${info.channel}), 길이 ${Math.round(dur)}초.
@@ -253,6 +259,7 @@ JSON 하나만 답해라: {"picks":[{"a": 시작초, "b": 끝초, "why": "한 �
       picks = pk.picks.map(x => [Math.max(0, +x.a), Math.min(dur, +x.b)]);
       win = [Math.min(...picks.map(x => x[0])), Math.max(...picks.map(x => x[1]))];
       ctx.log(`  고른 장면 ${picks.length}개: ${picks.map(x => `${r1(x[0])}~${r1(x[1])}`).join(', ')}`);
+      prog({ stage: 'fine', picks: picks.map(x => [r1(x[0]), r1(x[1])]), window: win });
     } else {
     const pick = await askClaude(E, ctx, `너는 ${st.genre} 쇼츠 편집자다. 아래 영상에서 세로 쇼츠 하나로 만들 가장 강한 하이라이트 한 장면을 고른다.
 영상: "${info.title}" (${info.channel}), 길이 ${Math.round(dur)}초.
@@ -264,12 +271,14 @@ JSON 하나만 답해라: {"a": 시작초, "b": 끝초, "why": "한 줄"}  (b-a 
       j => !(j.b > j.a) ? 'b 가 a 보다 커야 해요.' : j.a < 0 || j.b > dur + 1 ? `시각은 0~${Math.round(dur)}초 안이어야 해요.` : j.b - j.a > 60 ? '60초를 넘어요.' : '');
     win = [Math.max(0, +pick.a), Math.min(dur, +pick.b)];
     ctx.log(`  고른 장면: ${r1(win[0])}~${r1(win[1])}초 · ${pick.why || ''}`);
+    prog({ stage: 'fine', window: win, why: pick.why || '' });
     }
   }
   ctx.log('고른 장면을 0.2초 간격으로 봐요…');
   let fine;
   if (picks) { try { for (const f of fs.readdirSync(E.p('분석'))) if (f.startsWith('fine_')) fs.rmSync(E.p('분석', f)); } catch {} const parts = []; for (const [k, [a, b]] of picks.entries()) parts.push(await sheets(E, ctx, info.file, `fine_${k + 1}`, a, b - a, 5, 5, 5, 384)); fine = parts.join('\n'); }
   else fine = await sheets(E, ctx, info.file, 'fine', win[0], win[1] - win[0], 5, 5, 5, 384);
+  prog({ stage: 'plan', window: P.window || win, fine: shots('fine') });
   const plan = await askClaude(E, ctx, `${skills(ctx, ['shorts-blueprint', 'edit-plan-sheet'])}너는 ${st.genre} 쇼츠 편집자다. 아래는 "${info.title}" 의 ${picks ? `골라 둔 장면 ${picks.length}개(${picks.map(x => `${r1(x[0])}~${r1(x[1])}초`).join(', ')})` : `원본 ${r1(win[0])}~${r1(win[1])}초`}를 0.2초 간격으로 뽑은 프레임 시트다. Read 도구로 전부 봐라:
 ${fine}
 ${trTxt}
@@ -299,9 +308,11 @@ JSON 하나만 답해라:
       return total > 58 ? `출력 길이가 ${r1(total)}초예요. 58초 이하로 줄여라.` : total < 15 ? `출력 길이가 ${r1(total)}초예요. 너무 짧아요.` : '';
     });
   writeJson(E.p('편집/AI컷.json'), { window: win, vtype: E.s.vtype || 'highlight', sheets: fine, ...plan });
+  prog({ stage: 'render', cuts: plan.cuts.map(c => ({ a: r1(+c.a), b: r1(+c.b), role: c.role || '', speed: +c.speed || 1, note: String(c.step || c.note || c.why || '').slice(0, 60) })) });
   for (const f of ['편집/AI완성.json', '편집/AI스타일본.mp4', '편집/AI완성.mp4']) fs.rmSync(E.p(f), { force: true });
   for (const id of ['aistyle', 'aisubs', 'aibrand', 'aithumb']) if (E.s.steps[id]) E.s.steps[id] = { status: 'todo' };
   await renderCut(E, ctx, info);
+  prog({ stage: 'done' });
 }
 
 // 화면 틀: 영상 칸 y(vy)·높이(vh)·바탕. mat 이 기본 (1차 컷은 늘 이 틀로 만들고, 다른 틀은 스타일을 입힐 때 같은 컷으로 다시 그려요)
