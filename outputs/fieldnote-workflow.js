@@ -1442,6 +1442,45 @@ document.addEventListener('click', async e => {
   toast(ok ? (b.dataset.ypCopy === 'research-chat' ? 'claude.ai 채팅에 붙여 넣으세요.' : b.dataset.ypCopy === 'download-term' ? '터미널에 붙여 넣으세요.' : 'Claude Code 새 대화에 붙여 넣으세요.') : '복사에 실패했어요.');
 });
 
+// ===== 내가 추가하는 소스 (db.ytSources[채널] = [{id, url, name, memo, added}]) =====
+function ytMySources(ch) { return ((db.ytSources || {})[ch] || []); }
+function ytSrcIsVideo(u) { return /youtube\.com\/(watch\?v=|shorts\/)|youtu\.be\//.test(u); }
+function ytSrcName(u) { const h = /youtube\.com\/(@[\w.-]+)/.exec(u); if (h) return h[1]; const v = /(?:v=|shorts\/|youtu\.be\/)([\w-]{11})/.exec(u); return v ? '영상 ' + v[1] : u.replace(/^https?:\/\/(www\.)?/, '').slice(0, 40); }
+function ytMySourcesHtml(ch, mine) {
+  const btn = 'padding:5px 9px;font-size:11px';
+  const cards = mine.map(x => { const vid = ytSrcIsVideo(x.url), v = vid && (/(?:v=|shorts\/|youtu\.be\/)([\w-]{11})/.exec(x.url) || [])[1];
+    return `<article class="source-box" style="border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:12px 13px;display:flex;flex-direction:column;gap:7px;min-width:0">
+      ${v ? `<img src="https://i.ytimg.com/vi/${esc(v)}/mqdefault.jpg" alt="" loading="lazy" style="width:100%;border-radius:6px">` : ''}
+      <div style="display:flex;align-items:center;gap:8px;min-width:0"><span style="font-size:18px;line-height:1">${vid ? '🎬' : '📺'}</span><h3 style="font-size:14px;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(x.name || ytSrcName(x.url))}</h3></div>
+      <span class="statuspill" style="align-self:flex-start;font-size:10px">내 소스 · ${vid ? '영상' : '채널'}</span>
+      ${x.memo ? `<p class="small" style="margin:0">${esc(x.memo)}</p>` : ''}
+      <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:auto"><a class="btn" style="${btn}" href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${vid ? '영상' : '채널'} ↗</a>
+      ${vid ? `<button class="btn primary" style="${btn}" data-yp-src="${esc(x.url)}">⬇ 제작 라인</button>` : ''}
+      <button class="btn ghost" style="${btn}" data-ysrc-del="${esc(x.id)}" aria-label="${esc(x.name || ytSrcName(x.url))} 소스 지우기">지우기</button></div></article>`; }).join('');
+  return `${mine.length ? `<div class="sectionhead"><h2 style="font-size:15px">내가 추가한 소스</h2><span class="small">${mine.length}곳</span></div><div class="source-box-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">${cards}</div>` : ''}
+    <form class="ysrc-add" data-ysrc-ch="${esc(ch)}" style="display:grid;grid-template-columns:2fr 1fr 2fr auto;gap:8px;align-items:end;margin-top:14px">
+      <label class="small">유튜브 채널 또는 영상 주소<input class="pl-input" name="url" required placeholder="https://www.youtube.com/@채널 또는 영상 링크" autocomplete="off"></label>
+      <label class="small">이름 (선택)<input class="pl-input" name="name" maxlength="40" placeholder="비우면 주소에서 만들어요"></label>
+      <label class="small">메모 (선택)<input class="pl-input" name="memo" maxlength="120" placeholder="왜 참고하는지 한 줄"></label>
+      <button class="btn primary" type="submit">＋ 소스 추가</button></form>`;
+}
+document.addEventListener('submit', e => {
+  const f = e.target.closest?.('form.ysrc-add'); if (!f) return; e.preventDefault();
+  const url = f.url.value.trim(), ch = f.dataset.ysrcCh;
+  if (!/^https?:\/\/(www\.|m\.)?(youtube\.com|youtu\.be)\//.test(url)) { toast('유튜브 채널이나 영상 주소를 넣어 주세요.'); return; }
+  db.ytSources = db.ytSources || {}; const list = db.ytSources[ch] = db.ytSources[ch] || [];
+  if (list.some(x => x.url === url)) { toast('이미 있는 소스예요.'); return; }
+  list.unshift({ id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())), url, name: f.name.value.trim(), memo: f.memo.value.trim(), added: new Date().toISOString() });
+  persist(); render(); toast('소스를 추가했어요.');
+  const it = list[0];   // 이름을 비우면 유튜브에서 제목(영상) 이나 채널 이름을 받아 와요
+  if (!it.name) fetch('https://www.youtube.com/oembed?format=json&url=' + encodeURIComponent(it.url)).then(r => r.ok ? r.json() : null).then(j => { if (j && (j.title || j.author_name)) { it.name = (ytSrcIsVideo(it.url) ? j.title : j.author_name || j.title).slice(0, 60); persist(); render(); } }).catch(() => {});
+});
+document.addEventListener('click', e => {
+  const b = e.target.closest('button[data-ysrc-del]'); if (!b) return;
+  for (const ch of Object.keys(db.ytSources || {})) db.ytSources[ch] = db.ytSources[ch].filter(x => x.id !== b.dataset.ysrcDel);
+  persist(); render(); toast('소스를 지웠어요.');
+});
+
 // ===== YouTube '소스' 탭: 내가 준 레슬링 소스 채널 전부 =====
 function ytSourcesPage() {
   const chId = ytLock || ytTab();
@@ -1450,15 +1489,16 @@ function ytSourcesPage() {
   const others = YT_SOURCE_CHANNELS.filter(g => !YT_CHANNELS.some(c => c.id === g.id) && g.sources.length);
   const otherN = others.reduce((n, g) => n + g.sources.length, 0);
   const title = cur ? `${cur.emoji} ${esc(cur.tab)}` : esc((chDef ? chDef.tab : '이') + ' 소스 채널');
+  const mine = ytMySources(chId);
   const body = cur && cur.sources.length
     ? wrestlingSourceLibrary(cur.sources)
-    : `<div class="empty" style="border:1px dashed var(--line);border-radius:10px">이 채널 소스가 아직 없어요.<br><span class="small">참고할 유튜브 채널을 알려 주면 여기에 추가돼요.</span></div>`;
+    : mine.length ? '' : `<div class="empty" style="border:1px dashed var(--line);border-radius:10px">이 채널 소스가 아직 없어요.<br><span class="small">아래에 유튜브 채널이나 영상 주소를 넣어 추가하세요.</span></div>`;
   const common = otherN
     ? `<details class="panel" style="margin-top:14px"><summary style="cursor:pointer"><b>공통 · 기타 소스</b> <span class="small">${otherN}곳</span></summary><div style="margin-top:10px">${others.map(g => `<div class="sectionhead"><h2>${g.emoji} ${esc(g.tab)}</h2><span class="small">${g.sources.length}곳</span></div>${wrestlingSourceLibrary(g.sources)}`).join('')}</div></details>`
     : '';
   return head('소스', `${esc(chDef ? chDef.name : '이 채널')}의 소스만 모았어요. '⬇ 제작 라인'을 누르면 영상 주소가 구간 정하기 단계에 들어가요.`, false)
     + (chId === 'yt-wrestling' ? mustAthletesPanel() : '')
-    + `<section class="panel"><div class="sectionhead" style="margin-top:0"><h2>${title}</h2><span class="small">${cur ? cur.sources.length : 0}곳</span></div>${body}</section>`
+    + `<section class="panel"><div class="sectionhead" style="margin-top:0"><h2>${title}</h2><span class="small">${(cur ? cur.sources.length : 0) + mine.length}곳</span></div>${body}${ytMySourcesHtml(chId, mine)}</section>`
     + common
     + `<div class="actions" style="margin-top:14px"><button class="btn ghost" data-workflow="import">쇼츠 백업 가져오기</button></div>`;
 }
