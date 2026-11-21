@@ -813,7 +813,9 @@ async function render(E, ctx, st, plan, fin, outRel) {
 const IN_D = 2.2, OUT_D = 3.2;
 async function aibrand(E, ctx) {
   const st = styleOf(E), info = source(E), plan = readJson(E.p('편집/AI컷.json'));
-  if (!exists(E.p('편집/AI완성.mp4'))) throw new StepError('자막까지 끝내고 해 주세요.');
+  // 본편: 자막 단계를 했으면 AI완성.mp4, 안 했으면 스타일본 (자막 단계는 작업판에서 뺐어요)
+  const MAIN = exists(E.p('편집/AI완성.mp4')) ? '편집/AI완성.mp4' : '편집/AI스타일본.mp4';
+  if (!exists(E.p(MAIN))) throw new StepError('스타일 입히기를 먼저 해 주세요.');
   const root = E.homeRoot || path.join(HOME, 'Desktop/유투브'), logoPath = path.join(root, st.logo), hasLogo = exists(logoPath);
   if (!hasLogo) ctx.log(`  채널 로고가 없어서 글자만 넣어요 (${logoPath} 에 넣으면 들어가요)`);
   const logoIn = d => hasLogo ? ['-loop', '1', '-t', String(d), '-i', logoPath] : ['-f', 'lavfi', '-t', String(d), '-i', 'color=c=black@0.0:s=16x16,format=rgba'];
@@ -866,7 +868,7 @@ ${lines.map(([a, sty, txt]) => `Dialogue: 1,${ts(a)},${ts(d)},${sty},,0,0,0,,${t
   await prog.snap(ctx, '편집/AI인트로.mp4', IN_D * 0.6, '인트로');
   prog({ stage: 'outro' });
   ctx.log('아웃트로 그리는 중…');
-  await ff(['-sseof', '-0.2', '-i', E.p('편집/AI완성.mp4'), ...logoIn(OUT_D), '-f', 'lavfi', '-t', String(OUT_D), '-i', 'anullsrc=r=48000:cl=stereo', '-filter_complex',
+  await ff(['-sseof', '-0.2', '-i', E.p(MAIN), ...logoIn(OUT_D), '-f', 'lavfi', '-t', String(OUT_D), '-i', 'anullsrc=r=48000:cl=stereo', '-filter_complex',
     `[0:v]trim=end_frame=1,loop=loop=-1:size=1,trim=duration=${OUT_D},setpts=PTS-STARTPTS,crop=${W}:${layOf(st).vh}:0:${layOf(st).vy},scale=-2:${H},crop=${W}:${H},boxblur=24:2,eq=brightness=-0.32,fps=30,setsar=1[bg];` +
     `[1:v]${logoF(660, 0.3)}[lg];[bg][lg]overlay=x='(W-w)/2':y='930-h/2':eval=frame,subtitles=filename='${q(outAss)}':fontsdir='${fd}',fade=out:st=${OUT_D - 0.25}:d=0.25,format=yuv420p[v]`,
     '-map', '[v]', '-map', '2:a', '-t', String(OUT_D), '-c:v', 'libx264', '-crf', '19', '-preset', 'veryfast', '-c:a', 'aac', '-b:a', '160k', E.p('편집/AI아웃트로.mp4')], liveCtx(ctx, E, 'aibrand', '아웃트로 그리는 중', OUT_D, prog));
@@ -874,7 +876,7 @@ ${lines.map(([a, sty, txt]) => `Dialogue: 1,${ts(a)},${ts(d)},${sty},,0,0,0,,${t
   prog({ stage: 'join' });
   ctx.log('인트로 + 본편 + 아웃트로 붙이는 중…');
   const norm = i => `[${i}:v]fps=30,scale=${W}:${H},setsar=1,format=yuv420p[v${i}];[${i}:a]aresample=48000,aformat=channel_layouts=stereo[a${i}]`;
-  await ff(['-i', E.p('편집/AI인트로.mp4'), '-i', E.p('편집/AI완성.mp4'), '-i', E.p('편집/AI아웃트로.mp4'), '-filter_complex',
+  await ff(['-i', E.p('편집/AI인트로.mp4'), '-i', E.p(MAIN), '-i', E.p('편집/AI아웃트로.mp4'), '-filter_complex',
     `${norm(0)};${norm(1)};${norm(2)};[v0][a0][v1][a1][v2][a2]concat=n=3:v=1:a=1[v][a]`,
     '-map', '[v]', '-map', '[a]', '-c:v', 'libx264', '-crf', '19', '-preset', 'veryfast', '-c:a', 'aac', '-b:a', '160k', '-movflags', '+faststart', E.p('편집/AI최종.mp4')], liveCtx(ctx, E, 'aibrand', '인트로 + 본편 + 아웃트로 붙이는 중', IN_D + OUT_D + plan.duration, prog));
   ctx.log(`완성: 편집/AI최종.mp4 (인트로 ${IN_D}초 + 본편 ${plan.duration}초 + 아웃트로 ${OUT_D}초)`);

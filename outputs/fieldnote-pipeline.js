@@ -1231,12 +1231,12 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
     });
     const BR = ['aibrand'], brDone = ok('aibrand');
     const c5 = card(4, {
-      desc: !subDone ? '자막까지 끝나면 열려요.' : `채널 로고가 들어간 인트로·아웃트로를 따로 만들어 본편 앞뒤에 붙여요 (로고 파일이 없으면 글자만). 인트로는 스크롤을 멈추게 하는 한 방, 아웃트로는 다시 보게·구독하게 만드는 한 방.`,
+      desc: !styDone ? '스타일을 입히면 열려요.' : `채널 로고가 들어간 인트로·아웃트로를 따로 만들어 본편 앞뒤에 붙여요 (로고 파일이 없으면 글자만). 인트로는 스크롤을 멈추게 하는 한 방, 아웃트로는 다시 보게·구독하게 만드는 한 방.`,
       btn: () => runIn(BR) ? '실행 멈춤' : brDone ? '다시 만들기' : '인트로·아웃트로 만들기',
       attrs: stopOr(BR, 'data-ya-steps="aibrand"'), cls: runIn(BR) ? 'danger' : '',
-      disabled: () => off || !subDone || busyElse(BR),
+      disabled: () => off || !styDone || busyElse(BR),
       isDone: () => brDone, statusLine: runLine(BR),
-      result: () => ep ? errOf(BR) + (runnerApi >= 19 && (runIn(BR) || brDone) ? ytStepLive(ep, BR[0], runIn(BR)) : '') + (brDone ? ba('aisubs', '편집/AI완성.mp4', 'aibrand', '편집/AI최종.mp4', '완성본 (인트로·아웃트로 전)', '최종본 (인트로 + 본편 + 아웃트로)', 2.2) + `<div class="pl-files">${['편집/AI인트로.mp4', '편집/AI아웃트로.mp4'].filter(p => out('aibrand', p)).map(p => ytFileLink(ep.ep, { path: p })).join(' ')}</div>` : '') + logs(BR) : '',
+      result: () => ep ? errOf(BR) + (runnerApi >= 19 && (runIn(BR) || brDone) ? ytStepLive(ep, BR[0], runIn(BR)) : '') + (brDone ? ba(subDone ? 'aisubs' : 'aistyle', subDone ? '편집/AI완성.mp4' : '편집/AI스타일본.mp4', 'aibrand', '편집/AI최종.mp4', '완성본 (인트로·아웃트로 전)', '최종본 (인트로 + 본편 + 아웃트로)', 2.2) + `<div class="pl-files">${['편집/AI인트로.mp4', '편집/AI아웃트로.mp4'].filter(p => out('aibrand', p)).map(p => ytFileLink(ep.ep, { path: p })).join(' ')}</div>` : '') + logs(BR) : '',
     });
     const TH = ['aithumb'], thDone = ok('aithumb'), thImg = out('aithumb', '편집/AI썸네일.jpg');
     const TT = ytThumbDraft(ep);
@@ -1251,14 +1251,14 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
       isDone: () => thDone, statusLine: runLine(TH),
       result: () => ep ? errOf(TH) + (runnerApi >= 19 && (runIn(TH) || thDone) ? ytStepLive(ep, TH[0], runIn(TH)) : '') + (thDone && thImg ? `<p><img src="${RUNNER}/file?ep=${encodeURIComponent(ep.ep)}&path=${encodeURIComponent(thImg.path)}&t=${thImg.mtime || ''}" alt="썸네일" style="width:100%;max-width:480px;border-radius:8px;border:1px solid var(--line)"></p>` : '') + logs(TH) : '',
     });
-    const dl = p => { const o = out('aibrand', p) || out('aisubs', p) || out('aithumb', p); return o ? `<a class="btn ghost ya-file" href="${RUNNER}/file?ep=${encodeURIComponent(ep.ep)}&path=${encodeURIComponent(o.path)}&dl=1">${esc(p.replace('편집/AI', '').replace(/\.(mp4|jpg)$/, ''))} 내려받기 ⬇</a>` : ''; };
+    const dl = p => { const o = out('aibrand', p) || out('aisubs', p) || out('aistyle', p) || out('aithumb', p); return o ? `<a class="btn ghost ya-file" href="${RUNNER}/file?ep=${encodeURIComponent(ep.ep)}&path=${encodeURIComponent(o.path)}&dl=1">${esc(p.replace('편집/AI', '').replace(/\.(mp4|jpg)$/, ''))} 내려받기 ⬇</a>` : ''; };
     const fin = out('aibrand', '편집/AI최종.mp4');
     const c7 = card(6, {
       desc: !fin ? '인트로·아웃트로까지 끝나면 열려요.' : '최종본과 썸네일을 내려받아 YouTube Studio 에서 올리세요. 인트로·아웃트로·본편만 따로 받을 수도 있어요.',
       hideBtn: () => true, isDone: () => !!fin,
-      result: () => fin ? `<div class="pl-files">${['편집/AI최종.mp4', '편집/AI썸네일.jpg', '편집/AI인트로.mp4', '편집/AI완성.mp4', '편집/AI아웃트로.mp4'].map(dl).join(' ')}</div>` : '',
+      result: () => fin ? `<div class="pl-files">${['편집/AI최종.mp4', '편집/AI썸네일.jpg', '편집/AI인트로.mp4', subDone ? '편집/AI완성.mp4' : '편집/AI스타일본.mp4', '편집/AI아웃트로.mp4'].map(dl).join(' ')}</div>` : '',
     });
-    return [c1, c2, c3, c4, c5, c6, c7];
+    return [c1, c2, c3, c5, c6, c7];   // 자막 단계(c4)는 뺐어요: 스타일 입히기 다음 바로 인트로·아웃트로
   }
   // ===== ④ 1차 편집 · ⑤ 자막 넣기 · ⑥ 2차 편집 · ⑦ 최종 편집안 다운로드 =====
   function ytEditCards(it, ep, off) {
@@ -1358,11 +1358,11 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
     if (ep) {
       const ok = id => (ep.steps || []).some(x => x.id === id && x.status === 'done'), r = ep.round || 0, fb = (ep.feedbackAt || 0) > (ep.editAt || 0);
       if (AI_CH[ytCh(i)]) {   // AI 작업판 8칸
-        const af = [true, ok('aicut'), ok('aicut') && aiLookOk(ep.look), ok('aistyle'), ok('aisubs'), ok('aibrand'), ok('aithumb'), ok('aibrand') && ok('aithumb')], an = af.filter(Boolean).length, ak = af.findIndex(x => !x);
-        const AN = ['원본 링크', '1차 컷', '스타일 선택', '스타일 입히기', '자막', '인트로·아웃트로', '썸네일', '다운로드'], ab = [];
+        const af = [true, ok('aicut'), ok('aicut') && aiLookOk(ep.look), ok('aistyle'), ok('aibrand'), ok('aithumb'), ok('aibrand') && ok('aithumb')], an = af.filter(Boolean).length, ak = af.findIndex(x => !x);
+        const AN = ['원본 링크', '1차 컷', '스타일 선택', '스타일 입히기', '인트로·아웃트로', '썸네일', '다운로드'], ab = [];
         if (ep.running) ab.push('<i class="b run">실행 중</i>');
-        if ((ep.steps || []).some(x => ['research', 'download', 'aicut', 'aistyle', 'aisubs', 'aibrand', 'aithumb'].includes(x.id) && x.status === 'failed')) ab.push('<i class="b fail">실패</i>');
-        return `${an}/8 단계 · ${esc(ak < 0 ? '끝' : AN[ak])}${ab.length ? `<span class="pl-wbs">${ab.join('')}</span>` : ''}`;
+        if ((ep.steps || []).some(x => ['research', 'download', 'aicut', 'aistyle', 'aibrand', 'aithumb'].includes(x.id) && x.status === 'failed')) ab.push('<i class="b fail">실패</i>');
+        return `${an}/7 단계 · ${esc(ak < 0 ? '끝' : AN[ak])}${ab.length ? `<span class="pl-wbs">${ab.join('')}</span>` : ''}`;
       }
       const flags = [true, !!ep.look, !!(ep.fxPack || (ep.round || 0) >= 1 || (ok('research') && ok('download'))), ok('research') && ok('download'), r >= 1, fb || r >= 2, r >= 2 && !fb, ok('upload')], n = flags.filter(Boolean).length, k = flags.findIndex(x => !x);
       const nx = k < 0 ? null : { g: { name: YT_PLACEHOLDER[k] } };
