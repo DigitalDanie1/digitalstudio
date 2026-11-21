@@ -7,13 +7,13 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { HOME, StepError, StopError, sanitize, exists, parseRanges, isLocalSource, localPath, run, probe, FFMPEG, YTDLP, lastLines, fmtTime, MAX_RANGE } from './util.mjs';
 import { createHighlights, LEN_MIN, LEN_MAX } from './highlights.mjs';
-import { AI_STYLES, isRefLook, parseMine, analyzeRef, readRefAnalysis, refDir, refKind } from './ai.mjs';
+import { AI_STYLES, isRefLook, parseMine, aiSegs, analyzeRef, readRefAnalysis, refDir, refKind } from './ai.mjs';
 import { listStyles, saveStyle, enqueue, cancelJob, listJobs, resolveReadable, thumbOf, shutdownImages, ImgError } from './images.mjs';
 import { STEP_DEFS, STEP_FN, outputsFor, listAssets, checkScript, cleanPasted, parseScript, parseBanner, parseHook, PLACEHOLDER, SCRIPT_MAX_LINES, CHANNEL_PROFILES, LOOK_CHOICES, lookKeyOf, FX_PACKS, fxPackOf, parseFxTimes, migrateState, layoutLines, draftText, draftTranscript, splitAnswer, feedbackPrompt, callClaude, parseCredit, previewPlan, renderPreview } from './steps.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // 작업판이 쓰는 기능 수준. 3 = 새 9칸 순서 (/look, /ranges, deferRanges, 단계 clip·subs·fx)
-const API_LEVEL = 20;   // 20 = 사이트에서 실행기 업데이트 (POST /update: GitHub 최신 runner 파일 받아서 검사 후 바꾸고 다시 켜기), 레퍼런스 분석 줄 세우기 (queued) · 19 = 모든 AI 단계 실시간 보기 (편집/진행_<단계>.json) · 18 = 1차 컷 실시간 보기 (편집/AI컷_진행.json) · 17 = 레퍼런스 쇼츠 분석 (POST /ref/analyze, GET /ref/status, GET /ref/<id>: 컷·후크·이펙트·이목 장치를 먼저 보여 주고 고르면 그대로 적용) · 16 = 자막 원문·번역·해설·내 자막 나눠 켜기 (run body.subs), 썸네일 내 카피 (run body.thumb) · 15 = 실행기 다시 켜기 (POST /restart, health.disk) · 14 = 내 영상 올리기 (POST /upload) · 13 = 레퍼런스 쇼츠 룩 (look ref-<영상ID>, view.refStyle) · 12 = 한 구간·하이라이트 길이 최대 3분(30초·1분·2분·3분), 쇼츠 최대 3분 · 11 = 하이라이트 '지난 작업' 초기화(/hl/reset, 돌고 있으면 멈추고 휴지통 한 폴더로) · 10 = AI 편집 단계(aicut·aistyle·aisubs, 맥의 Claude Code) · 9 = 유튜브 초기화(/reset, 에피소드·하이라이트 전부 휴지통 한 폴더로) · 8 = 미리보기 견본(/preview, 고른 룩·이펙트를 실제 영상 4초로) · 7 = 에피소드 완전히 지우기(/episode/delete, 휴지통으로) · 6 = 하이라이트 찾기(/hl/*) ·  4 = 7칸 순서 (/edit 1차·2차 편집, /draft, /feedback, 슬로우 구간 x0.5, 매트 스토리 룩) · 5 = 최종 결과물 레퍼런스(이펙트 팩: /fxpack, status.fxPacks)
+const API_LEVEL = 21;   // 21 = 자막 편집기 (GET /segs, run body.subs.edit) · 20 = 사이트에서 실행기 업데이트 (POST /update: GitHub 최신 runner 파일 받아서 검사 후 바꾸고 다시 켜기), 레퍼런스 분석 줄 세우기 (queued) · 19 = 모든 AI 단계 실시간 보기 (편집/진행_<단계>.json) · 18 = 1차 컷 실시간 보기 (편집/AI컷_진행.json) · 17 = 레퍼런스 쇼츠 분석 (POST /ref/analyze, GET /ref/status, GET /ref/<id>: 컷·후크·이펙트·이목 장치를 먼저 보여 주고 고르면 그대로 적용) · 16 = 자막 원문·번역·해설·내 자막 나눠 켜기 (run body.subs), 썸네일 내 카피 (run body.thumb) · 15 = 실행기 다시 켜기 (POST /restart, health.disk) · 14 = 내 영상 올리기 (POST /upload) · 13 = 레퍼런스 쇼츠 룩 (look ref-<영상ID>, view.refStyle) · 12 = 한 구간·하이라이트 길이 최대 3분(30초·1분·2분·3분), 쇼츠 최대 3분 · 11 = 하이라이트 '지난 작업' 초기화(/hl/reset, 돌고 있으면 멈추고 휴지통 한 폴더로) · 10 = AI 편집 단계(aicut·aistyle·aisubs, 맥의 Claude Code) · 9 = 유튜브 초기화(/reset, 에피소드·하이라이트 전부 휴지통 한 폴더로) · 8 = 미리보기 견본(/preview, 고른 룩·이펙트를 실제 영상 4초로) · 7 = 에피소드 완전히 지우기(/episode/delete, 휴지통으로) · 6 = 하이라이트 찾기(/hl/*) ·  4 = 7칸 순서 (/edit 1차·2차 편집, /draft, /feedback, 슬로우 구간 x0.5, 매트 스토리 룩) · 5 = 최종 결과물 레퍼런스(이펙트 팩: /fxpack, status.fxPacks)
 let VERSION = 'dev';
 try { VERSION = fs.readFileSync(path.join(HERE, 'version.txt'), 'utf8').trim() || 'dev'; } catch {}
 const PORT = +(process.env.FIELDNOTE_RUNNER_PORT || 4777);
@@ -437,6 +437,7 @@ const routes = {
     if ([...episodes.values()].some(E => E.running)) throw new HttpError(409, '작업이 돌고 있어요. 끝난 뒤에 다시 켜 주세요.');
     setTimeout(bye, 300); return { json: { ok: true } };
   },
+  'GET /segs': ({ q }) => { const E = getEp(q.get('ep')); try { return { json: aiSegs(E) }; } catch (e) { throw new HttpError(409, '1차 컷을 먼저 만들어 주세요.'); } },
   'GET /status': () => { pruneGone(); return { json: { looks: LOOK_CHOICES, fxPacks: FX_PACKS, episodes: [...episodes.values()].sort((a, b) => b.s.created - a.s.created).map(view) } }; },
   'GET /episodes': () => routes['GET /status'](),
   'POST /episodes': ({ body }) => { const E = createEpisode(body); return { json: { ok: true, ep: E.s.ep } }; },
@@ -534,6 +535,10 @@ const routes = {
     if (ids.includes('aisubs') && body.subs && typeof body.subs === 'object') {   // AI 자막: 원문(en)·번역(ko)·해설/후크(ai) 켜고 끄기 + 내 자막
       let mine; try { mine = parseMine(body.subs.mine); } catch (e) { throw new HttpError(400, e.message); }
       E.s.subsOpt = { en: body.subs.en !== false, ko: body.subs.ko !== false, ai: body.subs.ai !== false, mine, mineText: String(body.subs.mine || '').slice(0, 4000) };
+      if (Array.isArray(body.subs.edit)) {   // 자막 편집기: [{s, e, kind: sp|ai|my, ko, en}]
+        if (body.subs.edit.length > 400) throw new HttpError(400, '자막이 너무 많아요 (400줄까지).');
+        E.s.subsOpt.edit = body.subs.edit.map(r => ({ s: Math.max(0, Math.round(+r.s * 10) / 10 || 0), e: Math.round(+r.e * 10) / 10 || 0, kind: ['sp', 'ai', 'my'].includes(r.kind) ? r.kind : 'ai', ko: String(r.ko || '').slice(0, 120), en: String(r.en || '').slice(0, 200) }));
+      }
     }
     if (ids.includes('aithumb')) {   // 썸네일: 내가 적은 상단·하단 카피 (비우면 Claude 가 써요)
       const t = body.thumb || {}; E.s.thumbText = { top: String(t.top || '').trim().slice(0, 30), bot: String(t.bot || '').trim().slice(0, 40) };

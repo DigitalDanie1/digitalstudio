@@ -910,7 +910,7 @@
   const ytRefLooks = ch => (typeof window.ytRefShorts === 'function' ? window.ytRefShorts(ch) : []).filter(r => !YT_AI_LOOKS.some(l => l.ref.includes(r.id))).map(r => ({ id: 'ref-' + r.id, vid: r.id, title: r.title, from: r.from }));
   // 자막·썸네일 입력 칸 초안 (화면이 다시 그려져도 남게): 에피소드별
   const YD = {};
-  function ytSubDraft(ep) { const k = 's:' + (ep ? ep.ep : ''); if (!YD[k]) { const o = (ep && ep.subsOpt) || {}; YD[k] = { en: o.en !== false, ko: o.ko !== false, ai: o.ai !== false, mine: o.mine || '' }; } return YD[k]; }
+  function ytSubDraft(ep) { const k = 's:' + (ep ? ep.ep : ''); if (!YD[k]) { const o = (ep && ep.subsOpt) || {}; YD[k] = { en: o.en !== false, ko: o.ko !== false, ai: o.ai !== false, mine: '' }; } return YD[k]; }
   function ytThumbDraft(ep) { const k = 't:' + (ep ? ep.ep : ''); if (!YD[k]) { const o = (ep && ep.thumbText) || {}; YD[k] = { top: o.top || '', bot: o.bot || '' }; } return YD[k]; }
   window.ytAiExtra = (ep, ids) => { const x = {}; if (ids.includes('aisubs')) x.subs = { ...ytSubDraft(ep) }; if (ids.includes('aithumb')) x.thumb = { ...ytThumbDraft(ep) }; return x; };
   // 만든 자막 목록 (편집/AI자막.json) 은 실행기에서 받아 와서 기억해요
@@ -973,8 +973,8 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
     if (!c.busy && (c.at === 0 || (live && Date.now() - c.at > 2500))) {
       c.busy = true; c.at = Date.now();
       fetch(`${RUNNER}/file?ep=${encodeURIComponent(ep.ep)}&path=${encodeURIComponent('편집/AI컷_진행.json')}&_=${Date.now()}`).then(r => r.ok ? r.json() : null)
-        .then(d => { c.busy = false; if (d && (!c.d || d.t !== c.d.t)) { c.d = d; repaint('youtube', true); } }).catch(() => { c.busy = false; });
-      if (live) setTimeout(() => { if (ep.running === 'aicut') repaint('youtube', true); }, 3000);
+        .then(d => { c.busy = false; if (d && (!c.d || d.t !== c.d.t)) { c.d = d; repaint('youtube'); } }).catch(() => { c.busy = false; });
+      if (live) setTimeout(() => { if (ep.running === 'aicut') repaint('youtube'); }, 3000);
     }
     return c.d;
   }
@@ -1003,8 +1003,8 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
     if (!c.busy && (c.at === 0 || (live && Date.now() - c.at > 2500))) {
       c.busy = true; c.at = Date.now();
       fetch(`${RUNNER}/file?ep=${encodeURIComponent(ep.ep)}&path=${encodeURIComponent(rel)}&_=${Date.now()}`).then(r => r.ok ? (kind === 'text' ? r.text() : r.json()) : null)
-        .then(d => { c.busy = false; const same = JSON.stringify(d) === JSON.stringify(c.d); c.d = d; if (!same) repaint('youtube', true); }).catch(() => { c.busy = false; });
-      if (live) setTimeout(() => { if (ep.running) repaint('youtube', true); }, 3000);
+        .then(d => { c.busy = false; const same = JSON.stringify(d) === JSON.stringify(c.d); c.d = d; if (!same) repaint('youtube'); }).catch(() => { c.busy = false; });
+      if (live) setTimeout(() => { if (ep.running) repaint('youtube'); }, 3000);
     }
     return c.d;
   }
@@ -1022,6 +1022,88 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
       ${tail ? `<pre class="small" style="white-space:pre-wrap;margin:8px 0 0;opacity:.85">${tail}</pre>` : ''}</details>`;
   }
   window.ytRefA = { RA, RK, poll: refPoll, panel: refPanel, start: refStart, img: refImg };
+  // ===== 자막 편집기 (CapCut 처럼): 영상 위에 자막이 바로 보이고, 줄마다 시각·글을 고쳐요 =====
+  const SED = {};
+  function ytSubEdMount() {
+    const box = document.getElementById('plSubEd'); if (!box || box.childElementCount) return;
+    const epId = box.dataset.ep, ep = (runnerData && runnerData.episodes || []).find(e => e.ep === epId); if (!ep) return;
+    const st = SED[epId] || (SED[epId] = { rows: null });
+    const fileUrl = r => `${RUNNER}/file?ep=${encodeURIComponent(epId)}&path=${encodeURIComponent(r)}`;
+    const step = id => (ep.steps || []).find(x => x.id === id) || {}, has = (id, r) => (step(id).outputs || []).find(o => o.path === r && o.exists);
+    const base = has('aistyle', '편집/AI스타일본.mp4');
+    if (!base) { box.innerHTML = '<p class="small">스타일을 입히면 자막 편집기가 열려요.</p>'; return; }
+    const t1 = x => (Math.round((+x || 0) * 10) / 10).toFixed(1), clamp = x => Math.max(0, Math.round((+x || 0) * 10) / 10);
+    box.innerHTML = `<section style="border:1px solid var(--line);border-radius:12px;padding:12px;margin:12px 0">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h3 style="margin:0;font-size:16px">자막 편집기</h3>
+        <div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="btn" data-se="load-ai">자동 자막 불러오기</button><button type="button" class="btn" data-se="load-src">영어 원문만 불러오기</button><button type="button" class="btn ghost" data-se="clear">모두 지우기</button></div></div>
+      <div style="display:grid;grid-template-columns:minmax(220px,300px) 1fr;gap:14px;margin-top:10px;align-items:start">
+        <div style="position:sticky;top:8px"><div style="position:relative;aspect-ratio:9/16;background:#000;border-radius:10px;overflow:hidden;container-type:inline-size">
+          <video id="plSeVid" src="${fileUrl(base.path)}&t=${base.mtime || ''}" playsinline preload="metadata" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain"></video>
+          <div id="plSeMine" style="position:absolute;left:4%;right:4%;top:26.6%;text-align:center;font-weight:800;color:#ffe600;font-size:calc(58/1080*100cqw);-webkit-text-stroke:calc(5/1080*100cqw) #000;paint-order:stroke;line-height:1.2;pointer-events:none"></div>
+          <div id="plSeCap" style="position:absolute;left:3%;right:3%;bottom:29.9%;text-align:center;font-weight:800;color:#fff;font-size:calc(74/1080*100cqw);-webkit-text-stroke:calc(7/1080*100cqw) #000;paint-order:stroke;line-height:1.25;pointer-events:none"></div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap"><button type="button" class="btn primary" data-se="play">▶ 재생</button><span id="plSeT" class="small">0.0초</span></div>
+        <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap"><button type="button" class="btn" data-se="add-ai">＋ 지금 위치에 자막</button><button type="button" class="btn" data-se="add-my">＋ 지금 위치에 내 자막 (노랑)</button></div>
+        <p class="small" style="margin-top:6px">미리보기는 자막 위치·크기를 비슷하게 보여 줘요. 정확한 건 "이 자막으로 그리기" 뒤 완성본에서 봐요.</p></div>
+        <div><div id="plSeList" style="max-height:620px;overflow:auto;display:grid;gap:6px"></div>
+          <div style="display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap"><button type="button" class="btn primary" data-se="save">이 자막으로 그리기</button><span id="plSeMsg" class="small" aria-live="polite"></span></div></div>
+      </div></section>`;
+    const vid = box.querySelector('#plSeVid'), list = box.querySelector('#plSeList'), cap = box.querySelector('#plSeCap'), mineEl = box.querySelector('#plSeMine'), tEl = box.querySelector('#plSeT'), msg = box.querySelector('#plSeMsg');
+    const KIND = { sp: '원문·번역', ai: '자막', my: '내 자막' };
+    const escH = t => String(t || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const fmt = t => escH(t).replace(/\\n|\n/g, '<br>').replace(/\[\[(.+?)\]\]/g, '<span style="color:#ffd600">$1</span>');
+    const draw = () => {
+      const t = vid.currentTime || 0, on = (st.rows || []).filter(r => t >= r.s && t < r.e);
+      const c = on.find(r => r.kind !== 'my'), m = on.find(r => r.kind === 'my');
+      cap.innerHTML = c ? (c.ko ? fmt(c.ko) : '') + (c.en ? `<div style="font-size:calc(40/1080*100cqw);font-weight:500;color:#dcdcdc;-webkit-text-stroke:calc(4/1080*100cqw) #000;margin-top:.2em">${escH(c.en)}</div>` : '') : '';
+      mineEl.innerHTML = m ? fmt(m.ko || m.en) : '';
+      tEl.textContent = t1(t) + '초';
+      list.querySelectorAll('[data-row]').forEach(el => { const r = st.rows[+el.dataset.row]; el.style.borderColor = r && t >= r.s && t < r.e ? '#ff5a5a' : 'var(--line)'; });
+    };
+    const paint = () => {
+      const rows = st.rows || [];
+      list.innerHTML = rows.length ? rows.map((r, i) => `<div data-row="${i}" style="border:1px solid var(--line);border-radius:8px;padding:6px 8px;display:grid;grid-template-columns:auto auto 1fr auto;gap:6px;align-items:center">
+        <button type="button" class="btn ghost" data-se="seek" data-i="${i}" title="여기로 가기" style="padding:2px 6px;font-size:12px">▶</button>
+        <span style="display:flex;gap:3px;align-items:center;font-size:12px"><input class="pl-input" data-sef="s" data-i="${i}" type="number" step="0.1" min="0" value="${t1(r.s)}" style="width:62px;padding:3px 4px" aria-label="시작 초"><button type="button" class="btn ghost" data-se="now-s" data-i="${i}" title="지금 시각을 시작으로" style="padding:2px 4px;font-size:11px">⏱</button>~<input class="pl-input" data-sef="e" data-i="${i}" type="number" step="0.1" min="0" value="${t1(r.e)}" style="width:62px;padding:3px 4px" aria-label="끝 초"><button type="button" class="btn ghost" data-se="now-e" data-i="${i}" title="지금 시각을 끝으로" style="padding:2px 4px;font-size:11px">⏱</button></span>
+        <span style="display:grid;gap:3px"><input class="pl-input" data-sef="ko" data-i="${i}" value="${escH(String(r.ko || '').replace(/\\n|\n/g, ' / '))}" placeholder="${r.kind === 'sp' ? '한국어 번역' : '자막 글'} ( / 로 줄바꿈, [[단어]] 강조)" style="padding:4px 6px">${r.kind === 'sp' ? `<input class="pl-input" data-sef="en" data-i="${i}" value="${escH(r.en)}" placeholder="영어 원문" style="padding:3px 6px;font-size:12px;opacity:.85">` : ''}</span>
+        <span style="display:grid;gap:3px;justify-items:end"><select class="pl-input" data-sef="kind" data-i="${i}" style="padding:2px 4px;font-size:11px">${Object.entries(KIND).map(([k, v]) => `<option value="${k}" ${r.kind === k ? 'selected' : ''}>${v}</option>`).join('')}</select><button type="button" class="btn ghost" data-se="del" data-i="${i}" aria-label="이 자막 지우기" style="padding:2px 6px;font-size:11px">지우기</button></span></div>`).join('')
+        : '<p class="small">자막이 없어요. 위에서 불러오거나, 영상을 멈추고 "＋ 지금 위치에 자막"을 누르세요.</p>';
+      draw();
+    };
+    const sort = () => st.rows.sort((a, b) => a.s - b.s);
+    const fromJson = d => [...(d.speech || []).map(x => ({ s: x.s, e: x.e, kind: 'sp', ko: x.ko || '', en: x.en || '' })), ...(d.ai || []).map(q => ({ s: q[0], e: q[1], kind: 'ai', ko: String(q[2] || ''), en: '' })), ...(d.mine || []).map(q => ({ s: q[0], e: q[1], kind: 'my', ko: String(q[2] || ''), en: '' }))].sort((a, b) => a.s - b.s);
+    const loadAi = () => { const o = has('aisubs', '편집/AI자막.json'); if (!o) { msg.textContent = '자동 자막이 아직 없어요. 위에서 "자막 넣기"를 먼저 누르세요.'; return Promise.resolve(false); }
+      return fetch(fileUrl(o.path) + '&_=' + Date.now()).then(r => r.json()).then(d => { st.rows = fromJson(d); paint(); msg.textContent = `자동 자막 ${st.rows.length}줄을 불러왔어요.`; return true; }).catch(() => { msg.textContent = '자동 자막을 못 읽었어요.'; return false; }); };
+    const loadSrc = () => runnerFetch('/segs?ep=' + encodeURIComponent(epId)).then(d => { st.rows = (d.segs || []).map(g => ({ s: g.s, e: g.e, kind: 'sp', ko: '', en: g.t })); paint(); msg.textContent = d.segs && d.segs.length ? `영어 원문 ${d.segs.length}줄을 불러왔어요. 한국어 칸을 채우세요.` : '이 영상은 원문 자막이 없어요.'; }).catch(e => { msg.textContent = e.message; });
+    box.addEventListener('click', e => {
+      const b = e.target.closest('[data-se]'); if (!b) return; const i = +b.dataset.i, r = st.rows && st.rows[i], now = clamp(vid.currentTime);
+      const a = b.dataset.se;
+      if (a === 'play') { if (vid.paused) vid.play(); else vid.pause(); }
+      else if (a === 'seek' && r) { vid.currentTime = r.s + 0.05; draw(); }
+      else if (a === 'now-s' && r) { r.s = now; if (r.e <= r.s) r.e = clamp(r.s + 1.5); sort(); paint(); }
+      else if (a === 'now-e' && r) { r.e = Math.max(now, clamp(r.s + 0.3)); paint(); }
+      else if (a === 'del' && r) { st.rows.splice(i, 1); paint(); }
+      else if (a === 'add-ai' || a === 'add-my') { st.rows = st.rows || []; st.rows.push({ s: now, e: clamp(now + 2), kind: a === 'add-my' ? 'my' : 'ai', ko: '', en: '' }); sort(); paint(); const k = st.rows.findIndex(x => x.s === now && !x.ko); const inp = list.querySelector(`[data-sef="ko"][data-i="${k}"]`); if (inp) inp.focus(); }
+      else if (a === 'load-ai') loadAi();
+      else if (a === 'load-src') { if (!st.rows || !st.rows.length || confirm('지금 자막을 영어 원문으로 바꿀까요?')) loadSrc(); }
+      else if (a === 'clear') { if (confirm('자막을 모두 지울까요?')) { st.rows = []; paint(); } }
+      else if (a === 'save') {
+        if (!st.rows || !st.rows.length) { msg.textContent = '그릴 자막이 없어요.'; return; }
+        const bad = st.rows.findIndex(x => !(x.e > x.s)); if (bad >= 0) { msg.textContent = `${bad + 1}번째 줄: 끝 시각이 시작보다 뒤여야 해요.`; return; }
+        b.disabled = true; msg.textContent = '보내는 중…';
+        runnerFetch('/run', { ep: epId, steps: ['aisubs'], subs: { ...ytSubDraft(ep), edit: st.rows } }).then(() => { msg.textContent = '그리는 중이에요. 끝나면 위 결과에 완성본이 나와요 (Claude 없이 바로).'; runnerRefresh(); }).catch(err => { msg.textContent = err.message; }).finally(() => { b.disabled = false; });
+      }
+    });
+    // 글·시각 고치기: 입력할 때마다 미리보기에 바로 (한글 조합 중에도 끊기지 않게 다시 그리지 않아요)
+    box.addEventListener('input', e => { const f = e.target.closest('[data-sef]'); if (!f) return; const r = st.rows[+f.dataset.i]; if (!r) return;
+      const k = f.dataset.sef; if (k === 's' || k === 'e') r[k] = clamp(f.value); else if (k === 'ko') r.ko = f.value.replace(/\s*\/\s*/g, '\n'); else r[k] = f.value; draw(); });
+    box.addEventListener('change', e => { const f = e.target.closest('[data-sef]'); if (!f) return; if (f.dataset.sef === 's' || f.dataset.sef === 'kind') { sort(); paint(); } });
+    vid.addEventListener('timeupdate', draw); vid.addEventListener('seeked', draw);
+    vid.addEventListener('play', () => { const tick = () => { draw(); if (!vid.paused) requestAnimationFrame(tick); }; tick(); box.querySelector('[data-se="play"]').textContent = '❚❚ 멈춤'; });
+    vid.addEventListener('pause', () => { box.querySelector('[data-se="play"]').textContent = '▶ 재생'; });
+    vid.addEventListener('click', () => { if (vid.paused) vid.play(); else vid.pause(); });
+    if (st.rows) paint(); else { st.rows = []; loadAi().then(ok => { if (!ok) paint(); }); }
+  }
   function ytAiCards(it, ep, off) {
     const names = ['1차 컷 (영상 종류)', '스타일 선택', '스타일 입히기', '자막', '인트로·아웃트로', '썸네일', '다운로드'];
     const chId = it.idea ? ytCh(it.idea) : ytTab(), sport = chId === 'yt-wrestling', myLook = AI_CH[chId] || 'yt-mat';
@@ -1092,8 +1174,8 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
       return `<details class="pl-peek" open><summary>자막 목록 ${rows.length}줄 (완성 영상 시각)</summary><table class="pl-subt" style="width:100%;font-size:13px;border-collapse:collapse"><thead><tr><th style="text-align:left">시각</th><th style="text-align:left">종류</th><th style="text-align:left">영어 원문</th><th style="text-align:left">한국어 / 자막</th></tr></thead><tbody>${rows.map(r => `<tr style="border-top:1px solid var(--line)"><td style="white-space:nowrap;padding:4px 6px 4px 0">${fmtT(r[0])}-${fmtT(r[1])}</td><td style="white-space:nowrap;padding-right:6px">${tag[r[2]]}</td><td style="color:var(--muted)">${esc(r[3] || '')}</td><td>${esc(String(r[4] || '').replace(/\\n|\n/g, ' / '))}</td></tr>`).join('')}</tbody></table></details>`; };
     const chk = (k, label, hint) => `<div style="display:flex;gap:10px;align-items:baseline;padding:6px 0"><input type="checkbox" id="plSub_${k}" data-pl-sub="${k}" ${SO[k] ? 'checked' : ''} style="width:18px;height:18px;flex:none;position:relative;top:3px"><label for="plSub_${k}" style="cursor:pointer"><b>${label}</b> <span class="small">${hint}</span></label></div>`;
     const subForm = `<fieldset style="border:1px solid var(--line);border-radius:10px;padding:8px 14px;margin:0 0 12px"><legend class="small" style="padding:0 6px">넣을 자막 (따로 켜고 꺼요)</legend>${chk('en', '영어 원문', '영상에서 나오는 말 그대로, 말하는 시각에 맞춰 작은 회색 줄로. Claude 없이 바로 나와요.')}${chk('ko', '한국어 번역', '원문 한 줄에 한 줄씩 옮겨서 큰 흰 글씨로 (원문 위에).')}${chk('ai', 'AI 해설·후크 자막', '말이 없는 곳 + 인트로·아웃트로 후크. Claude 가 써요.')}</fieldset><div class="pl-ya-form">
-      <label>내가 넣고 싶은 자막 <span class="small">(한 줄에 하나: <code>0:03-0:06 넣을 말</code> · 완성 영상 시각 · 노란 글씨로 영상 위쪽에 따로 나와요)</span><textarea class="pl-input" rows="3" id="plSubMine" data-pl-sub="mine" placeholder="0:03-0:06 여기서 승부가 갈렸다">${esc(SO.mine)}</textarea></label>
-      <p class="small">유튜브 자막이 없는 영상(내 파일 등)은 원문·번역이 비어요. 만든 뒤 아래 자막 목록에서 원문과 번역을 줄별로 맞춰 볼 수 있어요.</p></div>`;
+      <p class="small">위 세 가지로 "자막 넣기"를 누르면 자동으로 만들어요. 그다음 아래 <b>자막 편집기</b>에서 영상을 보면서 바로 고치고 "이 자막으로 그리기"를 누르세요. 유튜브 자막이 없는 영상(내 파일 등)은 원문·번역이 비어요.</p></div>
+      ${ep && runnerApi >= 21 ? `<div data-keep-id="subed-${esc(ep.ep)}" id="plSubEd" data-ep="${esc(ep.ep)}"></div>` : ''}`;
     const c4 = card(3, {
       body: () => styDone ? subForm : '',
       desc: !styDone ? '스타일을 입히면 열려요.' : '자막은 네 가지를 따로 넣어요: 영어 원문(영상에서 나오는 말), 한국어 번역(원문과 한 줄씩 짝), AI 해설·후크, 내가 넣는 자막. 원문·번역 시각은 영상 자막 시각 그대로라 말과 어긋나지 않아요.',
@@ -1541,6 +1623,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
     const tmp = document.createElement('div'); tmp.innerHTML = html;
     const next = tmp.firstElementChild; next.dataset.sig = html;
     [...next.querySelectorAll('details')].forEach((d, k) => { if (open[k]) d.open = true; });
+    for (const nk of next.querySelectorAll('[data-keep-id]')) { const ok = root.querySelector('[data-keep-id="' + nk.dataset.keepId + '"]'); if (ok && ok.childElementCount) nk.replaceWith(ok); }   // 자막 편집기처럼 손으로 만지는 부분은 그대로 둔다
     for (const nv of next.querySelectorAll('video[id]')) { const ov = root.querySelector('video[id="' + nv.id + '"]'); if (ov && ov.getAttribute('src') === nv.getAttribute('src')) nv.replaceWith(ov); }   // 보고 있던 영상은 끊지 않는다
     root.replaceWith(next);
     afterPaint(root.dataset.c);
@@ -1549,7 +1632,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
   window.ytGoScript = function () { const { steps } = evalSteps('youtube'), k = steps.findIndex(x => x.id === 'g-voice'); if (k >= 0) { T.view.youtube = k; repaint('youtube', true); } };
   window.ytRepaint = function () { repaint('youtube'); };
   function afterPaint(c) {
-    if (c === 'youtube') { setTimeout(ytPrevSync, 0); setTimeout(ytUpTextHydrate, 0); }
+    if (c === 'youtube') { setTimeout(ytPrevSync, 0); setTimeout(ytUpTextHydrate, 0); setTimeout(ytSubEdMount, 0); }
     if (window.CodexImg) setTimeout(() => CodexImg.hydrate(), 0);
     if (c === 'insta') setTimeout(() => window.InstaToon && window.InstaToon.hydrateArt(), 0);
     if (c === 'youtube' && T.logOpen) { const el = document.getElementById('plLog'), ep = ytItem().ep; if (el && ep) runnerFetch(`/log?ep=${encodeURIComponent(ep.ep)}&step=${T.logOpen}&tail=6000`).then(t => { el.textContent = t || '(로그 없음)'; el.scrollTop = el.scrollHeight; }).catch(e => { el.textContent = '로그를 못 읽었어요: ' + e.message; }); }

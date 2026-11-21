@@ -199,6 +199,8 @@ export function speechSegs(cues, cuts) {
   }
   return out.map((x, i) => ({ id: i + 1, ...x }));
 }
+// 자막 편집기용: 원문 자막 덩어리 (Claude 없이 바로)
+export function aiSegs(E) { const plan = readJson(E.p('편집/AI컷.json')); return { dur: plan.duration, segs: segsOf(E, source(E), plan).map(g => ({ s: g.s, e: g.e, t: g.t })) }; }
 const segsOf = (E, info, plan) => { const f = info.subFile && E.p(info.subFile); return f && exists(f) ? speechSegs(parseVtt(fs.readFileSync(f, 'utf8')), plan.cuts) : []; };
 // Claude 답 {lines:[[[S번호..],"한국어"]], captions:[[a,b,"글"]]} -> captions 하나로. lines 의 시각은 S 시각 그대로.
 export function mergeCaps(j, segs) {
@@ -533,6 +535,25 @@ async function aisubs(E, ctx) {
   const st = styleOf(E), info = source(E), plan = readJson(E.p('편집/AI컷.json'));
   let base; try { base = readJson(E.p('편집/AI완성.json')); } catch { throw new StepError('스타일 입히기를 먼저 해 주세요.'); }
   const o = { en: true, ko: true, ai: true, mine: [], ...(E.s.subsOpt || {}) };
+  if (Array.isArray(o.edit)) {   // 작업판 자막 편집기에서 내가 고친 그대로: Claude 없이 바로 그려요
+    const prog = progOf(E, 'aisubs', [['render', '내가 고친 자막 입혀 그리기'], ['done', '끝']]), d = plan.duration;
+    const rows = o.edit.filter(r => r.e > r.s && r.s < d + 0.5 && (r.ko || r.en)).sort((a, b) => a.s - b.s);
+    const speech = rows.filter(r => r.kind === 'sp').map(r => ({ s: r.s, e: r.e, en: r.en || '', ko: r.ko || '' }));
+    const ai = rows.filter(r => r.kind === 'ai').map(r => [r.s, r.e, r.ko || r.en]);
+    const mine = rows.filter(r => r.kind === 'my').map(r => [r.s, r.e, r.ko || r.en]);
+    const caps = [...speech.map(x => [x.s, x.e, x.ko || x.en, x.ko && x.en ? x.en : '']), ...ai.map(q => [q[0], q[1], q[2], ''])].sort((a, b) => a[0] - b[0]);
+    const j = { frame: base.frame, fx: base.fx, credits: base.credits, captions: caps, mine };
+    if (base.ranks) j.ranks = base.ranks; if (base.note) j.note = base.note;
+    writeJson(E.p('편집/AI자막.json'), { opt: { en: o.en, ko: o.ko, ai: o.ai }, speech, ai, mine, edited: true });
+    if (E.s.steps.aibrand) E.s.steps.aibrand = { status: 'todo' };
+    writeJson(E.p('편집/AI완성.json'), j);
+    ctx.log(`내가 고친 자막으로 그려요: 원문 ${speech.length}줄 · 해설/후크 ${ai.length}줄 · 내 자막 ${mine.length}줄`);
+    prog({ info: [['자막', `${rows.length}줄 (편집기에서 고친 그대로)`]] });
+    await render(E, ctx, st, plan, j, '편집/AI완성.mp4');
+    for (const c of caps.filter((_, k) => k % Math.max(1, Math.ceil(caps.length / 3)) === 0).slice(0, 3)) await prog.snap(ctx, '편집/AI완성.mp4', (c[0] + c[1]) / 2, `${r1(c[0])}초 자막`);
+    prog({ stage: 'done' });
+    return;
+  }
   const prog = progOf(E, 'aisubs', [['segs', '원문 자막 정리'], ['ko', '한국어 번역'], ['ai', '해설·후크 자막'], ['render', '자막 입혀 그리기'], ['done', '끝']]);
   const segs = (o.en || o.ko) ? segsOf(E, info, plan) : [], d = plan.duration;
   if ((o.en || o.ko) && !segs.length) ctx.log('  영상 원문 자막이 없어요 (내 파일이거나 유튜브 자막이 없는 영상). 원문·번역 자막은 건너뛰어요.');
