@@ -854,6 +854,7 @@ const CHRISTIAN_SOURCES = [
 // 유튜브 채널별 소스 묶음 — 현재 채널 것만 보여 주고, 채널에 없는 묶음은 '공통 · 기타'로
 const YT_SOURCE_CHANNELS = [
   { id:'yt-wrestling', tab:'레슬링 소스 채널', emoji:'🤼', sources:WRESTLING_SOURCES },
+  { id:'yt-wrestling-kr', tab:'해외 레슬링 소스 채널 (여러 언어)', emoji:'🌍', sources:WRESTLING_SOURCES.filter(s=>/[\u0400-\u04FF\u3040-\u30FF\u0600-\u06FF\u10A0-\u10FF]/.test((s.candidate&&s.candidate.title)||'')||/러시아|카자흐|키르기스|다게스탄|일본|튀르키|이란|몽골|조지아/.test(s.role||'')) },
   { id:'yt-christian', tab:'기독교 소스 채널', emoji:'🙏', sources:CHRISTIAN_SOURCES },
   { id:'yt-indochina', tab:'중국 및 인도 소스 채널', emoji:'🌏', sources:[] },
 ];
@@ -879,14 +880,15 @@ function wrestlingSourceLibrary(list) {
 document.addEventListener('click',event=>{
   const button=event.target.closest('button[data-wrestling-source]');
   if(!button)return;
-  const group=YT_SOURCE_CHANNELS.find(g=>g.sources.some(item=>item.id===button.dataset.wrestlingSource));
+  const has=g=>g.sources.some(item=>item.id===button.dataset.wrestlingSource),lk=typeof ytLock==='string'?ytLock:'';
+  const group=YT_SOURCE_CHANNELS.find(g=>g.id===lk&&has(g))||YT_SOURCE_CHANNELS.find(has);
   const source=group&&group.sources.find(item=>item.id===button.dataset.wrestlingSource);
   if(!source||db.ideas.some(idea=>idea.id==='wrestling-source-'+source.id))return;
   const video=source.candidate;
   db.ideas.unshift({
     id:'wrestling-source-'+source.id,title:video.title,
     note:`소스 · ${source.name}\n역할 · ${source.role}\n\n기획 방향\n${video.angle}\n\n확인 메모\n${source.note}\n\n검토 단계 · 원문·편집 구간·기술명·선수 정보 확인 전`,
-    sources:video.url+'\n'+source.url,preferredChannel:'youtube',ytChannel:group.id,topicId:video.topic,
+    sources:video.url+'\n'+source.url,preferredChannel:'youtube',ytChannel:group.id,topicId:group.id==='yt-wrestling-kr'?'yt-wkr-match':video.topic,
     sample:false,created:Date.now(),
   });
   log(group.tab.replace(' 소스 채널','')+' 검토 소재 등록: '+source.name);

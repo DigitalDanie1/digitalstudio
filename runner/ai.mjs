@@ -91,7 +91,7 @@ const readJson = f => JSON.parse(fs.readFileSync(f, 'utf8'));
 const writeJson = (f, o) => { fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, JSON.stringify(o, null, 1)); };
 const r1 = n => Math.round(n * 10) / 10;
 // 채널의 AI 스타일: 고른 룩이 AI 스타일이면 그것, 아니면 채널 기본
-const CH_STYLE = { 'yt-wrestling': 'yt-mat', 'yt-christian': 'yt-christian', 'yt-politics': 'yt-politics' };
+const CH_STYLE = { 'yt-wrestling': 'yt-mat', 'yt-wrestling-kr': 'yt-mat', 'yt-christian': 'yt-christian', 'yt-politics': 'yt-politics' };
 // 영상 종류 (레슬링): 처음에 고르면 1차 컷·자막·라벨이 그 틀로 짜여요. 없으면 하이라이트.
 export const VTYPES = {
   highlight: { vname: '하이라이트' },
@@ -253,6 +253,22 @@ export async function prepWhisper(ctx) {
   fs.writeFileSync(raw, Buffer.alloc(16000 * 4));
   await run(process.execPath, [path.join(HERE, 'whisper.mjs'), WH_DIR, path.join(WH_DIR, 'models'), WH_MODEL, raw, out, 'english'], ctx, { onOut: d => { const m = /PROGRESS (\S+) (\d+)/.exec(String(d)); if (m) ctx.log(`Whisper 모델 받는 중: ${m[1]} ${m[2]}%`); } });
   ctx.log('Whisper 준비 끝');
+}
+// Whisper 에 넘길 말 언어. 자동이면 제목·채널 이름의 글자로 짐작해요 (Whisper 가 스스로 못 고르고 영어로 받아 적어서).
+export const WH_LANGS = ['korean', 'english', 'russian', 'kazakh', 'japanese', 'turkish', 'persian', 'mongolian', 'georgian', 'azerbaijani', 'ukrainian', 'spanish', 'french', 'hindi', 'arabic', 'chinese'];
+export function guessLang(t) {
+  t = String(t || '');
+  if (/[가-힣]/.test(t)) return 'korean';
+  if (/[\u3040-\u30FF]/.test(t)) return 'japanese';
+  if (/[\u10A0-\u10FF]/.test(t)) return 'georgian';
+  if (/[\u0600-\u06FF]/.test(t)) return /[پچژگکی]/.test(t) ? 'persian' : 'arabic';
+  if (/[\u0400-\u04FF]/.test(t)) return /[әғқңұһӘҒҚҢҰҺ]/.test(t) ? 'kazakh' : /[їєґЇЄҐ]/.test(t) ? 'ukrainian' : /[өүӨҮ]/.test(t) ? 'mongolian' : 'russian';
+  if (/[\u4E00-\u9FFF]/.test(t)) return 'chinese';
+  if (/[\u0900-\u097F]/.test(t)) return 'hindi';
+  if (/[əƏ]/.test(t)) return 'azerbaijani';
+  if (/[ğışİĞŞ]/.test(t)) return 'turkish';
+  if (/[ñ¿¡]/.test(t)) return 'spanish';
+  return 'english';
 }
 const HALLU = /^(감사합니다\.?|시청해\s?주셔서 감사합니다\.?|구독과 좋아요.*|MBC 뉴스.*|thank you( for watching)?\.?|thanks for watching!?|you|\.+)$/i;
 const cleanAsr = t => String(t || '').replace(/>>/g, ' ').replace(/[\[(](noise|applause|music|laughter|cheering|박수|음악|웃음)[\])]/gi, ' ').replace(/[♪♫]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -644,12 +660,12 @@ async function aisubs(E, ctx) {
   const prog = progOf(E, 'aisubs', [['segs', '소리 받아 적기'], ['ko', '번역'], ['ai', '기술 설명 자막'], ['render', '자막 입혀 그리기'], ['done', '끝']]);
   const d = plan.duration, wantSpeech = o.en || o.ko;
   // 0) 영상 속 말: Whisper 로 원본 소리를 직접 받아 적어요 (한국어 영상·내 파일도). 안 되면 유튜브 영어 자막으로.
-  const lang = ['korean', 'english', 'japanese'].includes(o.srcLang) ? o.srcLang : (/[가-힣]/.test(info.title || '') ? 'korean' : 'english');
-  const L = lang === 'korean' ? 'ko' : lang === 'english' ? 'en' : 'other';
+  const lang = WH_LANGS.includes(o.srcLang) ? o.srcLang : guessLang(`${info.title || ''} ${info.channel || ''}`);
+  const L = lang === 'korean' ? 'ko' : lang === 'english' ? 'en' : 'other', LNAME = { korean: '한국어', english: '영어', russian: '러시아어', kazakh: '카자흐어', japanese: '일본어', turkish: '튀르키예어', persian: '페르시아어', mongolian: '몽골어', georgian: '조지아어', azerbaijani: '아제르바이잔어', ukrainian: '우크라이나어', spanish: '스페인어', french: '프랑스어', hindi: '힌디어', arabic: '아랍어', chinese: '중국어' }[lang] || lang;
   let segs = [];
   if (wantSpeech) {
-    try { segs = speechSegs(await whisperCues(E, ctx, info, plan, lang, prog), plan.cuts); ctx.log(`  받아 적은 말: ${segs.length}덩어리 (${L === 'ko' ? '한국어' : L === 'en' ? '영어' : lang})`); }
-    catch (e) { if (e instanceof StopError) throw e; ctx.log('  ' + e.message + ' · 유튜브 영어 자막으로 대신해요.'); segs = L === 'ko' ? [] : segsOf(E, info, plan); }
+    try { segs = speechSegs(await whisperCues(E, ctx, info, plan, lang, prog), plan.cuts); ctx.log(`  받아 적은 말: ${segs.length}덩어리 (${LNAME})`); }
+    catch (e) { if (e instanceof StopError) throw e; ctx.log('  ' + e.message + ' · 유튜브 영어 자막으로 대신해요.'); segs = L === 'en' ? segsOf(E, info, plan) : []; }
   }
   const talk = segs.reduce((t, g) => t + (g.e - g.s), 0);
   if (wantSpeech && talk < 1.5 && !o.ai) { o.ai = true; ctx.log('  말이 거의 없는 영상이에요. 하단은 기술 설명 자막으로 채워요.'); }
@@ -663,7 +679,7 @@ async function aisubs(E, ctx) {
     prog({ stage: 'ko', info: [['받아 적은 말', segs.length + '줄']], rows: { head: ['시각', '원문'], rows: segs.map(g => [`${g.s}-${g.e}`, g.t]) } });
     ctx.log(`Claude 가 받아 적은 말 ${segs.length}줄을 다듬고 ${need.map(x => x === 'ko' ? '한국어' : '영어').join('·')} 자막으로 만들어요 (한 줄에 한 줄, 시각은 말 그대로)…`);
     const j = await askClaude(E, ctx, `너는 ${st.genre} 쇼츠의 자막 번역가다. 원본: "${info.title}" (${info.channel}). 등장인물: ${JSON.stringify(plan.who || '')}
-아래는 영상에서 나오는 말을 음성 인식으로 받아 적은 것이다 (원문 언어: ${lang}). 번호마다 그 줄에 있는 말만 옮긴다.
+아래는 영상에서 나오는 말을 음성 인식으로 받아 적은 것이다 (원문 언어: ${LNAME}). 번호마다 그 줄에 있는 말만 옮긴다.
 - 한 줄에 한 줄. 앞뒤 줄의 말을 끌어오거나 합치거나 요약하지 마라. 문장이 중간에 끊겨 있으면 끊긴 그대로 자연스럽게.
 - 받아 적기가 틀린 단어(이름, 기술 이름)는 앞뒤 뜻으로 바로잡는다. 없는 말을 지어내지 마라.
 ${need.includes('ko') ? (L === 'ko' ? '- 한국어(ko): 원문 그대로 둔다. 잘못 들은 단어만 바로잡고, 줄당 18자 안팎에서 \\n 으로 나눈다.\n' : `- 한국어(ko): 말투 ${st.tone} 최대 2줄, 줄당 18자 이내, 줄바꿈은 \\n.\n`) : ''}${need.includes('en') ? (L === 'en' ? '- 영어(en): 원문 그대로 둔다. 잘못 들은 단어(이름·기술 이름)만 바로잡는다.\n' : '- 영어(en): 자연스러운 구어 영어, 최대 2줄, 줄당 32자 이내, 줄바꿈은 \\n.\n') : ''}${segs.map(x => `${x.id}. ${x.t}`).join('\n')}

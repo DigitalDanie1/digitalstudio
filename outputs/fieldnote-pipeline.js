@@ -892,7 +892,7 @@
   // ===== 레슬링 작업판 (AI 편집, 맥의 Claude Code): 링크 → 하이라이트 1차 컷 → 스타일 선택 → 스타일 입히기 → 자막 → 다운로드 =====
   // 인트로·아웃트로는 모든 단계에서 후크: 1차 컷(첫 컷 intro·마지막 컷 outro) / 스타일(위 제목) / 자막(0초 후크·마지막 줄 후크)
   // AI 편집 작업판을 쓰는 채널 → 그 채널의 AI 편집 스타일(룩). 실행기 runner/ai.mjs 의 CH_STYLE 과 같아요.
-  const AI_CH = { 'yt-wrestling': 'yt-mat', 'yt-christian': 'yt-christian', 'yt-politics': 'yt-politics' };
+  const AI_CH = { 'yt-wrestling': 'yt-mat', 'yt-wrestling-kr': 'yt-mat', 'yt-christian': 'yt-christian', 'yt-politics': 'yt-politics' };
   // 레슬링 AI 편집에서 더 고를 수 있는 쇼츠 스타일 (레퍼런스 쇼츠를 본뜬 틀). 실행기 runner/ai.mjs 의 AI_STYLES 와 같아요.
   const YT_AI_LOOKS = [
     { id: 'yt-replay', name: '리플레이 룩', desc: '꽉 찬 경기 화면 + 짧은 노란 말자막 + 결정적 순간 링 + 제목 없음 · 참고: TAKEDOWN 쇼츠 1,310만 회', ref: 'https://www.youtube.com/shorts/OEZ-90bZ_cI' },
@@ -909,7 +909,7 @@
   const ytRefLooks = ch => (typeof window.ytRefShorts === 'function' ? window.ytRefShorts(ch) : []).filter(r => !YT_AI_LOOKS.some(l => l.ref.includes(r.id))).map(r => ({ id: 'ref-' + r.id, vid: r.id, title: r.title, from: r.from }));
   // 자막·썸네일 입력 칸 초안 (화면이 다시 그려져도 남게): 에피소드별
   const YD = {};
-  function ytSubDraft(ep) { const k = 's:' + (ep ? ep.ep : ''); if (!YD[k]) { const o = (ep && ep.subsOpt) || {}; YD[k] = { tech: o.tech != null ? !!o.tech : true, techLang: o.techLang || 'ko', speech: o.speech != null ? !!o.speech : true, speechLang: o.speechLang || 'both', srcLang: o.srcLang || '', capStyle: o.capStyle || 'mat', top1: o.top1 || '', top2: o.top2 || '', mine: '' }; } return YD[k]; }
+  function ytSubDraft(ep) { const k = 's:' + (ep ? ep.ep : ''); if (!YD[k]) { const o = (ep && ep.subsOpt) || {}; YD[k] = { tech: o.tech != null ? !!o.tech : true, techLang: o.techLang || 'ko', speech: o.speech != null ? !!o.speech : true, speechLang: o.speechLang || (ep && ep.channel === 'yt-wrestling-kr' ? 'ko' : 'both'), srcLang: o.srcLang || '', capStyle: o.capStyle || 'mat', top1: o.top1 || '', top2: o.top2 || '', mine: '' }; } return YD[k]; }
   function ytThumbDraft(ep) { const k = 't:' + (ep ? ep.ep : ''); if (!YD[k]) { const o = (ep && ep.thumbText) || {}; YD[k] = { top: o.top || '', bot: o.bot || '' }; } return YD[k]; }
   window.ytAiExtra = (ep, ids) => { const x = {}; if (ids.includes('aisubs')) x.subs = { ...ytSubDraft(ep) }; if (ids.includes('aithumb')) x.thumb = { ...ytThumbDraft(ep) }; return x; };
   // 만든 자막 목록 (편집/AI자막.json) 은 실행기에서 받아 와서 기억해요
@@ -1141,7 +1141,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
   for (const ev of ['play', 'pause', 'seeked', 'timeupdate']) document.addEventListener(ev, e => { const a = e.target; if (a && a.dataset && a.dataset.baRole === 'a') baFollow(a); }, true);
   function ytAiCards(it, ep, off) {
     const names = ['1차 컷 (영상 종류)', '스타일 선택', '스타일 입히기', '자막', '인트로·아웃트로', '썸네일', '다운로드'];
-    const chId = it.idea ? ytCh(it.idea) : ytTab(), sport = chId === 'yt-wrestling', myLook = AI_CH[chId] || 'yt-mat';
+    const chId = it.idea ? ytCh(it.idea) : ytTab(), sport = chId === 'yt-wrestling' || chId === 'yt-wrestling-kr', myLook = AI_CH[chId] || 'yt-mat';
     const st = id => (ep && (ep.steps || []).find(x => x.id === id)) || { status: 'todo', outputs: [] }, ok = id => st(id).status === 'done';
     const out = (id, p) => (st(id).outputs || []).find(o => o.path === p && o.exists);
     const old = !!ep && !(ep.steps || []).some(x => x.id === 'aicut');
@@ -1245,7 +1245,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
       <div role="radiogroup" aria-label="${title} 언어" style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 0 28px">${LANGS.map(([v, l]) => `<label class="pl-chip ${SO[lk] === v ? 'on' : ''}" style="cursor:pointer"><input type="radio" name="plSub_${lk}" data-pl-sub="${lk}" value="${v}" ${SO[lk] === v ? 'checked' : ''} style="margin-right:5px">${l}</label>`).join('')}</div></div>`;
     const subForm = `${opt('tech', '기술 설명 자막', '자동. 레퍼런스처럼 하이라이트·기술을 하나하나 짚어 줘요 (원속도는 상황 한 줄, 슬로우는 ① ② ③ 단계).', 'techLang')}
       ${opt('speech', '영상 음성 자막 (아래)', runnerApi >= 25 ? '자동. 맥에서 Whisper 가 영상 소리를 직접 받아 적어요 (한국어·영어 영상, 내 파일도). 말이 거의 없는 영상은 아래를 기술 설명 자막으로 채워요. 처음 한 번은 Whisper 설치·모델(약 1GB) 받느라 몇 분 더 걸려요.' : '자동. 영상 속 말(중계·인터뷰)을 그대로, 말하는 시각에 맞춰요. 유튜브 자막이 있는 영상만 돼요.', 'speechLang')}
-      ${runnerApi >= 25 ? `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:-4px 0 12px 14px"><span class="small">영상 속 말 언어</span>${radios('srcLang', [['', '자동 (제목 보고)'], ['korean', '한국어'], ['english', '영어']], '영상 속 말 언어')}</div>` : ''}
+      ${runnerApi >= 25 ? `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:-4px 0 12px 14px"><span class="small">영상 속 말 언어</span><select class="pl-input" style="width:auto" data-pl-sub="srcLang" aria-label="영상 속 말 언어">${(runnerApi >= 26 ? [['', '자동 (제목 글자로 짐작)'], ['english', '영어'], ['russian', '러시아어'], ['kazakh', '카자흐어'], ['japanese', '일본어'], ['turkish', '튀르키예어'], ['persian', '페르시아어 (이란)'], ['mongolian', '몽골어'], ['georgian', '조지아어'], ['azerbaijani', '아제르바이잔어'], ['ukrainian', '우크라이나어'], ['spanish', '스페인어'], ['french', '프랑스어'], ['hindi', '힌디어'], ['arabic', '아랍어'], ['chinese', '중국어'], ['korean', '한국어']] : [['', '자동 (제목 보고)'], ['korean', '한국어'], ['english', '영어']]).map(([v, l]) => `<option value="${v}" ${SO.srcLang === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>` : ''}
       ${capPick}
       <p class="small">둘 다 켜면 말이 나오는 곳은 음성 자막, 나머지는 기술 설명이 들어가요. "한국어 + 영어"는 큰 한국어 아래 작은 영어 줄로 나와요. 자막이 필요 없으면 아래 "자막 없이 다음 단계로".</p>
       ${!subDone && !subSkip ? '<p><button type="button" class="pl-link" data-pl-subskip>자막 없이 다음 단계로 →</button></p>' : ''}`;

@@ -75,8 +75,8 @@ function userRefs(ch){
 // 편집 스타일 선택 단계에서 쓰는 레퍼런스 쇼츠 목록: 기본 채널 대표 영상 + 내가 추가한 쇼츠 + 추가한 채널의 대표 영상
 window.ytRefShorts=function(ch){
  const out=[],seen=new Set(),push=(id,title,from)=>{if(id&&!seen.has(id)){seen.add(id);out.push({id,title:title||'',from})}};
- const b=BUILTIN[ch];if(b){const top=b.shorts.slice().sort((x,y)=>y.views-x.views)[0];if(top)push(top.id,top.title,b.name)}
- for(const r of list(ch)){if(r.kind==='video')push(r.videoId,r.memo,'내 레퍼런스');else if(r.top)push(r.top.videoId,r.top.title,r.handle||'채널')}
+ const b=BUILTIN[ch]||(ch==='yt-wrestling-kr'?BUILTIN['yt-wrestling']:null);if(b){const top=b.shorts.slice().sort((x,y)=>y.views-x.views)[0];if(top)push(top.id,top.title,b.name)}
+ for(const r of ch==='yt-wrestling-kr'?[...list(ch),...list('yt-wrestling')]:list(ch)){if(r.kind==='video')push(r.videoId,r.memo,'내 레퍼런스');else if(r.top)push(r.top.videoId,r.top.title,r.handle||'채널')}
  return out;
 };
 // 레퍼런스 분석 탭에서 쇼츠 링크 하나를 바로 추가 (스타일 선택 목록에도 같이 떠요)
