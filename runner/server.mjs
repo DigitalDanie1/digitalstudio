@@ -7,12 +7,13 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { HOME, StepError, StopError, sanitize, exists, parseRanges, isLocalSource, localPath, run, probe, FFMPEG, YTDLP, lastLines, fmtTime, MAX_RANGE } from './util.mjs';
 import { createHighlights, LEN_MIN, LEN_MAX } from './highlights.mjs';
-import { AI_STYLES, isRefLook, parseMine, aiSegs, analyzeRef, readRefAnalysis, refDir, refKind } from './ai.mjs';
+import { prepWhisper, AI_STYLES, isRefLook, parseMine, aiSegs, analyzeRef, readRefAnalysis, refDir, refKind } from './ai.mjs';
 import { listStyles, saveStyle, enqueue, cancelJob, listJobs, resolveReadable, thumbOf, shutdownImages, ImgError } from './images.mjs';
 import { STEP_DEFS, STEP_FN, outputsFor, listAssets, checkScript, cleanPasted, parseScript, parseBanner, parseHook, PLACEHOLDER, SCRIPT_MAX_LINES, CHANNEL_PROFILES, LOOK_CHOICES, lookKeyOf, FX_PACKS, fxPackOf, parseFxTimes, migrateState, layoutLines, draftText, draftTranscript, splitAnswer, feedbackPrompt, callClaude, parseCredit, previewPlan, renderPreview } from './steps.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // 작업판이 쓰는 기능 수준. 3 = 새 9칸 순서 (/look, /ranges, deferRanges, 단계 clip·subs·fx)
+const WH = { state: 'idle', log: [] };
 const API_LEVEL = 25;   // 25 = 자막: Whisper 로 영상 소리 직접 받아 적기 (한국어·영어), 위 고정 제목 두 줄 고치기 (top1·top2), 자막 모양 7가지 (capStyle) · 24 = 자막: 기술 설명(tech)·영상 음성(speech) + 언어(ko|en|both) · 23 = Claude 가 지금 하는 일 실시간 (편집/진행_claude.json, stream-json) · 22 = 그리는 중인 화면 실시간 (진행_<단계>_live.jpg) · 21 = 자막 편집기 (GET /segs, run body.subs.edit) · 20 = 사이트에서 실행기 업데이트 (POST /update: GitHub 최신 runner 파일 받아서 검사 후 바꾸고 다시 켜기), 레퍼런스 분석 줄 세우기 (queued) · 19 = 모든 AI 단계 실시간 보기 (편집/진행_<단계>.json) · 18 = 1차 컷 실시간 보기 (편집/AI컷_진행.json) · 17 = 레퍼런스 쇼츠 분석 (POST /ref/analyze, GET /ref/status, GET /ref/<id>: 컷·후크·이펙트·이목 장치를 먼저 보여 주고 고르면 그대로 적용) · 16 = 자막 원문·번역·해설·내 자막 나눠 켜기 (run body.subs), 썸네일 내 카피 (run body.thumb) · 15 = 실행기 다시 켜기 (POST /restart, health.disk) · 14 = 내 영상 올리기 (POST /upload) · 13 = 레퍼런스 쇼츠 룩 (look ref-<영상ID>, view.refStyle) · 12 = 한 구간·하이라이트 길이 최대 3분(30초·1분·2분·3분), 쇼츠 최대 3분 · 11 = 하이라이트 '지난 작업' 초기화(/hl/reset, 돌고 있으면 멈추고 휴지통 한 폴더로) · 10 = AI 편집 단계(aicut·aistyle·aisubs, 맥의 Claude Code) · 9 = 유튜브 초기화(/reset, 에피소드·하이라이트 전부 휴지통 한 폴더로) · 8 = 미리보기 견본(/preview, 고른 룩·이펙트를 실제 영상 4초로) · 7 = 에피소드 완전히 지우기(/episode/delete, 휴지통으로) · 6 = 하이라이트 찾기(/hl/*) ·  4 = 7칸 순서 (/edit 1차·2차 편집, /draft, /feedback, 슬로우 구간 x0.5, 매트 스토리 룩) · 5 = 최종 결과물 레퍼런스(이펙트 팩: /fxpack, status.fxPacks)
 let VERSION = 'dev';
 try { VERSION = fs.readFileSync(path.join(HERE, 'version.txt'), 'utf8').trim() || 'dev'; } catch {}
@@ -433,6 +434,11 @@ const routes = {
     if (auto) setTimeout(bye, 300);
     return { json: { ok: true, from: VERSION, to, restarting: auto } };
   },
+  'POST /whisper/prep': () => {   // Whisper 미리 설치 (패키지 + 모델 약 1GB). 상태는 GET /whisper
+    if (WH.state !== 'running') { WH.state = 'running'; WH.log = []; prepWhisper({ log: l => { WH.log.push(l); WH.log = WH.log.slice(-20); }, aborted: () => false, setChild: () => {}, onTime: () => {} }).then(() => { WH.state = 'done'; }, e => { WH.state = 'error'; WH.log.push(e.message); }); }
+    return { json: { ok: true, state: WH.state } };
+  },
+  'GET /whisper': () => ({ json: { state: WH.state, log: WH.log } }),
   'POST /restart': () => {
     if ([...episodes.values()].some(E => E.running)) throw new HttpError(409, '작업이 돌고 있어요. 끝난 뒤에 다시 켜 주세요.');
     setTimeout(bye, 300); return { json: { ok: true } };

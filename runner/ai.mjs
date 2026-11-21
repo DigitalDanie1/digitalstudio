@@ -246,6 +246,14 @@ async function ensureWhisper(ctx) {
   try { await run(npm, ['install', '@huggingface/transformers@3', '--no-audit', '--no-fund', '--onnxruntime-node-install-cuda=skip'], ctx, { cwd: WH_DIR, path: NODE_DIR }); }
   catch (e) { if (e instanceof StopError) throw e; throw new StepError('Whisper 설치를 못 했어요: ' + (lastLines(e.err) || e.message)); }
 }
+// 미리 설치: 패키지 + 모델을 받아 둬요 (1초 무음을 한 번 받아 적어서 모델까지 내려받기)
+export async function prepWhisper(ctx) {
+  await ensureWhisper(ctx);
+  const raw = path.join(WH_DIR, 'silence.raw'), out = path.join(WH_DIR, 'silence.json');
+  fs.writeFileSync(raw, Buffer.alloc(16000 * 4));
+  await run(process.execPath, [path.join(HERE, 'whisper.mjs'), WH_DIR, path.join(WH_DIR, 'models'), WH_MODEL, raw, out, 'english'], ctx, { onOut: d => { const m = /PROGRESS (\S+) (\d+)/.exec(String(d)); if (m) ctx.log(`Whisper 모델 받는 중: ${m[1]} ${m[2]}%`); } });
+  ctx.log('Whisper 준비 끝');
+}
 const HALLU = /^(감사합니다\.?|시청해\s?주셔서 감사합니다\.?|구독과 좋아요.*|MBC 뉴스.*|thank you( for watching)?\.?|thanks for watching!?|you|\.+)$/i;
 const cleanAsr = t => String(t || '').replace(/>>/g, ' ').replace(/[\[(](noise|applause|music|laughter|cheering|박수|음악|웃음)[\])]/gi, ' ').replace(/[♪♫]/g, ' ').replace(/\s+/g, ' ').trim();
 // 컷에 쓰인 원본 구간만 받아 적어요 (구간마다 앞뒤 1초 여유, 가까운 구간은 합쳐서). 결과는 분석/whisper_*.json 에 남겨 다시 안 해요.
