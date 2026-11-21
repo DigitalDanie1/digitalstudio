@@ -630,7 +630,6 @@
   const YT_GROUPS = [
     { id: 'g-dl', name: '링크 영상 다운', ids: ['research', 'download'], desc: '링크의 영상을 맥에 통째로 받아요. 영어 자막이 있으면 같이 받아요.', go: '영상 받기' },
     { id: 'g-cut', name: '컷 편집', ids: ['clip', 'plan', 'rough'], desc: '쓸 구간을 넣으세요. 한 구간은 3분까지예요. 구간을 잘라 이어 붙여 가편집을 만들어요.', go: '컷 편집 실행' },
-    { id: 'g-subs', name: '자막 자동화', ids: ['subs'], desc: '영상 속 말을 자동 자막으로 입혀요. 소스 영상의 자막을 쓰고, AI 키가 있으면 한국어로 옮겨요.', go: '자막 넣기' },
     { id: 'g-fx', name: '이펙트', ids: ['fx'], desc: '고른 룩의 배너·훅 제목·흑백 인트로·워터마크를 입혀요. 끝나면 위에서 바로 볼 수 있어요.', go: '이펙트 넣기' },
     { id: 'g-voice', name: '음악/녹음', ids: ['script', 'mix'], desc: '대본을 만들고 한 번 읽어 본 뒤, 줄마다 내 목소리를 녹음하고 배경음악을 골라 합쳐요. 대본 자막도 이때 영상에 들어가요.', go: '대본 만들기' },
     { id: 'g-upload', name: '업로드 패키지', ids: ['upload'], desc: '제목·설명란·태그·썸네일 문구를 한 파일로 만들어요.', go: '업로드 패키지 만들기' },
@@ -831,9 +830,9 @@
       const todo = G.sts.filter(x => x.status !== 'done').map(x => x.id), all = g.ids.slice();
       const ids = G.done || !todo.length ? all : todo;
       // 앞 칸이 끝나야 열려요: 영상 다운 → 컷 편집 → 자막 → 이펙트 → (음악/녹음, 업로드 패키지)
-      const prev = { 'g-dl': null, 'g-cut': ['research', 'download'], 'g-subs': ['clip', 'plan', 'rough'], 'g-fx': ['subs'], 'g-voice': ['fx'], 'g-upload': ['fx'] }[g.id];
+      const prev = { 'g-dl': null, 'g-cut': ['research', 'download'], 'g-fx': ['clip', 'plan', 'rough'], 'g-voice': ['fx'], 'g-upload': ['fx'] }[g.id];
       const locked = !!prev && !prev.every(okSt);
-      const lockMsg = { 'g-cut': '링크 영상을 먼저 받아 주세요.', 'g-subs': '컷 편집이 끝나면 열려요.', 'g-fx': '자막 자동화가 끝나면 열려요.', 'g-voice': '이펙트가 끝나면 열려요.', 'g-upload': '이펙트가 끝나면 열려요.' }[g.id];
+      const lockMsg = { 'g-cut': '링크 영상을 먼저 받아 주세요.', 'g-fx': '컷 편집이 끝나면 열려요.', 'g-voice': '이펙트가 끝나면 열려요.', 'g-upload': '이펙트가 끝나면 열려요.' }[g.id];
       const desc = G.gate ? '대본이 만들어졌어요. 아래 결과에서 대본을 열어 읽어 보고, 괜찮으면 "대본 확인 완료 · 계속"을 누르세요.'
         : locked ? lockMsg : isVoice && !scriptDone ? '먼저 대본을 만들어요. 다 되면 한 번 읽어 보고 계속 진행하세요.'
         : isVoice ? '대본이 정해졌어요. "녹음·음악 열기"에서 줄마다 녹음하고 배경음악을 골라 "목소리·음악 넣기"를 누르세요.' : g.desc;
@@ -1307,7 +1306,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
     };
     const e3 = {
       id: 'e3', name: '2차 편집', title: '2차 편집',
-      desc: round < 1 ? '1차 편집이 끝나면 열려요.' : fbNew || round < 2 ? '저장한 자막으로 다시 편집해요. 자막·제목·선수 태그·점수 도장·원본 소리·배경음악이 들어가요.' : "다시 고치려면 '자막 넣기'에서 자막을 저장하고 누르세요.",
+      desc: round < 1 ? '1차 편집이 끝나면 열려요.' : fbNew || round < 2 ? '다시 편집해요. 제목·선수 태그·점수 도장·원본 소리·배경음악이 들어가요.' : "다시 고치려면 '자막 넣기'에서 자막을 저장하고 누르세요.",
       btn: () => editing && (ep.editRound || 0) >= 2 ? '실행 멈춤' : round >= 2 ? `${round + 1}차 편집 만들기` : '2차 편집 만들기',
       attrs: () => editing && (ep.editRound || 0) >= 2 ? 'data-ya-act="stop"' : `data-ya-act="edit" data-ya-round="${Math.max(round + 1, 2)}"`,
       cls: editing && (ep.editRound || 0) >= 2 ? 'danger' : '',
@@ -1347,7 +1346,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
         recordUrl('youtube', it.key, it.idea, it.idea.title);
       },
     };
-    return [e1, e2, e3, e4];
+    return [e1, e3, e4];   // 자막 넣기(e2)는 뺐어요
   }
   // ===== 유튜브 "작업 중" 카드 띠 =====
   const ytThumb = idea => { const v = ytVidOf(ytFirstUrl(idea)); return v ? `https://i.ytimg.com/vi/${v}/mqdefault.jpg` : ''; };

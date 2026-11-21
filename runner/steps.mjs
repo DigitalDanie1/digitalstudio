@@ -1173,6 +1173,11 @@ ${ev.join('\n')}
 `;
 }
 async function subs(E, ctx) {
+  // 자막 넣기는 꺼 두었어요 (모든 유튜브 작업판): 가편집 그대로 다음 단계(이펙트)로 넘어가요
+  fs.rmSync(E.p('편집/자막본.mp4'), { force: true }); fs.rmSync(E.p('편집/원본자막.ass'), { force: true });
+  try { const P0 = readJson(E.p('편집/편집계획.json')); P0.srcSubs = false; writeJson(E.p('편집/편집계획.json'), P0); } catch {}
+  ctx.log('자막 넣기는 꺼 두었어요. 가편집 그대로 다음 단계로 가요.');
+  return;
   const P = readJson(E.p('편집/편집계획.json'));
   if (!P) throw new StepError('편집 계획이 먼저예요.');
   if (!exists(E.p('편집/가편집.mp4'))) throw new StepError('가편집이 먼저예요.');
