@@ -1130,6 +1130,16 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
     vid.addEventListener('click', () => { if (vid.paused) vid.play(); else vid.pause(); });
     if (st.rows) paint(); else { st.rows = []; loadAi().then(ok => { if (!ok) paint(); }); }
   }
+  // 1차 컷 전/후: 컷 계획(편집/AI컷_진행.json)으로 "완성 시각 -> 원본 시각" 을 맞춰요
+  function ytCutMap(ep) { const d = ytCutProg(ep, false); if (!d || !d.cuts) return null; let t = 0;
+    return d.cuts.map(c => { const sp = Math.min(1, Math.max(0.1, +c.speed || 1)), dur = (c.b - c.a) / sp, o = [t, t + dur, c.a, sp]; t += dur; return o; }); }
+  const baFollow = a => { const box = a.closest('.pl-ba'); if (!box) return; const b = box.querySelector('video[data-ba-role="b"]'); if (!b) return;
+    const m = box.dataset.baMap, t = a.currentTime; let bt = t;
+    if (m && m[0] === '[') { try { const cs = JSON.parse(m), c = cs.find(x => t >= x[0] && t < x[1]) || cs[cs.length - 1]; if (c) bt = c[2] + (Math.min(t, c[1]) - c[0]) * c[3]; } catch {} }
+    else bt = t - (+m || 0);
+    bt = Math.max(0, bt); if (Math.abs(b.currentTime - bt) > 0.25) b.currentTime = bt;
+    b.playbackRate = 1; if (a.paused !== b.paused) { if (a.paused) b.pause(); else if (t >= (+m > 0 ? +m : 0)) b.play().catch(() => {}); } };
+  for (const ev of ['play', 'pause', 'seeked', 'timeupdate']) document.addEventListener(ev, e => { const a = e.target; if (a && a.dataset && a.dataset.baRole === 'a') baFollow(a); }, true);
   function ytAiCards(it, ep, off) {
     const names = ['1차 컷 (영상 종류)', '스타일 선택', '스타일 입히기', '자막', '인트로·아웃트로', '썸네일', '다운로드'];
     const chId = it.idea ? ytCh(it.idea) : ytTab(), sport = chId === 'yt-wrestling', myLook = AI_CH[chId] || 'yt-mat';
@@ -1142,6 +1152,14 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
     const errOf = ids => { const f = ids.map(st).find(x => x.status === 'failed'); return f && f.error ? `<p class="pl-error"><b>${esc(f.name)}</b> · ${esc(runnerFriendly(f.error))}</p>` : ''; };
     const logs = ids => `<div class="pl-logs">${ids.map(id => `<button type="button" class="pl-link" data-pl-log="${id}" aria-expanded="${T.logOpen === id}">${esc(st(id).name || id)} 로그${T.logOpen === id ? ' 닫기' : ''}</button>`).join('')}</div>${ids.includes(T.logOpen) ? '<pre class="pl-log" id="plLog">불러오는 중…</pre>' : ''}`;
     const vid = (id, p, label) => { const o = out(id, p); return o ? ytVideoBox('plAi' + id, ep, o, label) : ''; };
+    // 전/후 나란히: 뒤(after) 영상을 틀면 앞(before) 영상이 같은 순간으로 따라가요. map: 'cut'(원본 구간으로) / 숫자(시간 차이)
+    const ba = (bId, bP, aId, aP, labB, labA, map = 0) => { const ob = bId === 'src' ? (st('download').outputs || []).find(o => o.exists) : out(bId, bP), oa = out(aId, aP);
+      if (!oa) return ''; if (!ob) return vid(aId, aP, labA);
+      const cuts = map === 'cut' ? ytCutMap(ep) : null;
+      return `<div class="pl-ba" data-ba="${esc(aId)}" data-ba-map="${cuts ? esc(JSON.stringify(cuts)) : map}" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:8px 0">
+        <figure class="pl-vid" style="margin:0"><video id="plBAb_${aId}" data-ba-role="b" muted playsinline preload="metadata" src="${esc(ytSrc(ep, ob.path, ob.mtime))}" style="width:100%;background:#000;border-radius:8px"></video><figcaption class="small"><b>전</b> · ${esc(labB)}</figcaption></figure>
+        <figure class="pl-vid" style="margin:0"><video id="plBAa_${aId}" data-ba-role="a" controls playsinline preload="metadata" src="${esc(ytSrc(ep, oa.path, oa.mtime))}" style="width:100%;background:#000;border-radius:8px"></video><figcaption class="small"><b>후</b> · ${esc(labA)} · <a class="pl-link" href="${esc(ytSrc(ep, oa.path, oa.mtime))}" target="_blank" rel="noopener noreferrer">새 창 ↗</a></figcaption></figure>
+        <p class="small" style="grid-column:1/-1;margin:0">오른쪽(후)을 재생·이동하면 왼쪽(전)이 같은 순간을 따라가요. 무엇이 바뀌었는지 나란히 보세요.</p></div>`; };
     const runLine = ids => () => { if (!runIn(ids)) return ''; const pct = Number.isFinite(ep.progress) ? ep.progress : null;
       return `<b>${pct != null ? pct + '%' : '실행 중…'}</b> · ${esc(st(ep.running).name || ep.running)} 하는 중. Claude 가 영상을 보는 단계는 몇 분 걸려요 (%는 지난번 걸린 시간으로 어림). 끝나면 자동으로 바뀌어요.${pct != null ? `<div style="height:8px;border-radius:99px;background:var(--line);margin-top:6px;overflow:hidden"><div style="height:100%;width:${pct}%;background:var(--accent,#ff5b5b);transition:width .6s"></div></div>` : ''}`; };
     const stopOr = (ids, attrs) => () => runIn(ids) ? 'data-ya-act="stop"' : attrs;
@@ -1164,7 +1182,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
       disabled: () => !it.idea || off || runnerOnline === null || old || busyElse(CUT),
       isDone: () => cutDone,
       statusLine: runLine(CUT),
-      result: () => ep ? errOf(CUT) + (runnerApi >= 18 && (runIn(CUT) || cutDone) ? ytCutLive(ep, runIn(CUT)) : '') + (cutDone ? `<p><b>1차 컷이 나왔어요.</b> 인트로·아웃트로가 후크인지 보고, 아니면 "AI 가 다시 자르기"를 누르세요.</p>` + vid('aicut', '편집/AI1차컷.mp4', '1차 컷') : '') + logs(CUT) : '',
+      result: () => ep ? errOf(CUT) + (runnerApi >= 18 && (runIn(CUT) || cutDone) ? ytCutLive(ep, runIn(CUT)) : '') + (cutDone ? `<p><b>1차 컷이 나왔어요.</b> 인트로·아웃트로가 후크인지 보고, 아니면 "AI 가 다시 자르기"를 누르세요.</p>` + ba('src', '', 'aicut', '편집/AI1차컷.mp4', '원본 (같은 순간)', '1차 컷', 'cut') : '') + logs(CUT) : '',
       body: () => (off ? '<p class="pl-error" role="alert"><b>실행기가 꺼져 있어요.</b></p>' : old ? oldMsg : '') + (it.idea ? vtChips() : ''),
     });
     const refWait = id => runnerApi >= 17 && (RA.st[id.slice(4)] || {}).status !== 'done';
@@ -1188,7 +1206,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
       attrs: stopOr(ST, 'data-ya-steps="aistyle"'), cls: runIn(ST) ? 'danger' : '',
       disabled: () => off || !lookOk || !cutDone || busyElse(ST),
       isDone: () => styDone, statusLine: runLine(ST),
-      result: () => ep ? errOf(ST) + (runnerApi >= 19 && (runIn(ST) || styDone) ? ytStepLive(ep, ST[0], runIn(ST)) : '') + (styDone ? vid('aistyle', '편집/AI스타일본.mp4', '스타일본 (자막 전)') + (out('aistyle', '조사/research.md') ? `<p class="small">${ytFileLink(ep.ep, { path: '조사/research.md' })} · 제목·라벨에 쓴 사실의 근거</p>` : '') : '') + logs(ST) : '',
+      result: () => ep ? errOf(ST) + (runnerApi >= 19 && (runIn(ST) || styDone) ? ytStepLive(ep, ST[0], runIn(ST)) : '') + (styDone ? ba('aicut', '편집/AI1차컷.mp4', 'aistyle', '편집/AI스타일본.mp4', '1차 컷', '스타일 입힌 뒤 (자막 전)') + (out('aistyle', '조사/research.md') ? `<p class="small">${ytFileLink(ep.ep, { path: '조사/research.md' })} · 제목·라벨에 쓴 사실의 근거</p>` : '') : '') + logs(ST) : '',
     });
     const SU = ['aisubs'], subDone = ok('aisubs');
     // 자막: 원문(영어)·번역(한국어)·해설/후크(AI)·내 자막을 나눠 켜고, 만든 뒤 줄별로 확인
@@ -1209,7 +1227,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
       attrs: stopOr(SU, 'data-ya-steps="aisubs"'), cls: runIn(SU) ? 'danger' : '',
       disabled: () => off || !styDone || busyElse(SU),
       isDone: () => subDone, statusLine: runLine(SU),
-      result: () => ep ? errOf(SU) + (runnerApi >= 19 && (runIn(SU) || subDone) ? ytStepLive(ep, SU[0], runIn(SU)) : '') + (subDone ? vid('aisubs', '편집/AI완성.mp4', '완성본') + subTable() : '') + logs(SU) : '',
+      result: () => ep ? errOf(SU) + (runnerApi >= 19 && (runIn(SU) || subDone) ? ytStepLive(ep, SU[0], runIn(SU)) : '') + (subDone ? ba('aistyle', '편집/AI스타일본.mp4', 'aisubs', '편집/AI완성.mp4', '스타일본 (자막 전)', '자막 넣은 뒤') + subTable() : '') + logs(SU) : '',
     });
     const BR = ['aibrand'], brDone = ok('aibrand');
     const c5 = card(4, {
@@ -1218,7 +1236,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
       attrs: stopOr(BR, 'data-ya-steps="aibrand"'), cls: runIn(BR) ? 'danger' : '',
       disabled: () => off || !subDone || busyElse(BR),
       isDone: () => brDone, statusLine: runLine(BR),
-      result: () => ep ? errOf(BR) + (runnerApi >= 19 && (runIn(BR) || brDone) ? ytStepLive(ep, BR[0], runIn(BR)) : '') + (brDone ? vid('aibrand', '편집/AI최종.mp4', '최종본 (인트로 + 본편 + 아웃트로)') + `<div class="pl-files">${['편집/AI인트로.mp4', '편집/AI아웃트로.mp4'].filter(p => out('aibrand', p)).map(p => ytFileLink(ep.ep, { path: p })).join(' ')}</div>` : '') + logs(BR) : '',
+      result: () => ep ? errOf(BR) + (runnerApi >= 19 && (runIn(BR) || brDone) ? ytStepLive(ep, BR[0], runIn(BR)) : '') + (brDone ? ba('aisubs', '편집/AI완성.mp4', 'aibrand', '편집/AI최종.mp4', '완성본 (인트로·아웃트로 전)', '최종본 (인트로 + 본편 + 아웃트로)', 2.2) + `<div class="pl-files">${['편집/AI인트로.mp4', '편집/AI아웃트로.mp4'].filter(p => out('aibrand', p)).map(p => ytFileLink(ep.ep, { path: p })).join(' ')}</div>` : '') + logs(BR) : '',
     });
     const TH = ['aithumb'], thDone = ok('aithumb'), thImg = out('aithumb', '편집/AI썸네일.jpg');
     const TT = ytThumbDraft(ep);
