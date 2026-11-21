@@ -143,12 +143,39 @@ function source(E) {
 }
 
 // Claude Code 에게 묻고 JSON 하나를 받아요. check 가 오류 문장을 돌려주면 그걸 알려 주고 한 번 더 물어요.
+// Claude 가 지금 하는 일 (어떤 장면 시트를 보는지, 무엇을 검색하는지, 뭐라고 쓰는지) 을 편집/진행_claude.json 에 실시간으로
+function thinkLog(E, ctx, ask) {
+  const F = E.p ? E.p('편집/진행_claude.json') : path.join(E.dir, '진행_claude.json'), P = { step: ctx.stepId || '', ask, started: Date.now(), events: [] };
+  let buf = '', last = 0;
+  const save = (force) => { const now = Date.now(); if (!force && now - last < 500) return; last = now; try { writeJson(F, { ...P, t: now }); } catch {} };
+  const rel = f => { const a = String(f || ''); return a.startsWith(E.dir) ? a.slice(E.dir.length + 1) : a; };
+  const push = (kind, text, extra = {}) => { P.events.push({ at: Date.now(), kind, text: String(text || '').slice(0, 600), ...extra }); if (P.events.length > 60) P.events.splice(0, P.events.length - 60); save(); };
+  const onEv = ev => {
+    if (ev.type === 'assistant' && ev.message && Array.isArray(ev.message.content)) for (const c of ev.message.content) {
+      if (c.type === 'thinking' && c.thinking) push('think', c.thinking.trim());
+      else if (c.type === 'text' && c.text && c.text.trim()) push('text', c.text.trim());
+      else if (c.type === 'tool_use') { const i = c.input || {};
+        if (c.name === 'Read') { const f = rel(i.file_path); if (/SKILL\.md$/.test(f) || f.includes('/skills/')) push('skill', f.split('/').slice(-2, -1)[0] || f); else { push('read', f, { file: f }); ctx.log('  Claude 가 보는 중: ' + f); } }
+        else if (c.name === 'WebSearch') { push('search', i.query); ctx.log('  Claude 검색: ' + i.query); }
+        else if (c.name === 'WebFetch') push('fetch', i.url);
+        else if (c.name === 'Write') push('write', rel(i.file_path));
+        else push('tool', c.name); }
+    }
+  };
+  save(true);
+  return { onOut: d => { buf += d; let k; while ((k = buf.indexOf('\n')) >= 0) { const line = buf.slice(0, k).trim(); buf = buf.slice(k + 1); if (!line) continue; try { onEv(JSON.parse(line)); } catch {} } },
+    note: (kind, text) => push(kind, text), done: () => { P.ended = Date.now(); save(true); } };
+}
 async function askClaude(E, ctx, prompt, check) {
   let p = prompt;
+  const ls = String(prompt).split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#') && !/^[-=]{3,}/.test(l));
+  const what = ls.find(l => /이번 할 일/.test(l)) || ls.find(l => /^너는/.test(l)) || ls[0] || '';
   for (let i = 0; i < 2; i++) {
     ctx.log(i ? '  답을 고쳐 달라고 한 번 더 물어요…' : '  Claude 가 영상을 보는 중… (2~5분)');
+    const tl = thinkLog(E, ctx, what.slice(0, 200));
+    if (i) tl.note('retry', '답을 고쳐 달라고 한 번 더 물어요');
     let out;
-    try { ({ out } = await run(CLAUDE, ['-p', p, '--output-format', 'json', '--allowedTools', 'Read,Write,WebSearch,WebFetch', '--add-dir', E.dir, '--add-dir', SKILL_DIR], ctx)); }
+    try { ({ out } = await run(CLAUDE, ['-p', p, '--output-format', 'stream-json', '--verbose', '--allowedTools', 'Read,Write,WebSearch,WebFetch', '--add-dir', E.dir, '--add-dir', SKILL_DIR], ctx, { onOut: tl.onOut })); }
     catch (e) {
       const lim = /hit your limit[^"]*/i.exec(String(e.out || '') + String(e.err || ''));
       if (lim) throw new StepError('Claude 구독 사용 한도에 걸렸어요 (' + lim[0] + '). 풀린 뒤 다시 실행하세요.');
@@ -156,11 +183,15 @@ async function askClaude(E, ctx, prompt, check) {
       if (e instanceof StopError || e instanceof StepError) throw e.message.includes('ENOENT') ? new StepError('Claude Code(claude)를 못 찾았어요. 맥에 Claude Code 를 설치하고 로그인해 주세요.') : e;
       throw new StepError('Claude Code 실행 실패: ' + (lastLines(e.err) || lastLines(e.out) || e.message));
     }
-    let text = out; try { text = JSON.parse(out).result ?? out; } catch {}
+    let text = out;
+    const resLine = String(out).trim().split('\n').reverse().find(l => /"type"\s*:\s*"result"/.test(l));
+    try { text = resLine ? (JSON.parse(resLine).result ?? out) : (JSON.parse(out).result ?? out); } catch {}
     const s = text.indexOf('{'), e = text.lastIndexOf('}');
     let j = null, err = '';
     if (s < 0 || e < s) err = 'JSON 이 없어요.'; else { try { j = JSON.parse(text.slice(s, e + 1)); } catch (x) { err = 'JSON 모양이 깨졌어요: ' + x.message; } }
     if (!err) err = check(j) || '';
+    tl.note(err ? 'bad' : 'ok', err ? '답에 문제: ' + err : '답을 받았어요');
+    tl.done();
     if (!err) return j;
     ctx.log('  답에 문제가 있어요: ' + err);
     p = prompt + `\n\n방금 네 답의 문제: ${err}\n고쳐서 JSON 하나만 다시 답해라.`;
