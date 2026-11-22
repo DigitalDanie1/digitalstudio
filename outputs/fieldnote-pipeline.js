@@ -769,7 +769,8 @@
           <p class="small" id="plYlHint">${esc(YL.state === 'fail' ? '제목을 직접 적어 주세요.' : '한국어 제목으로 바꿔도 돼요.')}</p>
           <label>내 관점 한 줄 (선택)<textarea class="pl-input" rows="2" id="plYlView" data-yl="view" placeholder="이 영상에서 내가 말하고 싶은 것">${esc(YL.view)}</textarea></label></div>`;
         const list = ytIdeas(), pg = (T.page.youtube || 0) % Math.max(1, Math.ceil(list.length / PAGE)), shown = list.slice(pg * PAGE, pg * PAGE + PAGE);
-        const saved = list.length ? `<details class="pl-peek"><summary>저장된 주제에서 고르기 (${list.length})</summary><div class="pl-topics" role="radiogroup" aria-label="주제">${shown.map(t => `<button type="button" role="radio" aria-checked="false" class="pl-topic" data-pl-ytpick="${esc(t.id)}"><span>${esc(t.title)}</span></button>`).join('')}</div>${list.length > PAGE ? `<button type="button" class="pl-link" data-pl-more>다른 주제 보기 (${pg + 1}/${Math.ceil(list.length / PAGE)})</button>` : ''}</details>` : '';
+        const vw = v => ytLock ? ytLock + '/' + v : v;
+        const saved = `<details class="pl-peek"><summary>저장된 주제에서 고르기 (${list.length})</summary>${list.length ? `<div class="pl-topics" role="radiogroup" aria-label="주제">${shown.map(t => `<button type="button" role="radio" aria-checked="false" class="pl-topic" data-pl-ytpick="${esc(t.id)}"><span>${esc(t.title)}</span></button>`).join('')}</div>${list.length > PAGE ? `<button type="button" class="pl-link" data-pl-more>다른 주제 보기 (${pg + 1}/${Math.ceil(list.length / PAGE)})</button>` : ''}` : `<p class="small">이 채널에 저장된 ${ytPipe.format === 'long' ? '롱폼' : '쇼츠'} 주제가 아직 없어요. <button type="button" class="pl-link" data-view="${vw('youtubePlan')}">AI 주제 발굴</button>에서 찾아 저장하거나, <button type="button" class="pl-link" data-view="${vw('ytSources')}">소스</button>에서 '소재 등록'을 누르면 여기에 모여요.</p>`}</details>`;
         return tabs + `<div class="pl-chips">${fmt('shorts')}${fmt('long')}</div>` + form + saved;
       },
       run: it => ytLinkStart(it),
