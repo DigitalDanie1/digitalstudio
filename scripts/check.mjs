@@ -17,6 +17,14 @@ console.log('1) 문법');
 const code = [...list('outputs', /\.js$/), ...list('runner', /\.mjs$/), ...list('api', /\.js$/), ...list('lib', /\.mjs$/), 'middleware.js', 'scripts/check.mjs'].filter(f => fs.existsSync(path.join(ROOT, f)));
 for (const f of code) { const r = spawnSync(process.execPath, ['--check', path.join(ROOT, f)], { encoding: 'utf8' }); r.status === 0 ? null : fail(`${f}: ${(r.stderr || '').trim().split('\n').slice(0, 4).join(' / ')}`); }
 for (const f of list('runner', /\.command$/)) { const r = spawnSync('bash', ['-n', path.join(ROOT, f)], { encoding: 'utf8' }); if (r.status !== 0) fail(`${f}: ${(r.stderr || '').trim()}`); }
+// html 안의 <script> 도 검사 (따옴표 하나로 사이트 전체가 멈출 수 있어요)
+for (const f of list('outputs', /\.html$/).concat(['login.html'].filter(f => fs.existsSync(path.join(ROOT, f))))) {
+  [...read(f).matchAll(/<script(?![^>]*\bsrc=)(?![^>]*type="(?:application\/json|text\/template)")[^>]*>([\s\S]*?)<\/script>/g)].forEach((m, i) => {
+    const t = path.join(os.tmpdir(), `fieldnote-inline-${process.pid}-${i}.js`); fs.writeFileSync(t, m[1]);
+    const r = spawnSync(process.execPath, ['--check', t], { encoding: 'utf8' }); fs.rmSync(t, { force: true });
+    if (r.status !== 0) fail(`${f} 의 ${i + 1}번째 <script>: ${(r.stderr || '').trim().split('\n').filter(l => /SyntaxError|^\s*\^/.test(l) || l.includes(':')).slice(0, 3).join(' / ')}`);
+  });
+}
 ok(`${code.length}개 파일`);
 
 console.log('2) 사이트가 불러오는 파일');

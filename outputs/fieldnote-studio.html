@@ -326,8 +326,13 @@ const YT_V7_BY_ID=Object.fromEntries(YT_V7.map(t=>[t.id,t]));
 const YT_CHANNELS=[
 {id:'yt-christian',name:'기독교 채널',tab:'기독교',persona:'성경과 교리를 쉽게, 이단의 황당한 주장은 날카롭게. 교단 공식 판단과 개인 의견을 구분하고 사람을 조롱하지 않는다.'},
 {id:'yt-politics',name:'크리스천 가치관 정치·이민 채널',tab:'정치·이민',persona:'크리스천 보수 가치관으로 이민·다문화·이슬람 정책을 비판. 정책과 주장을 비판하되 특정 국적·종교의 사람을 비하하지 않는다. 출처 있는 사실 중심.'},
+<<<<<<< Updated upstream
 {id:'yt-wrestling',name:'레슬링 채널',tab:'레슬링',persona:'퇴근하고 매트에 가는 30대 직장인 생활체육 레슬러가 직접 운영하는 채널이다(20대 후반에 시작한 일반인, 주 5회 운동). 방송·해설 채널 말투가 아니라 운동 끝나고 친구한테 영상 보여 주듯 말하고, 프로 기술도 직장인 레슬러 내 몸으로 해 보면 어떤지를 기준으로 비교한다. 피곤하지만 레슬링이 좋아서 하는 사람의 솔직한 감탄과 자조 섞인 유머가 있다. 주 시청자는 레슬링·주짓수·MMA를 취미로 하는 20~40대 직장인. 입문·첫 스파링·체급 차이·부상 예방·동호인 대회·퇴근 후 체력 훈련처럼 직장인 레슬러가 직접 겪는 이야기와, 프로 경기에서 동호인이 가져갈 기술을 다룬다. 기술·경기 하이라이트·선수 소개·여자 레슬러·UFC 속 레슬링도 다룬다. 경기 기록과 내 의견을 구분하고, 겪지 않은 일화나 숫자는 지어내지 않는다.'},
 {id:'yt-wrestling-kr',name:'레슬링 KOREA 채널',tab:'레슬링 KOREA',persona:'해외 레슬링 영상(러시아·카자흐·다게스탄·일본·튀르키예·이란·몽골·조지아·미국 등)의 해설·인터뷰·코치 설명을 한국어로 정확히 옮겨 한국 시청자에게 전달하는 전담 채널. 원어 발언과 내 해설을 구분하고, 영상에 없는 말을 지어내지 않는다. 선수·대회·체급은 확인된 것만. 옮기는 사람은 퇴근하고 매트에 가는 30대 직장인 생활체육 레슬러라서, 내 해설은 운동 끝나고 친구한테 말하듯 솔직하고 짧게 한다.'},
+=======
+{id:'yt-wrestling',name:'레슬링 채널',tab:'레슬링',persona:'퇴근하고 체육관 가는 30대 직장인 생활체육 레슬러가 운영하는 계정이다. "채널"이 아니라 레슬링 좋아하는 평범한 회사원의 시선으로, 프로 경기도 "나 같은 일반인이 매트에서 당해 보고 써 보고 싶은" 눈높이로 본다. 시청자는 레슬링·주짓수·MMA를 취미로 하는 20~40대 직장인. 입문·첫 스파링·체급 차이·부상·야근 뒤 체력·동호인 대회처럼 직장인 생활체육인이 직접 겪는 이야기와, 프로 경기에서 동호인이 내일 써먹을 기술을 다룬다. 말투는 친구한테 하듯 반말, 직장인 공감 한 줄(출근·야근·월요일·허리·무릎), 과장된 유튜버 말투와 "레전드" 남발은 피한다. 경기 기록과 해설자의 분석을 구분하고, 개인 경력은 지어내지 않는다.'},
+{id:'yt-wrestling-kr',name:'레슬링 KOREA 채널',tab:'레슬링 KOREA',persona:'해외 레슬링 영상(러시아·카자흐·다게스탄·일본·튀르키예·이란·몽골·조지아·미국 등)의 해설·인터뷰·코치 설명을 한국어로 정확히 옮겨 한국 시청자에게 전달하는 전담 채널. 원어 발언과 내 해설을 구분하고, 영상에 없는 말을 지어내지 않는다. 선수·대회·체급은 확인된 것만.'},
+>>>>>>> Stashed changes
 {id:'yt-program-review',name:'프로그램 리뷰 채널',tab:'프로그램 리뷰',persona:'리얼리티·연애·서바이벌·관찰 예능의 한 장면을 맥락과 편집 방식까지 분석한다. 출연자 개인을 조롱하거나 단정하지 않고, 방송에서 확인되는 장면·자막·인터뷰와 내 해석을 구분한다. 스포일러는 제목·썸네일·도입에서 명확히 알리고, 클립·이미지는 인용 범위와 사용 권리를 확인한다.'}
 ];
 const IG_ACCOUNTS=[
@@ -385,10 +390,12 @@ function migrateYoutubeTopics(x){
  }
 }
 /* v8: 블로그에서 사회·신앙 철회 + 유튜브 3개 채널(ytChannel) 배치. 어떤 이전 버전에서도 같은 결과(멱등). */
+/* 기본 성격을 바꾸면 예전 기본값 그대로 쓰던 채널은 새 기본값으로 (직접 고친 문구는 그대로) */
+const OLD_PERSONA={'yt-wrestling':'레슬링·주짓수·MMA를 취미로 하는 생활체육인(20~40대 직장인)이 주 시청자다. 입문·첫 스파링·체급 차이·부상 예방·동호인 대회·집에서 하는 체력 훈련처럼 생활체육인이 직접 겪는 이야기와, 프로 경기에서 동호인이 가져갈 기술을 다룬다. 레슬링 기술·경기 하이라이트·선수 소개·여자 레슬러·UFC에서의 레슬링 활용도 다룬다. 실제 장면의 자세·연결 동작과 승부의 이유를 쉽게 해설한다. 경기 기록과 해설자의 분석을 구분한다.'};
 function ytChannelsInit(x){
  const old=x.profile&&typeof x.profile==='object'&&typeof x.profile.youtubeVoice==='string'&&x.profile.youtubeVoice!==DEFAULT_YOUTUBE_VOICE?x.profile.youtubeVoice:null;
  const have=Array.isArray(x.ytChannels)?x.ytChannels.filter(c=>c&&typeof c==='object'&&YT_CH_BY_ID[c.id]):null;
- const out=YT_CHANNELS.map(d=>{const c=have&&have.find(h=>h.id===d.id);if(c)return {id:d.id,name:typeof c.name==='string'&&c.name.trim()?c.name:d.name,voice:typeof c.voice==='string'?c.voice:d.persona};return {id:d.id,name:d.name,voice:old??d.persona}});
+ const out=YT_CHANNELS.map(d=>{const c=have&&have.find(h=>h.id===d.id);if(c)return {id:d.id,name:typeof c.name==='string'&&c.name.trim()?c.name:d.name,voice:typeof c.voice==='string'&&c.voice!==OLD_PERSONA[d.id]?c.voice:d.persona};return {id:d.id,name:d.name,voice:old??d.persona}});
  x.ytChannels=out;
 }
 function migrateSocietyAndYtChannelsV8(x){
@@ -508,6 +515,7 @@ if(Array.isArray(x.interests)&&Array.isArray(x.ideas)&&x.blogSeedVersion!==4){se
 if(x.profile&&typeof x.profile==='object'&&typeof x.profile.blogVoice!=='string')x.profile.blogVoice=DEFAULT_BLOG_VOICE;
 if(x.profile&&typeof x.profile==='object'&&typeof x.profile.youtubeVoice!=='string')x.profile.youtubeVoice=DEFAULT_YOUTUBE_VOICE;
 if(Array.isArray(x.interests)&&!Array.isArray(x.ytChannels))ytChannelsInit(x);
+if(Array.isArray(x.ytChannels))x.ytChannels.forEach(c=>{if(c&&OLD_PERSONA[c.id]&&c.voice===OLD_PERSONA[c.id])c.voice=YT_CH_BY_ID[c.id].persona});
 igAccountsInit(x);
 return x}
 
