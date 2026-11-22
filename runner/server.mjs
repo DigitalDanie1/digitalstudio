@@ -420,8 +420,8 @@ const routes = {
     const sha = String((await get(`https://api.github.com/repos/${REPO}/commits/main`, true)).sha || '');
     if (!/^[0-9a-f]{40}$/.test(sha)) throw new HttpError(502, 'GitHub 최신 버전을 못 읽었어요.');
     const to = sha.slice(0, 7), auto = !!process.env.XPC_SERVICE_NAME && process.env.XPC_SERVICE_NAME.includes('digitalstudio');
-    if (to === VERSION) return { json: { ok: true, same: true, version: VERSION } };
     const FILES = ['server.mjs', 'steps.mjs', 'ai.mjs', 'util.mjs', 'images.mjs', 'highlights.mjs', 'whisper.mjs', 'styles.json', 'README.md', '실행기 켜기.command', '자동실행 켜기.command', '자동실행 끄기.command', '유튜브 로그인 연결.command'];
+    if (to === VERSION && FILES.every(f => exists(path.join(HERE, f)))) return { json: { ok: true, same: true, version: VERSION } };   // 빠진 파일이 있으면 같은 버전이어도 다시 받아요
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'fieldnote-update-'));
     try {
       for (const f of FILES) {
