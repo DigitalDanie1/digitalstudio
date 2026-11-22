@@ -751,7 +751,8 @@
     const topic = {
       id: 'topic', name: '원본 링크', title: '원본 링크', desc: () => ytPipe.format === 'long' ? '긴 롱폼 영상을 넣으면 하이라이트 장면 여러 개를 먼저 뽑아요. 체크한 장면마다 쇼츠 작업이 생기고, 하나씩 골라 아래 단계로 재가공해요.' : '쇼츠 영상 링크를 넣거나, 내가 받아 둔 영상 파일을 올리세요. 그 영상을 재가공해서 내 쇼츠 하나를 만들어요.',
       btn: '이 링크로 시작',
-      hideBtn: it => !!it.idea || ytPipe.format === 'long',
+      hideBtn: it => !!it.idea,
+      get noBtn() { return ytPipe.format === 'long'; },   // 롱폼 → 하이라이트: 시작은 아래 '하이라이트 찾기'로
       isDone: it => !!it.idea,
       result: it => it.idea ? `<b>${esc(it.idea.title)}</b>${/^https?:/.test(ytFirstUrl(it.idea)) ? ` · <a class="pl-link" href="${esc(ytFirstUrl(it.idea))}" target="_blank" rel="noopener noreferrer">원본 링크 ↗</a>` : ytFirstUrl(it.idea) ? ' · 내 영상 파일' : ''}${it.ep ? '' : ' <button type="button" class="pl-link" data-pl-ytchange>다른 링크로 바꾸기</button>'}` : '',
       body: it => {
