@@ -13,7 +13,7 @@ TARGET="${FIELDNOTE_INSTALL_DIR:-$HOME_ROOT/실행기}"
 PORT="${FIELDNOTE_RUNNER_PORT:-4777}"
 BIN="$HOME/.local/bin"
 STAMP="$(date +%Y%m%d-%H%M)"
-FILES=(server.mjs steps.mjs ai.mjs util.mjs images.mjs highlights.mjs test.mjs README.md "실행기 켜기.command" "자동실행 켜기.command" "자동실행 끄기.command")
+FILES=(server.mjs steps.mjs ai.mjs util.mjs images.mjs highlights.mjs test.mjs README.md "실행기 켜기.command" "자동실행 켜기.command" "자동실행 끄기.command" "유튜브 로그인 연결.command")
 
 say() { echo; echo "▶ $*"; }
 finish() { echo; if [ -t 0 ]; then read -r -p "엔터를 누르면 닫혀요"; fi; exit "${1:-0}"; }
@@ -133,6 +133,11 @@ if [ "$NO_START" = 0 ]; then
   done
   if echo "$H" | grep -q '"ok":true'; then
     echo "  $H"
+    if ! grep -q -- "--cookies-from-browser" "$HOME/.config/yt-dlp/config" 2>/dev/null; then
+      echo
+      echo "※ 이 맥은 아직 YouTube 로그인 연결 전이에요. 영상 받기가 \"봇 확인\"으로 막히면"
+      echo "  $TARGET/유튜브 로그인 연결.command 를 한 번 더블클릭하세요."
+    fi
     echo
     echo "다 됐어요. 새로 뜬 터미널 창은 닫지 마세요."
     echo "크롬이 \"로컬 네트워크 접근\"을 물으면 허용을 누르세요."

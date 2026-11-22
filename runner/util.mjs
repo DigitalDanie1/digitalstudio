@@ -65,6 +65,7 @@ export async function run(cmd, args, ctx = {}, opts = {}) {
       try { return await run1(cmd, ['--extractor-args', `youtube:player_client=${c}`, ...args], ctx, opts); }
       catch (e2) { if (e2 instanceof StopError) throw e2; last = e2; if (!BOT_RE.test(e2.err || '') && !/Requested format|not available/i.test(e2.err || '')) throw e2; }
     }
+    last.err = (last.err || '') + '\n→ 이 맥에서 ~/Desktop/유투브/실행기/유튜브 로그인 연결.command 를 한 번 더블클릭하세요 (맥마다 한 번).';
     throw last;
   }
 }
