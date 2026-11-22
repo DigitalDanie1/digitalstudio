@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import crypto from 'node:crypto';
 import { HOME, FFMPEG, YTDLP, FONT_DIR, FONT_NAME, StepError, StopError, run, ff, probe, lastLines, exists, parseVtt, rangeSecs } from './util.mjs';
 
 // 자동실행(launchd)은 PATH 가 짧아서 Claude Code 가 깔리는 곳을 직접 찾아요
@@ -244,8 +245,22 @@ function thinkLog(E, ctx, ask) {
   return { onOut: d => { buf += d; let k; while ((k = buf.indexOf('\n')) >= 0) { const line = buf.slice(0, k).trim(); buf = buf.slice(k + 1); if (!line) continue; try { onEv(JSON.parse(line)); } catch {} } },
     note: (kind, text) => push(kind, text), done: () => { P.ended = Date.now(); save(true); } };
 }
+// Claude 가 한글 경로를 옮겨 적다 틀려서(예: 분석 -> 분析) 파일을 못 읽고 맴도는 일이 있어요.
+// 그래서 프레임 폴더는 영어 이름(AN)으로, 에피소드 폴더는 영어 이름 바로가기(~/.fieldnote/ep/<해시>)로 알려 줘요.
+const AN = 'frames';
+function epAlias(dir) {
+  try {
+    const a = path.join(HOME, '.fieldnote', 'ep', crypto.createHash('sha1').update(dir).digest('hex').slice(0, 10));
+    fs.mkdirSync(path.dirname(a), { recursive: true });
+    let ok = false; try { ok = fs.realpathSync(a) === fs.realpathSync(dir); } catch {}
+    if (!ok) { fs.rmSync(a, { force: true }); fs.symlinkSync(dir, a); }
+    return a;
+  } catch { return dir; }
+}
 async function askClaude(E, ctx, prompt, check) {
-  let p = prompt;
+  const alias = epAlias(E.dir);
+  const al = t => alias === E.dir ? t : String(t).split(E.dir).join(alias);
+  let p = al(prompt);
   const ls = String(prompt).split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#') && !/^[-=]{3,}/.test(l));
   const what = ls.find(l => /이번 할 일/.test(l)) || ls.find(l => /^너는/.test(l)) || ls[0] || '';
   for (let i = 0; i < 2; i++) {
@@ -253,7 +268,7 @@ async function askClaude(E, ctx, prompt, check) {
     const tl = thinkLog(E, ctx, what.slice(0, 200));
     if (i) tl.note('retry', '답을 고쳐 달라고 한 번 더 물어요');
     let out;
-    try { ({ out } = await run(CLAUDE, ['-p', p, '--output-format', 'stream-json', '--verbose', '--allowedTools', 'Read,Write,WebSearch,WebFetch', '--add-dir', E.dir, '--add-dir', SKILL_DIR], ctx, { onOut: tl.onOut })); }
+    try { ({ out } = await run(CLAUDE, ['-p', p, '--output-format', 'stream-json', '--verbose', '--allowedTools', 'Read,Write,WebSearch,WebFetch', '--add-dir', alias, '--add-dir', E.dir, '--add-dir', SKILL_DIR], ctx, { onOut: tl.onOut })); }
     catch (e) {
       const lim = /hit your limit[^"]*/i.exec(String(e.out || '') + String(e.err || ''));
       if (lim) throw new StepError('Claude 구독 사용 한도에 걸렸어요 (' + lim[0] + '). 풀린 뒤 다시 실행하세요.');
@@ -272,7 +287,7 @@ async function askClaude(E, ctx, prompt, check) {
     tl.done();
     if (!err) return j;
     ctx.log('  답에 문제가 있어요: ' + err);
-    p = prompt + `\n\n방금 네 답의 문제: ${err}\n고쳐서 JSON 하나만 다시 답해라.`;
+    p = al(prompt) + `\n\n방금 네 답의 문제: ${err}\n고쳐서 JSON 하나만 다시 답해라.`;
   }
   throw new StepError('Claude 답을 쓸 수 없었어요. 로그를 보고 다시 실행해 주세요.');
 }
@@ -355,11 +370,11 @@ async function whisperCues(E, ctx, info, plan, lang, prog) {
   const rs = plan.cuts.map(c => [Math.max(0, +c.a - 1), +c.b + 1]).sort((a, b) => a[0] - b[0]), merged = [];
   for (const r of rs) { const m = merged[merged.length - 1]; if (m && r[0] <= m[1] + 3) m[1] = Math.max(m[1], r[1]); else merged.push([...r]); }
   const cues = [];
-  fs.mkdirSync(E.p('분석'), { recursive: true });
+  fs.mkdirSync(E.p(AN), { recursive: true });
   for (const [k, [a, b]] of merged.entries()) {
-    const out = E.p('분석', `whisper_${lang}_${r1(a)}_${r1(b)}.json`);
+    const out = E.p(AN, `whisper_${lang}_${r1(a)}_${r1(b)}.json`);
     if (!exists(out)) {
-      const raw = E.p('분석', 'whisper.raw');
+      const raw = E.p(AN, 'whisper.raw');
       ctx.log(`  소리 받아 적는 중 ${k + 1}/${merged.length} (원본 ${r1(a)}~${r1(b)}초, ${lang === 'korean' ? '한국어' : lang === 'english' ? '영어' : lang})…`);
       prog && prog({ info: [['받아 적기', `${k + 1}/${merged.length} 구간`]] });
       await ff(['-ss', String(a), '-t', String(b - a), '-i', info.file, '-vn', '-ac', '1', '-ar', '16000', '-f', 'f32le', raw], ctx);
@@ -398,7 +413,7 @@ export function mergeCaps(j, segs) {
 
 // 썸네일 시트: a 부터 fps 로 뽑아 cols x rows 로 붙여요
 async function sheets(E, ctx, src, name, a, dur, fps, cols, rows, width) {
-  const out = E.p('분석'); fs.mkdirSync(out, { recursive: true });
+  const out = E.p(AN); fs.mkdirSync(out, { recursive: true });
   for (const f of fs.readdirSync(out)) if (f.startsWith(name + '_')) fs.rmSync(path.join(out, f));
   await ff(['-ss', String(a), '-t', String(dur), '-i', src, '-vf', `fps=${fps},scale=${width}:-2,tile=${cols}x${rows}`, '-q:v', '4', path.join(out, `${name}_%03d.jpg`)], ctx);
   const per = cols * rows, step = 1 / fps;
@@ -439,7 +454,7 @@ async function aicut(E, ctx) {
   // 작업판에서 컷이 어떻게 되고 있는지 실시간으로 보게: 단계·본 장면 시트·고른 구간·컷 계획을 그때그때 적어요
   const P = { dur: r1(dur), stage: 'scan', sheets: [], fine: [], window: null, picks: null, why: '', cuts: null };
   const prog = o => { Object.assign(P, o); try { writeJson(E.p('편집/AI컷_진행.json'), { ...P, t: Date.now() }); } catch {} };
-  const shots = pre => { try { return fs.readdirSync(E.p('분석')).filter(f => f.startsWith(pre)).sort().map(f => '분석/' + f); } catch { return []; } };
+  const shots = pre => { try { return fs.readdirSync(E.p(AN)).filter(f => f.startsWith(pre)).sort().map(f => AN + '/' + f); } catch { return []; } };
   prog({});
   if (!picks && spanDur > Math.max(60, T * 1.5)) {
     ctx.log(rgs.length ? '고른 구간을 2초 간격으로 훑어봐요…' : '전체 영상을 2초 간격으로 훑어봐요…');
@@ -486,7 +501,7 @@ JSON 하나만 답해라: {"engine":"${eks.join('|')}","question":"이 쇼츠가
   }
   ctx.log('고른 장면을 0.2초 간격으로 봐요…');
   let fine;
-  if (picks) { try { for (const f of fs.readdirSync(E.p('분석'))) if (f.startsWith('fine_')) fs.rmSync(E.p('분석', f)); } catch {} const parts = []; for (const [k, [a, b]] of picks.entries()) parts.push(await sheets(E, ctx, info.file, `fine_${k + 1}`, a, b - a, 5, 5, 5, 384)); fine = parts.join('\n'); }
+  if (picks) { try { for (const f of fs.readdirSync(E.p(AN))) if (f.startsWith('fine_')) fs.rmSync(E.p(AN, f)); } catch {} const parts = []; for (const [k, [a, b]] of picks.entries()) parts.push(await sheets(E, ctx, info.file, `fine_${k + 1}`, a, b - a, 5, 5, 5, 384)); fine = parts.join('\n'); }
   else fine = await sheets(E, ctx, info.file, 'fine', win[0], win[1] - win[0], win[1] - win[0] > 60 ? 2 : 5, 5, 5, 384);
   prog({ stage: 'plan', window: P.window || win, fine: shots('fine') });
   const plan = await askClaude(E, ctx, `${skills(ctx, ['shorts-blueprint', 'edit-plan-sheet'])}너는 ${st.genre} 쇼츠 편집자다. 아래는 "${info.title}" 의 ${picks ? `골라 둔 장면 ${picks.length}개(${picks.map(x => `${r1(x[0])}~${r1(x[1])}초`).join(', ')})` : `원본 ${r1(win[0])}~${r1(win[1])}초`}를 0.2초 간격으로 뽑은 프레임 시트다. Read 도구로 전부 봐라:
@@ -564,7 +579,7 @@ async function renderCut(E, ctx, info, lay = LAY.mat, outRel = '편집/AI1차컷
 }
 
 // ---------- 4. 스타일 입히기 / 5. 자막: Claude 가 AI완성.json 을 쓰고 그려요 ----------
-const fineList = E => { try { return fs.readdirSync(E.p('분석')).filter(f => f.startsWith('fine_')).sort().map(f => E.p('분석', f)).join(', '); } catch { return ''; } };
+const fineList = E => { try { return fs.readdirSync(E.p(AN)).filter(f => f.startsWith('fine_')).sort().map(f => E.p(AN, f)).join(', '); } catch { return ''; } };
 function checkFinal(plan, needCaps, st = {}) {
   const d = plan.duration, inT = (a, b) => a >= 0 && b > a && b <= d + 0.6, in01 = v => +v >= 0 && +v <= 1;
   return j => {
@@ -627,7 +642,7 @@ export async function analyzeRef(id, channel, ctx) {
   catch (e) { if (e instanceof StopError) throw e; }
   const cuts = { times: cutT, count: cutT.length + 1, avg: r1(dur / (cutT.length + 1)) };
   ctx.log('프레임 시트를 만들어요…');
-  const sheets = path.join(dir, '시트'), step = r1(Math.max(0.5, dur / 80)); fs.rmSync(sheets, { recursive: true, force: true }); fs.mkdirSync(sheets, { recursive: true });
+  const sheets = path.join(dir, 'sheets'), step = r1(Math.max(0.5, dur / 80)); fs.rmSync(sheets, { recursive: true, force: true }); fs.mkdirSync(sheets, { recursive: true });
   await ff(['-i', vid, '-vf', `fps=${(1 / step).toFixed(3)},scale=216:-2,tile=5x4`, '-q:v', '4', path.join(sheets, 's_%02d.jpg')], ctx);
   const list = fs.readdirSync(sheets).sort().map((f, i) => `- ${path.join(sheets, f)} (${r1(i * 20 * step)}~${r1(Math.min(dur, (i * 20 + 19) * step))}초)`).join('\n');
   const talk = kind === 'talk', chKey = CH_STYLE[channel] || 'yt-mat';
@@ -1122,7 +1137,7 @@ const TW = 1280, TH = 720, TOP = 140, BOT = 120;
 async function aithumb(E, ctx) {
   const info = source(E), plan = readJson(E.p('편집/AI컷.json')), dur = (await probe(info.file, ctx)).duration;
   let fin = {}; try { fin = readJson(E.p('편집/AI완성.json')); } catch {}
-  const sheetsOf = pre => { try { return fs.readdirSync(E.p('분석')).filter(f => f.startsWith(pre + '_')).sort().map(f => E.p('분석', f)); } catch { return []; } };
+  const sheetsOf = pre => { try { return fs.readdirSync(E.p(AN)).filter(f => f.startsWith(pre + '_')).sort().map(f => E.p(AN, f)); } catch { return []; } };
   const coarse = sheetsOf('coarse'), fine = sheetsOf('fine');
   const nos = t => String(t || '').replace(/\s/g, '').length;
   const st = styleOf(E), my = E.s.thumbText || {}, myTop = String(my.top || '').trim(), myBot = String(my.bot || '').trim();
