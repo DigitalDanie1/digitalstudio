@@ -32,6 +32,12 @@ FIELDNOTE 작업판의 "⚡ 이 주제 제작" 버튼이 이 맥에서 실제 �
 - 판단은 이 맥의 **Claude Code**(`claude -p`, 구독)가 해요. API 키 필요 없음. 맥에서 `claude` 가 로그인돼 있어야 해요.
 - 단계마다 `~/.claude/skills` 의 스킬 규칙을 먼저 읽어요: 1차 컷 = shorts-blueprint·edit-plan-sheet / 스타일 = source-check-research(조사 → `조사/research.md`)·shorts-blueprint / 자막 = shorts-blueprint.
 - 인트로·아웃트로는 모든 단계에서 후크: 첫 컷 intro·마지막 컷 outro, 위 2줄 제목, 0초 자막·마지막 자막.
+- **편집 뇌 (서사 엔진)**: 원본을 시간순으로 줄이지 않고, 질문 하나 → 답으로 재조립해요. 모든 YouTube 작업판 공통.
+  - 장면 고르기: 태그(SETUP·DOUBT·TAUNT·TRY·MONEY·REACT·ESCALATE·REVEAL·PUNCH)로 재료를 찾고, 흩어진 재료 구간 1~4개 + 엔진 하나를 정해요.
+  - 엔진: 레슬링 = 정체공개 · 계단식 · 도발-참교육 · 역전 / 말 영상 = 충돌 · 자폭 · 반전.
+  - 컷: 모든 컷에 beat(hook·기·승·전·결)와 tag. hook 0~2초, 기 15% · 승 30% · 전 35% · 결 15%. MONEY 다음은 REACT, 전에서 판이 커지고, 시간순 그대로면 다시 짜요.
+  - 제목 = 상황 / 질문 키워드, 자막 = L2 내레이션(컷이 점프하는 자리마다 "그 모습을 보고", "이번엔 ~") + L3 대사·리액션 + 결의 펀치 한 줄. 인트로는 질문, 아웃트로는 펀치를 되받아 질문으로.
+  - 결과: `편집/AI컷.json` 의 `story`(engine·question·punch) 와 컷마다 `beat`·`tag`. 작업판 "컷 실시간 보기"에 서사 칸으로 보여요.
 - 결과: `편집/AI컷.json` · `AI1차컷.mp4` → `AI완성.json` · `AI스타일본.mp4` → `AI완성.mp4`. 자막을 직접 고치려면 `AI완성.json` 을 고치고 "자막 다시 쓰기" 대신 그 파일로 다시 그리면 돼요.
 - 인트로(2.2초)·아웃트로(3.2초): Claude 가 후크 문장을 쓰고, 채널 로고 `~/Desktop/유투브/브랜드/matstory_logo.png` 와 @matstoryhq 를 넣어 그려요. 결과: `AI인트로.mp4` · `AI아웃트로.mp4` · 붙인 `AI최종.mp4`.
 - 배경음악: `~/Desktop/유투브/소리/BGM/` 의 첫 파일을 원본 경기 소리 아래에 깔아요.

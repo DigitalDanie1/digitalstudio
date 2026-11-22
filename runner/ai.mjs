@@ -128,6 +128,71 @@ export const VTYPES = {
     fx: '라벨 하나 (type label, k=주제 이름, s=한 줄 설명). 팝업 없음.',
     caps: '- 정보 하나만. 질문 → 이유 → 답 순서. 문장은 짧게.' },
 };
+// ---------- 편집 뇌 (서사 엔진) ----------
+// 원본을 시간순으로 줄이지 않는다. 질문 하나를 세우고, 그 답으로 닫히게 재조립한다. 모든 YouTube 작업판(레슬링·KOREA·기독교·Stupid)의 컷·제목·자막·인트로/아웃트로가 이 뇌로 판단해요.
+// 레퍼런스: 퍽퍽퍽 "정지현을본 외국 파이터들 반응"(정체공개) / 송곳주먹 "격투기선수를 던져버리는 레슬링 레전드"(계단식) / 매미킴 도장깨기 EP.7(도발-참교육)
+export const BEATS = ['hook', '기', '승', '전', '결'];
+export const ENGINES = {
+  sport: {
+    reveal: { name: '정체공개', how: '주변·상대가 주인공을 모르거나 의심한다(DOUBT) → 붙어 보고 놀란다(MONEY, REACT) → 정체·권위가 드러난다(REVEAL). 질문 "저 사람 누구야?". 결 = 정체 확인 + 한 줄 펀치(개그 가능).' },
+    ladder: { name: '계단식', how: '압도 장면(MONEY)이 2개 이상, 상대가 점점 세진다(체급·명성·인원). 질문 "어디까지 되나?". 전 = 제일 센 상대. 결 = 겉모습·나이와 실력의 반전 한 줄.' },
+    taunt: { name: '도발-참교육', how: '누군가 자신 있게 도발한다(TAUNT) → 맞붙는다(TRY) → 압도당한다(MONEY). 질문 "진짜 이길 수 있을까?". 결 = 압도 뒤 주인공 또는 진 쪽의 한 줄 교훈·소감.' },
+    clutch: { name: '역전', how: '지고 있거나 위기처럼 보인다(TRY) → 버틴다 → 뒤집는다(MONEY). 질문 "여기서 뒤집힐까?". 결 = 역전 결과·점수 + 리액션.' },
+  },
+  talk: {
+    clash: { name: '충돌', how: '한쪽이 센 주장을 한다(TAUNT) → 상대·청중이 반박하거나 술렁인다(REACT) → 결정타 발언(MONEY). 질문 "누가 이기나?". 결 = 결정타 한 마디 + 반응.' },
+    selfown: { name: '자폭', how: '화자가 자신만만하게 말한다(TAUNT) → 말이 꼬이거나 스스로 모순된다(MONEY) → 본인·청중 반응(REACT). 질문 "이 말 괜찮아?". 결 = 가장 어이없는 한 마디를 그대로 + 리액션. 조롱하는 말은 쓰지 않는다. 말 그대로 보여 준다.' },
+    reveal: { name: '반전', how: '처음엔 평범하거나 반대로 들린다(SETUP) → 맥락이 쌓인다(ESCALATE) → 진짜 요지가 드러난다(REVEAL). 질문 "무슨 말을 하려는 거지?". 결 = 핵심 한 문장.' },
+  },
+};
+const engOf = st => ENGINES[st.kind === 'sport' ? 'sport' : 'talk'];
+const TAGS = 'SETUP(누가·어디서·뭘 하는지) · DOUBT(주인공을 의심/모름) · TAUNT(도발·자신감 선언) · TRY(시도, 위기처럼 보이는 순간) · MONEY(압도·결정적 순간) · REACT(주변·상대 리액션 얼굴/소리) · ESCALATE(판이 커지는 정보: 더 센 상대, 남은 시간, 숫자) · REVEAL(정체·권위·진짜 요지 공개) · PUNCH(한 줄로 닫는 대사·개그·교훈)';
+const engList = st => Object.entries(engOf(st)).map(([k, e]) => `- ${k} (${e.name}): ${e.how}`).join('\n');
+// 1) 장면 고를 때: 재료(태그)부터 찾고 엔진 하나를 정한다
+const brainPick = st => `[편집 뇌] 가장 센 한 장면만 고르지 마라. 서사 재료를 찾는다.
+원본 전체에서 아래 태그가 붙는 순간을 찾는다. 태그가 안 붙는 구간(인사, 소개, 광고·PPL, 이동, 식사, 잡담)은 버린다:
+${TAGS}
+그리고 엔진 하나를 고른다 (우선순위: TAUNT 있으면 도발 계열 > DOUBT+REVEAL 있으면 정체공개 계열 > MONEY 2개 이상이면 계단식 계열):
+${engList(st)}
+재료는 원본 여기저기 흩어져 있어도 된다 (예: 12분의 도발 대사 + 20분의 스파링 + 28분의 소감). MONEY 가 없으면 그 영상은 약하다고 why 에 적는다.`;
+// 2) 컷 짤 때: 비트 배분·컷 규칙·셀프체크
+const brainCut = (st, T) => {
+  const L = T || 45, sec = p => Math.max(1, Math.round(L * p));
+  return `[편집 뇌] 원본 시간순으로 줄이지 마라. 서사 질문 하나를 세우고 그 답으로 닫히게 재조립한다. 엔진 (하나만, 섞지 않는다):
+${engList(st)}
+태그: ${TAGS}
+비트 배분 (출력 ${L}초 기준): hook 0~2초 / 기 약 ${sec(0.15)}초 (SETUP + DOUBT·TAUNT) / 승 약 ${sec(0.3)}초 (TRY → 첫 MONEY → REACT) / 전 약 ${sec(0.35)}초 (ESCALATE → 가장 큰 MONEY → REACT) / 결 약 ${sec(0.15)}초 (REVEAL·PUNCH).
+- hook: 정체공개·반전 계열이면 결의 REVEAL 대사를 맨 앞에 붙인다 (콜드오픈, 본편 결에서 같은 장면이 다시 나와 회수된다). 나머지는 가장 센 MONEY 를 0.8~2초만 보여 주고 결론은 숨긴다.
+- 컷마다 beat(hook|기|승|전|결)와 tag 를 붙인다. 첫 컷 = hook(intro), 마지막 컷 = 결(outro). beat 순서는 hook → 기 → 승 → 전 → 결 로만 간다.
+- 일반 컷은 출력 2.5초 이하. MONEY 만 예외 (원속도 한 번 + 슬로우 한 번 가능).
+- MONEY 바로 다음 컷은 REACT (리액션 얼굴·관중). 액션 → 리액션이 한 세트.
+- 전에서는 반드시 판이 커진다: 상대가 세지거나, 시간이 줄거나, 의심이 커지거나.
+- 0.7초 넘게 아무 일도 안 일어나는 구간은 넣지 않는다. 같은 각도 3컷 연속 금지.
+- 마지막 컷은 얼굴(주인공이나 리액션한 사람)로 끝내는 것이 기본. 얼굴이 없으면 intro 첫 프레임으로 이어지는 루프.
+- 아래 장르 규칙(슬로우 단계, 말 끊지 않기 등)은 MONEY 를 보여 주는 방법이다. 이 비트 순서 안에서 쓴다.
+셀프체크 (하나라도 아니면 다시 짠다): 질문을 한 문장으로 쓸 수 있나 / 0~2초에 결과 예고나 최고 장면이 나오나 / 전에서 판이 커지나 / 결이 한 줄(대사·개그·교훈)로 닫히나 / 원본 시간순 그대로가 아닌가.`;
+};
+// 3) 이후 단계(제목·자막·인트로/아웃트로·썸네일)가 보는 서사 요약
+export function storyTxt(plan) {
+  const s = plan && plan.story; if (!s) return '';
+  const cuts = (plan.cuts || []).map((c, i) => `${i + 1}. [${c.beat || '?'}${c.tag ? '·' + c.tag : ''}] ${c.out ? `완성 ${c.out[0]}~${c.out[1]}초` : `원본 ${c.a}~${c.b}초`}${c.step ? ' · ' + c.step : ''}`).join('\n');
+  return `[편집 뇌 · 이 쇼츠의 서사] 엔진: ${s.engine}${s.engineName ? ' (' + s.engineName + ')' : ''} / 질문: ${s.question} / 결의 펀치: ${s.punch || '(없음)'}
+비트별 컷:
+${cuts}`;
+}
+// 완성 영상에서 원본 순서가 끊기는 자리 (재배치·점프): 자막 내레이션(L2)이 이어 줘야 하는 곳
+export function joinsOf(plan) {
+  const c = plan.cuts || [], out = [];
+  for (let i = 1; i < c.length; i++) if (c[i].out && Math.abs(+c[i].a - +c[i - 1].b) > 1.5 && c[i].beat !== c[i - 1].beat) out.push({ t: +c[i].out[0], beat: c[i].beat, tag: c[i].tag || '' });
+  return out;
+}
+const brainCaps = `[편집 뇌 · 자막 3레이어] 자막은 컷과 컷을 이어서 서사를 만드는 내레이터다.
+- L1 위 고정 제목 (이미 정함): 상황 / 질문·반전 키워드.
+- L2 내레이션 (컷을 잇는 접착제): 원본이 점프하는 자리와 비트가 바뀌는 자리마다 한 줄. 연결어를 쓴다: 상황 열기 "~하는데", "~하던 중" / 연결 "그 모습을 보고", "그러자", "결국" / 판 키우기 "이번엔 ~", "이번 상대는 ~" / 긴장 "...?" 말줄임 ("백 잡히는...?"). 내레이션은 판단하지 않고 상황만 던진다.
+- L3 대사·리액션: 원어 대사는 짧게 옮기고, 리액션은 소리 그대로 ("우와", "와"). 숫자는 꼭 살린다 ("90kg가 날아갔어").
+- 결의 PUNCH 는 한 줄로 닫는다. 괄호 속 편집자 한마디 "(친구한테 물어봤나 봄)" 는 영상 전체에서 한 번만.
+- 결론을 hook 자막에서 다 말하지 않는다. 질문을 던지고 결에서 답한다.`;
+
 // 레퍼런스 쇼츠 룩 (look = "ref-<영상ID>"): 스타일 입히기 때 그 쇼츠를 받아 Claude 가 보고 가장 가까운 틀 + 색·제목·이펙트·자막 규칙을 정해요 (E.s.refStyle)
 export const isRefLook = l => /^ref-[\w-]{11}$/.test(l || '');
 const REF_BASES = { 'yt-mat': '검은 바탕, 위에 큰 2줄 제목(노랑/빨강), 가운데 경기 화면, 아래 자막, 선수 라벨·점수 팝업', 'yt-replay': '꽉 찬 경기 화면, 짧은 말자막, 결정적 순간 링, 위 제목 없음', 'yt-breakdown': '꽉 찬 화면, 핵심 부위 링·화살표, ①②③ 해설 자막, SLOW 표시', 'yt-top5': '위 "TOP N" + 키워드, 흐린 배경 위 경기 화면, 아래 순위 목록', 'yt-wordpop': '꽉 찬 화면, 가운데 한 단어씩 튀어나오는 자막, 화살표·링', 'yt-post': '흰 바탕 SNS 게시물 모양, 검은 굵은 제목 2줄, 가운데 영상, 아래 채널 한마디 카드' };
@@ -356,7 +421,7 @@ async function aicut(E, ctx) {
   const T = +E.s.target >= 10 ? Math.min(180, Math.round(+E.s.target)) : 0, tol = T ? Math.max(3, Math.round(T * 0.1)) : 0;
   const rgs = (Array.isArray(info.ranges) ? info.ranges : []).map(r => rangeSecs(r)).filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b) && b > a).map(([a, b]) => [Math.max(0, a - 2), Math.min(dur, b + 2)]);
   const span = rgs.length ? [Math.min(...rgs.map(x => x[0])), Math.max(...rgs.map(x => x[1]))] : [0, dur], spanDur = span[1] - span[0];
-  let win = span, picks = rgs.length > 1 ? rgs : null;
+  let win = span, picks = rgs.length > 1 ? rgs : null, story = null;
   if (picks) ctx.log(`하이라이트로 고른 구간 ${picks.length}개 안에서만 잘라요: ${picks.map(x => `${r1(x[0])}~${r1(x[1])}`).join(', ')}`);
   else if (rgs.length) ctx.log(`하이라이트로 고른 구간 ${r1(span[0])}~${r1(span[1])}초 안에서만 잘라요.`);
   // 작업판에서 컷이 어떻게 되고 있는지 실시간으로 보게: 단계·본 장면 시트·고른 구간·컷 계획을 그때그때 적어요
@@ -382,18 +447,29 @@ JSON 하나만 답해라: {"picks":[{"a": 시작초, "b": 끝초, "why": "한 �
       win = [Math.min(...picks.map(x => x[0])), Math.max(...picks.map(x => x[1]))];
       ctx.log(`  고른 장면 ${picks.length}개: ${picks.map(x => `${r1(x[0])}~${r1(x[1])}`).join(', ')}`);
       prog({ stage: 'fine', picks: picks.map(x => [r1(x[0]), r1(x[1])]), window: win });
+      story = { engine: 'ladder', engineName: engOf(st).ladder ? engOf(st).ladder.name : '계단식', question: '어디까지 되나?', punch: '' };
     } else {
-    const pick = await askClaude(E, ctx, `너는 ${st.genre} 쇼츠 편집자다. 아래 영상에서 세로 쇼츠 하나로 만들 가장 강한 하이라이트 한 장면을 고른다.
+    const eks = Object.keys(engOf(st)), tMax = sMax + 25;
+    const pick = await askClaude(E, ctx, `너는 ${st.genre} 쇼츠 편집자다. 아래 영상으로 세로 쇼츠 하나를 만든다.
 영상: "${info.title}" (${info.channel}), 길이 ${Math.round(dur)}초.${rgs.length ? ` 원본 ${r1(span[0])}~${r1(span[1])}초 안에서만 고른다.` : ''}
 아래 썸네일 시트를 Read 도구로 전부 보고 판단해라:
 ${coarse}
 ${trTxt}
-고를 기준: ${st.pick}.
-JSON 하나만 답해라: {"a": 시작초, "b": 끝초, "why": "한 줄"}  (b-a 는 ${sLo}~${sHi}초, 결정적 순간 앞 3초 이상 포함)`,
-      j => !(j.b > j.a) ? 'b 가 a 보다 커야 해요.' : j.a < span[0] - 1 || j.b > span[1] + 1 ? `시각은 ${Math.round(span[0])}~${Math.round(span[1])}초 안이어야 해요.` : j.b - j.a > sMax ? `${sMax}초를 넘어요.` : '');
-    win = [Math.max(0, +pick.a), Math.min(dur, +pick.b)];
-    ctx.log(`  고른 장면: ${r1(win[0])}~${r1(win[1])}초 · ${pick.why || ''}`);
-    prog({ stage: 'fine', window: win, why: pick.why || '' });
+${brainPick(st)}
+MONEY 를 고르는 기준: ${st.pick}.
+이번 할 일: 서사 재료 구간 1~4개를 고른다. MONEY 구간은 결정적 순간 앞 3초 이상 포함. 재료가 한곳에 모여 있으면 구간 하나로 충분하다.
+JSON 하나만 답해라: {"engine":"${eks.join('|')}","question":"이 쇼츠가 던질 질문 한 문장","punch":"결에서 닫을 한 줄(대사·개그·교훈, 원본에 있는 것)","picks":[{"a":시작초,"b":끝초,"tags":["TAUNT"],"why":"한 줄"}]}  (각 구간 b-a 는 3~${sHi}초, 합계 ${sLo}~${tMax}초)`,
+      j => { const p = j.picks; if (!eks.includes(j.engine)) return `engine 은 ${eks.join(', ')} 중 하나여야 해요.`; if (!String(j.question || '').trim()) return 'question 이 없어요.';
+        if (!Array.isArray(p) || !p.length || p.length > 4) return 'picks 는 1~4개여야 해요.';
+        for (const [i, x] of p.entries()) { if (!(+x.b > +x.a)) return `${i + 1}번 구간 b 가 a 보다 커야 해요.`; if (x.a < span[0] - 1 || x.b > span[1] + 1) return `시각은 ${Math.round(span[0])}~${Math.round(span[1])}초 안이어야 해요.`; if (x.b - x.a > sHi + 5) return `${i + 1}번 구간이 ${sHi + 5}초를 넘어요.`; }
+        const tot = p.reduce((t, x) => t + (x.b - x.a), 0); return tot > tMax ? `구간 합계 ${r1(tot)}초가 ${tMax}초를 넘어요.` : ''; });
+    const ps = pick.picks.map(x => [Math.max(0, +x.a), Math.min(dur, +x.b)]).sort((x, y) => x[0] - y[0]);
+    story = { engine: pick.engine, engineName: engOf(st)[pick.engine].name, question: String(pick.question).trim(), punch: String(pick.punch || '').trim(), materials: pick.picks.map(x => ({ a: r1(+x.a), b: r1(+x.b), tags: x.tags || [], why: x.why || '' })) };
+    if (ps.length > 1) picks = ps;
+    win = [ps[0][0], ps[ps.length - 1][1]];
+    const why = `[${story.engineName}] ${story.question}`;
+    ctx.log(`  서사: ${why} · 재료 ${ps.map(x => `${r1(x[0])}~${r1(x[1])}`).join(', ')}`);
+    prog({ stage: 'fine', window: win, picks: picks ? picks.map(x => [r1(x[0]), r1(x[1])]) : null, why, story });
     }
   }
   ctx.log('고른 장면을 0.2초 간격으로 봐요…');
@@ -406,13 +482,16 @@ ${fine}
 ${trTxt}
 
 할 일: 세로 쇼츠 1차 컷 편집안을 짠다. 인트로와 아웃트로가 제일 중요하다. 둘 다 후크여야 한다. 스크롤을 멈추게 하는 장면으로 시작한다.
+${brainCut(st, T)}
+${story ? `앞에서 정한 서사 (따르되, 프레임을 보고 더 맞는 게 있으면 바꿔도 된다): ${JSON.stringify(story)}\n` : ''}장르 규칙 (MONEY 를 보여 주는 방법):
 ${st.cut}
 ${T ? `목표 출력 길이: ${T}초 (${T - tol}~${T + tol}초). 위 설명에 적힌 전체 길이보다 이 목표를 따른다. 원속도 컷을 늘리거나 줄여서 맞춘다.\n` : ''}각 컷의 출력 길이는 (b-a)/speed. 첫 컷은 반드시 intro, 마지막 컷은 반드시 outro.
 시각은 반드시 프레임에서 직접 확인한 원본 초(소수점 1자리)로 적어라.
 
 JSON 하나만 답해라:
-{"moments":[{"t":원본초,"what":"그 순간 화면에 보이는 것"}],
- "cuts":[{"a":원본초,"b":원본초,"speed":1,"role":"${st.roles}","step":"슬로우 단계 이름(slow 일 때만)"}],
+{"story":{"engine":"${Object.keys(engOf(st)).join('|')}","question":"질문 한 문장","punch":"결을 닫는 한 줄"},
+ "moments":[{"t":원본초,"what":"그 순간 화면에 보이는 것","tag":"TAUNT 등 태그"}],
+ "cuts":[{"a":원본초,"b":원본초,"speed":1,"role":"${st.roles}","beat":"hook|기|승|전|결","tag":"MONEY 등 태그","step":"슬로우 단계 이름(slow 일 때만)"}],
  "who":"${st.who}",
  "crop_bottom": 화면 아래쪽 중계 띠(뉴스 티커·광고 띠 등)가 차지하는 높이 비율 0~0.25 (없으면 0. 장면이 잘리지 않게)}`,
     j => {
@@ -420,6 +499,13 @@ JSON 하나만 답해라:
       if (!Array.isArray(c) || c.length < 3) return 'cuts 가 3개 이상 있어야 해요.';
       if (c[0].role !== 'intro') return '첫 컷 role 이 intro 가 아니에요.';
       if (c[c.length - 1].role !== 'outro') return '마지막 컷 role 이 outro 가 아니에요.';
+      const sy = j.story || {}, eks = Object.keys(engOf(st));
+      if (!eks.includes(sy.engine) || !String(sy.question || '').trim()) return `story 에 engine(${eks.join(', ')} 중 하나)과 question 이 있어야 해요.`;
+      if (c.some(x => !BEATS.includes(x.beat))) return 'cuts 마다 beat(hook, 기, 승, 전, 결)가 있어야 해요.';
+      if (c[0].beat !== 'hook' || c[c.length - 1].beat !== '결') return '첫 컷 beat 는 hook, 마지막 컷 beat 는 결이어야 해요.';
+      for (let i = 1; i < c.length; i++) if (BEATS.indexOf(c[i].beat) < BEATS.indexOf(c[i - 1].beat)) return `${i + 1}번째 컷 beat 순서가 거꾸로예요 (hook → 기 → 승 → 전 → 결).`;
+      if (c.length >= 5 && !c.some(x => x.beat === '전')) return '전(판이 커지는 구간) 컷이 없어요.';
+      if (c.length >= 4 && c.every((x, i) => !i || +x.a >= +c[i - 1].a)) return '원본 시간순 그대로예요. hook 은 뒤쪽 장면을 앞으로 당겨야 해요.';
       for (const [i, x] of c.entries()) {
         if (!(+x.b > +x.a)) return `${i + 1}번째 컷의 b 가 a 보다 커야 해요.`;
         if (x.a < 0 || x.b > dur + 0.5) return `${i + 1}번째 컷이 영상 길이(0~${r1(dur)}초)를 벗어나요.`;
@@ -430,8 +516,9 @@ JSON 하나만 답해라:
       if (T) return total > T + tol ? `출력 길이가 ${r1(total)}초예요. ${T + tol}초 이하로 줄여라.` : total < T - tol ? `출력 길이가 ${r1(total)}초예요. ${T - tol}초 이상으로 늘려라.` : '';
       return total > 58 ? `출력 길이가 ${r1(total)}초예요. 58초 이하로 줄여라.` : total < 15 ? `출력 길이가 ${r1(total)}초예요. 너무 짧아요.` : '';
     });
+  plan.story = { ...(story || {}), ...plan.story, engineName: engOf(st)[plan.story.engine].name };
   writeJson(E.p('편집/AI컷.json'), { window: win, target: T || null, vtype: E.s.vtype || 'highlight', sheets: fine, ...plan });
-  prog({ stage: 'render', cuts: plan.cuts.map(c => ({ a: r1(+c.a), b: r1(+c.b), role: c.role || '', speed: +c.speed || 1, note: String(c.step || c.note || c.why || '').slice(0, 60) })) });
+  prog({ stage: 'render', story: plan.story, why: `[${plan.story.engineName}] ${plan.story.question}`, cuts: plan.cuts.map(c => ({ a: r1(+c.a), b: r1(+c.b), role: c.role || '', beat: c.beat || '', tag: c.tag || '', speed: +c.speed || 1, note: String(c.step || c.note || c.why || '').slice(0, 60) })) });
   for (const f of ['편집/AI완성.json', '편집/AI스타일본.mp4', '편집/AI완성.mp4']) fs.rmSync(E.p(f), { force: true });
   for (const id of ['aistyle', 'aisubs', 'aibrand', 'aithumb']) if (E.s.steps[id]) E.s.steps[id] = { status: 'todo' };
   await renderCut(E, liveCtx(ctx, E, 'aicut', '1차 컷 그리는 중', plan.cuts.reduce((t, c) => t + (c.b - c.a) / Math.min(1, Math.max(0.1, +c.speed || 1)), 0), prog), info);
@@ -496,6 +583,7 @@ const common = (E, st, info, plan, noTr = false) => `너는 한국어 ${st.genre
 원본: "${info.title}" (${info.channel}) ${info.url}
 1차 컷 편집안 (cuts 의 out = 완성 영상의 [시작초, 끝초], a/b = 원본 초, moments = 원본 시각에 보이는 것). 완성 영상 길이 ${plan.duration}초:
 ${JSON.stringify({ moments: plan.moments, cuts: plan.cuts, who: plan.who }, null, 1)}
+${storyTxt(plan)}
 프레임 시트 (Read 로 확인):
 ${plan.sheets || `원본 ${r1(plan.window[0])}초부터 0.2초 간격, 5x5 타일: ${fineList(E)}`}
 ${!noTr && transcript(E, info) ? '영어 중계 자막(원본 시각):\n' + transcript(E, info) : ''}
@@ -609,7 +697,8 @@ async function aistyle(E, ctx) {
 먼저 할 일: 이 경기·선수·대회·기록을 source-check-research 방식(한·영 검색, A/B/C 등급, 교차 확인, 확인 못 한 것 표시)으로 조사해서 Write 도구로 ${E.p('조사/research.md')} 에 저장한다.
 
 이번 할 일: 스타일 요소만 정한다 (자막은 다음 단계).
-- ${st.title || '위 고정 제목 l1, l2: 각 14자 이내. 이것이 인트로 후크다. 사람+결과+숫자. 설명·인사 금지.'}
+- ${st.title || '위 고정 제목 l1, l2: 각 14자 이내. 이것이 인트로 후크다. 설명·인사 금지.'}
+- [편집 뇌] 위 제목은 이 쇼츠의 서사 질문을 프레임으로 건다. l1 = 상황(누가·무엇을, 예 "정지현의 레슬링을 본" / "격투기 선수를 던져"), l2 = 질문·반전 키워드 (예 "외국 파이터들의 반응" / "버리는 레슬링 레전드"). 결의 답(누가 이겼는지, 정체)을 다 말하지 않는다. 숫자가 서사의 핵심이면 넣는다.
 - fx: ${st.fx} 남발 금지. 아웃트로에는 fx 를 두지 않는다.${st.extra ? '\n- ' + st.extra : ''}
 - credits: [[0, ${plan.duration}, "원본 채널명"]]
 JSON 하나만 답해라: {"frame":{"l1":"","l2":""},"fx":[[시작,끝,{"type":"label","k":"","s":""}],[시작,끝,{"type":"pop","text":"","sub":"","y":660}]${st.lay && st.lay !== 'mat' ? ',[시작,끝,{"type":"ring","x":0.5,"y":0.5}],[시작,끝,{"type":"arrow","x":0.5,"y":0.5}]' : ''}]${st.extraJson || ''},"credits":[[0,${plan.duration},"${info.channel || ''}"]],"facts":["쓴 사실과 근거 한 줄씩"]}`, checkFinal(plan, false, st));
@@ -701,7 +790,7 @@ JSON 하나만 답해라: {${need.map(k => `"${k}":[[1,"..."],[2,"..."]]`).join(
   // 2) Claude 해설·후크 자막: 말 자막이 없는 곳에만 (인트로·아웃트로 컷 안에서는 말 자막보다 앞서요)
   let ai = [];
   if (o.ai) {
-    const hookCuts = plan.cuts.filter(c => c.role === 'intro' || c.role === 'outro').map(c => c.out);
+    const hookCuts = plan.cuts.filter(c => c.role === 'intro' || c.role === 'outro').map(c => c.out), joins = joinsOf(plan);
     const inHook = (a, b) => hookCuts.some(([x, y]) => a < y && b > x);
     const fixed = speech.filter(x => !inHook(x.s, x.e));
     prog({ stage: 'ai' });
@@ -710,7 +799,8 @@ JSON 하나만 답해라: {${need.map(k => `"${k}":[[1,"..."],[2,"..."]]`).join(
 이미 정한 위 제목·라벨·팝업: ${JSON.stringify({ frame: base.frame, fx: base.fx })}
 ${st.check}
 이번 할 일: 기술 설명 자막 (해설 + 후크). 인트로와 아웃트로가 제일 중요하다. 둘 다 후크다.
-기술 설명 자막은 MAT STORY 레퍼런스처럼, 보는 사람이 그 기술·하이라이트를 하나하나 따라가게 만든다:
+${brainCaps}
+${joins.length ? `- L2 내레이션이 꼭 있어야 하는 자리 (원본이 점프하거나 비트가 바뀌는 곳, 완성 영상 초): ${joins.map(x => `${x.t}초(${x.beat}${x.tag ? '·' + x.tag : ''})`).join(', ')}. 그 시각부터 1초 안에 시작하는 자막 하나씩.\n` : ''}${plan.story && plan.story.punch ? `- 마지막 자막(결)은 이 펀치로 닫는다: "${plan.story.punch}" (뜻을 살려 짧게 다듬어도 된다)\n` : ''}기술 설명 자막은 MAT STORY 레퍼런스처럼, 보는 사람이 그 기술·하이라이트를 하나하나 따라가게 만든다:
 - 원속도 구간: 지금 무슨 일이 일어나는지 반말 구어체 한 줄 ("일부러 다리를 내줬어.", "스나이더가 다리 잡았지?", "이게 미끼야.").
 - 슬로우 구간(SLOW): 기술을 단계로 쪼갠다. 단계마다 번호를 붙인다: "① 확 낮추기" → "② 허리 감고 들기" → "③ 그대로 넘기기". 단계 이름은 동작 그대로 짧게 (8~12자).
 - 숫자·결과는 정확히 (경기 시간, 점수). 모르는 건 쓰지 않는다.
@@ -728,7 +818,10 @@ JSON 하나만 답해라: {"captions":[[시작,끝,"${aiLang === 'en' ? '영어'
           if (String(q[2]).split(/\n|\\n/).some(l => l.replace(/\[\[|\]\]/g, '').length > lim)) return `자막 ${i + 1}번 한 줄이 ${lim - 2}자를 넘어요.`;
           const hit = fixed.find(f => q[0] < f.e - 0.05 && q[1] > f.s + 0.05); if (hit) return `자막 ${i + 1}번이 원문 자막 [${hit.s}-${hit.e}] 과 겹쳐요.`; }
         if (c[0][0] > 0.3) return '첫 자막(인트로 후크)이 0초에 시작해야 해요.';
-        if (c[c.length - 1][1] < d - 1.5) return '마지막 자막(아웃트로 후크)이 영상 끝까지 가야 해요.'; return ''; });
+        if (c[c.length - 1][1] < d - 1.5) return '마지막 자막(아웃트로 후크)이 영상 끝까지 가야 해요.';
+        const miss = joins.filter(x => !c.some(q => q[0] >= x.t - 0.6 && q[0] <= x.t + 1.2) && !fixed.some(f => f.s <= x.t + 1.2 && f.e >= x.t));
+        if (joins.length && miss.length > joins.length / 2) return `컷이 이어지는 자리에 내레이션 자막이 비어 있어요: ${miss.map(x => x.t + '초').join(', ')}`;
+        return ''; });
     ai = j.captions.map(q => [+q[0], +q[1], String(q[2]), aiLang === 'both' ? String(q[3] || '') : '']);
     speech = speech.filter(x => !ai.some(q => x.s < q[1] - 0.05 && x.e > q[0] + 0.05));   // 후크가 이기는 자리의 말 자막은 빼요
   }
@@ -955,6 +1048,8 @@ async function aibrand(E, ctx) {
 본편 쇼츠 앞에 붙일 인트로(${IN_D}초)와 뒤에 붙일 아웃트로(${OUT_D}초) 문장을 쓴다. 둘 다 무조건 후크다.
 본편: 위 제목 ${JSON.stringify(fin.frame)}, 자막 ${JSON.stringify(fin.captions)}
 1차 컷 정보: ${JSON.stringify({ moments: plan.moments, who: plan.who })}
+${storyTxt(plan)}
+[편집 뇌] 인트로는 서사 질문을 던지고(답은 숨긴다), 아웃트로는 결의 펀치를 되받아 질문으로 돌려준다 (예: 인트로 "올림픽 챔피언을 / [[못 알아본]] 외국인들" → 아웃트로 "결국 알아본 방법은? / 댓글로 맞혀 봐").
 사실은 조사 파일 ${E.p('조사/research.md')} 의 A·B 등급만 쓴다 (Read 로 확인). ${st.check}
 말투: ${st.tone}
 - 인트로: 0.1초 만에 스크롤을 멈추게 하는 한 방. 결과·숫자·반전·질문 중 하나. 인사·채널 소개·"오늘은" 금지. l1 은 짧은 도발(10자 이내), l2 는 핵심 한 방(12자 이내). 강조 단어 하나만 [[단어]].
@@ -1038,6 +1133,7 @@ async function aithumb(E, ctx) {
 원본: "${info.title}" (${info.channel}), 길이 ${Math.round(dur)}초.
 본편 제목·자막: ${JSON.stringify({ frame: fin.frame, captions: fin.captions })}
 장면 정보: ${JSON.stringify({ moments: plan.moments, who: plan.who })}
+${plan.story ? `[편집 뇌] 이 쇼츠의 질문: "${plan.story.question}" (${plan.story.engineName || plan.story.engine}). 상단 = 그 질문의 MONEY 순간, 왼쪽 = MONEY 컷, 오른쪽 = REACT 컷, 하단 = 답을 숨긴 반전/궁금증.` : ''}
 사실은 조사 파일 ${E.p('조사/research.md')} 의 A·B 등급만 (Read 로 확인). ${st.check}
 프레임 시트를 Read 로 보고 장면을 골라라:
 ${coarse.length ? `- 전체 영상 2초 간격 6x5 타일: 시트 k(1부터) 타일 i 의 시각 = ((k-1)*30 + i)*2 초\n${coarse.map(f => '  ' + f).join('\n')}\n` : ''}- 고른 구간 0.2초 간격 5x5 타일:
@@ -1110,7 +1206,7 @@ ${(existing || []).slice(0, 80).map(t => '- ' + t).join('\n') || '(없음)'}
 - 채널 성격과 테마에 맞는 영상만 고른다. 다른 종목·다른 분야 영상(예: 레슬링 채널인데 축구·복싱)은 조회수가 높아도 절대 고르지 않는다. 맞는 영상이 ${n}개보다 적으면 적게 고르고, 하나도 없으면 topics 를 빈 배열로 답한다.
 - 영상 하나에 주제 하나. 그중 조회수·장면이 좋은 영상을 서로 다른 각도로.
 - title: 우리 채널에 올릴 한국어 영상 제목. 구체적으로, 과장·낚시 없이, 40자 이내.
-- angle: 이 영상으로 무엇을 보여 줄지 1~2문장. hook: 첫 3초에 할 말 한 문장. why: 이 영상을 고른 이유 한 문장.
+- angle: 이 영상으로 던질 서사 질문 한 문장 + 어떤 흐름(도발→참교육, 정체공개, 계단식 레벨업, 역전, 충돌, 자폭, 반전 중 하나)으로 닫을지. hook: 첫 3초에 할 말 한 문장 (답은 숨기고 질문을 던진다). why: 이 영상을 고른 이유 한 문장.
 - 영상 제목에 없는 사실(선수 이름·대회·결과·숫자)은 지어내지 않는다. 필요하면 "[확인 필요: …]" 로 남긴다.
 - 원어 이름은 발음대로 정확히 한국어로 옮기고, 자신 없으면 원어를 괄호로 같이 쓴다.
 - 파일을 읽거나 검색하지 말고 목록만 보고 답한다.
