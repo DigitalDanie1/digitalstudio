@@ -1018,7 +1018,7 @@ let ytThemeState={};
 const ytThemeLinks=id=>{if(!db.ytThemeLinks||typeof db.ytThemeLinks!=='object'||Array.isArray(db.ytThemeLinks))db.ytThemeLinks={};return Array.isArray(db.ytThemeLinks[id])?db.ytThemeLinks[id]:[]};
 function ytThemeBox(id,def,fmt){
  const st=ytThemeState[id]||{},links=ytThemeLinks(id),busy=!!st.busy;
- return `<div class="field" style="margin-top:14px;border:1px solid var(--line);border-radius:10px;padding:12px 14px"><label for="ytThemeLinks"><b>이 테마의 소스 링크</b> <span class="small">(한 줄에 하나 · 유튜브 채널·영상·재생목록 · 최대 10개)</span></label>
+ return `<div class="field" style="margin-top:14px;border:1px solid var(--line);border-radius:10px;padding:12px 14px"><label for="ytThemeLinks"><b>이 테마의 소스 링크</b> <span class="small">(한 줄에 하나 · 유튜브 채널·영상·재생목록·채널 안 검색 주소 · 최대 10개)</span></label>
  <textarea id="ytThemeLinks" data-yt-theme="${esc(id)}" rows="4" placeholder="https://www.youtube.com/@채널이름&#10;https://www.youtube.com/watch?v=영상ID" ${busy?'disabled':''}>${esc(links.join('\n'))}</textarea>
  <div class="actions" style="margin-top:8px;align-items:center"><button class="btn primary" data-action="ytThemePick" data-yt-topic="${esc(id)}" ${busy?'disabled':''}>${busy?'주제 뽑는 중… (1~3분)':'링크에서 주제 뽑기'}</button><label class="small">몇 개<select id="ytThemeCount" style="margin-left:6px">${[3,5,10].map(n=>`<option ${(st.count||5)===n?'selected':''}>${n}</option>`).join('')}</select></label></div>
  <p class="small" aria-live="polite" style="margin:6px 0 0">${esc(st.msg||`맥 실행기가 링크 속 최근 ${fmt==='long'?'롱폼':'쇼츠'} 영상(링크마다 30개)을 모으고, Claude 가 "${def.name}" 에 맞는 영상을 골라 주제로 만들어요. 뽑은 주제는 아래와 작업판 "저장된 주제에서 고르기"에 들어가요. 이미 쓴 영상은 빼요.`)}</p></div>`;

@@ -1078,7 +1078,7 @@ async function linkVideos(u, format, ctx) {
     return r.out.split('\n').map(l => l.split('\t')).filter(x => /^[\w-]{11}$/.test(x[0] || '')).map(([id, v, ch, ...t]) => ({ id, views: +v || 0, from: ch && ch !== 'NA' ? ch : '', title: t.join(' ').trim() })); } catch { return []; } };
   const v = vidOf(u);
   if (v && !/[?&]list=/.test(u)) return rows(`https://www.youtube.com/watch?v=${v}`, false);
-  if (/[?&]list=/.test(u)) return rows(u, true);
+  if (/[?&]list=/.test(u) || /\/search\?/.test(u)) return rows(u, true);   // 재생목록 · 채널 안 검색 (예: @채널/search?query=күрес)
   const base = u.replace(/[?#].*$/, '').replace(/\/(shorts|videos|featured|streams)\/?$/i, '').replace(/\/$/, '');
   const tabs = format === 'long' ? ['videos', 'shorts'] : ['shorts', 'videos'];
   for (const t of tabs) { const a = await rows(`${base}/${t}`, true); if (a.length) return a.map(x => ({ ...x, from: x.from || base.split('/').pop() })); }
@@ -1099,14 +1099,17 @@ ${list.map((x, i) => `${i + 1}. [${x.views}] ${x.title} · ${x.from}`).join('\n'
 이미 있는 주제 제목 (겹치지 않게):
 ${(existing || []).slice(0, 80).map(t => '- ' + t).join('\n') || '(없음)'}
 규칙:
-- 영상 하나에 주제 하나. 테마에 잘 맞고 조회수·장면이 좋은 영상을 고른다. 서로 다른 각도로.
+- 채널 성격과 테마에 맞는 영상만 고른다. 다른 종목·다른 분야 영상(예: 레슬링 채널인데 축구·복싱)은 조회수가 높아도 절대 고르지 않는다. 맞는 영상이 ${n}개보다 적으면 적게 고르고, 하나도 없으면 topics 를 빈 배열로 답한다.
+- 영상 하나에 주제 하나. 그중 조회수·장면이 좋은 영상을 서로 다른 각도로.
 - title: 우리 채널에 올릴 한국어 영상 제목. 구체적으로, 과장·낚시 없이, 40자 이내.
 - angle: 이 영상으로 무엇을 보여 줄지 1~2문장. hook: 첫 3초에 할 말 한 문장. why: 이 영상을 고른 이유 한 문장.
 - 영상 제목에 없는 사실(선수 이름·대회·결과·숫자)은 지어내지 않는다. 필요하면 "[확인 필요: …]" 로 남긴다.
+- 원어 이름은 발음대로 정확히 한국어로 옮기고, 자신 없으면 원어를 괄호로 같이 쓴다.
 - 파일을 읽거나 검색하지 말고 목록만 보고 답한다.
 JSON 하나만 답해라: {"topics":[{"n":번호,"title":"","angle":"","hook":"","why":""}]}`,
-    x => { const t = Array.isArray(x && x.topics) ? x.topics : []; if (!t.length) return 'topics 가 비었어요.';
+    x => { if (!Array.isArray(x && x.topics)) return 'topics 배열이 없어요.'; const t = x.topics; if (!t.length) return '';
       const ns = t.map(y => +y.n); if (ns.some(k => !(k >= 1 && k <= list.length))) return '없는 번호가 있어요.'; if (new Set(ns).size !== ns.length) return '같은 영상을 두 번 골랐어요.';
       return t.some(y => !String(y.title || '').trim()) ? '제목이 빈 주제가 있어요.' : ''; });
+  if (!j.topics.length) throw new StepError(`링크 속 영상 ${cands.length}개 중에 이 채널·테마에 맞는 영상이 없었어요. 레슬링만 모인 링크(예: 채널 안 검색 주소 @채널/search?query=레슬링)를 넣어 보세요.`);
   return { scanned: cands.length, topics: j.topics.slice(0, n).map(y => { const x = list[+y.n - 1]; return { videoId: x.id, url: `https://www.youtube.com/watch?v=${x.id}`, srcTitle: x.title, views: x.views, from: x.from, title: String(y.title).trim().slice(0, 80), angle: String(y.angle || '').trim(), hook: String(y.hook || '').trim(), why: String(y.why || '').trim() }; }) };
 }
