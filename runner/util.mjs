@@ -52,7 +52,23 @@ export const sanitize = (t, n = 40) =>
 export const exists = p => { try { fs.accessSync(p); return true; } catch { return false; } };
 
 // 외부 프로그램 실행. ctx.log(줄), ctx.setChild(child), ctx.aborted() 를 사용
-export function run(cmd, args, ctx = {}, opts = {}) {
+// YouTube 가 "봇이 아닌지 확인" 으로 막으면 yt-dlp 의 다른 플레이어(tv, 모바일 웹, 사파리 웹)로 차례대로 다시 시도해요 (로그인 쿠키는 쓰지 않아요)
+const BOT_RE = /Sign in to confirm you.re not a bot/i, YT_CLIENTS = ['tv', 'mweb', 'web_safari', 'ios'];
+export async function run(cmd, args, ctx = {}, opts = {}) {
+  if (cmd !== YTDLP || args.includes('--extractor-args')) return run1(cmd, args, ctx, opts);
+  try { return await run1(cmd, args, ctx, opts); }
+  catch (e) {
+    if (e instanceof StopError || !BOT_RE.test(e.err || '')) throw e;
+    let last = e;
+    for (const c of YT_CLIENTS) {
+      ctx.log?.(`YouTube 가 봇 확인으로 막아서 다른 방식(${c})으로 다시 받아요…`);
+      try { return await run1(cmd, ['--extractor-args', `youtube:player_client=${c}`, ...args], ctx, opts); }
+      catch (e2) { if (e2 instanceof StopError) throw e2; last = e2; if (!BOT_RE.test(e2.err || '') && !/Requested format|not available/i.test(e2.err || '')) throw e2; }
+    }
+    throw last;
+  }
+}
+function run1(cmd, args, ctx = {}, opts = {}) {
   return new Promise((resolve, reject) => {
     if (ctx.aborted?.()) return reject(new StopError('멈췄어요'));
     const child = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'], cwd: opts.cwd, env: { ...process.env, PATH: `${opts.path ? opts.path + ':' : ''}${path.join(HOME, '.local/bin')}:/usr/bin:/bin:/usr/sbin:/sbin:${process.env.PATH || ''}` } });
