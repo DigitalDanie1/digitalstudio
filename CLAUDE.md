@@ -1,6 +1,7 @@
 # FIELDNOTE 작업 규칙 (여러 Claude 세션이 같이 고쳐요)
 
 - 고치기 전에 `git pull --rebase`, 올리기 직전에 다시 `git pull --rebase` 하고 `npm run check` 가 통과해야 push.
+  - `npm run check | tail` 처럼 파이프로 이으면 실패해도 통과처럼 보여요. 파이프 없이 돌리거나 `set -o pipefail`.
   - Vercel 도 배포 때 `npm run check` 를 먼저 돌려요 (package.json 의 vercel-build). 걸리면 배포가 멈추고 사이트는 예전 그대로예요.
 - `outputs/fieldnote-studio.html` 에 새 `<script>`·`<link>` 파일을 넣으면 `vercel.json` rewrites 에 같은 경로를 꼭 추가 (안 하면 사이트에서 404, 빈 화면).
   - 스크립트를 바꾸면 `?v=` 값을 올려요 (브라우저 캐시).
