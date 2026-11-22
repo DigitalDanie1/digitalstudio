@@ -46,7 +46,15 @@ const TALK = {
 };
 const TALK_RULES = ['자막과 문장은 모두 한국어로만. 영어 문장을 그대로 두지 않는다.', '화자의 말을 옮길 때 누가 한 말인지 분명히 밝힌다.', '영상에 없는 발언을 지어내지 않는다.'];
 export const AI_STYLES = {
-  'yt-mat': { ...SPORT, genre: '레슬링', name: 'MAT STORY', handle: '@matstoryhq', logo: '브랜드/matstory_logo.png', watermark: ['MAT', 'STORY'], yellow: 'FFD600', red: 'FF3B30', tone: '반말, 짧고 세게. 레슬링을 모르는 사람도 알아듣게. 위 제목 2줄 끝에 "ㄷㄷ" 가능.' },
+  'yt-mat': { ...SPORT, genre: '레슬링', name: 'MAT STORY', handle: '@matstoryhq', logo: '브랜드/matstory_logo.png', watermark: ['MAT', 'STORY'], yellow: 'FFD600', red: 'FF3B30', tone: '반말, 짧고 세게. 레슬링을 모르는 사람도 알아듣게. 위 제목 2줄 끝에 "ㄷㄷ" 가능.',
+    // 화자: 채널이 아니라 퇴근하고 매트에 가는 30대 직장인 생활체육 레슬러 (MAT STORY | Wrestling Breakdowns After Work)
+    voice: `이 채널은 방송·해설 채널이 아니라, 퇴근하고 매트에 가는 30대 직장인 생활체육 레슬러 한 사람이 운영한다 (20대 후반에 레슬링을 시작한 일반인, 주 5회 운동).
+- 말투는 운동 끝나고 친구한테 영상 보여 주며 하는 말. 프로 해설자·뉴스 말투, "여러분", "오늘은 ~를 알아보겠습니다" 금지.
+- 일반인 직장인 레슬러의 눈으로 본다: 프로 기술을 보며 "직장인은 이 각도 절대 안 나옴", "퇴근하고 이거 따라 하면 허리 나감", "스파링에서 이거 당하면 진짜 아무것도 못 함" 처럼 내 몸·내 체육관 기준으로 비교한다.
+- 피곤하지만 레슬링이 좋아서 하는 사람의 솔직한 감탄과 자조 섞인 유머 (예: "내일 출근인데...", "월요일 무릎 각"). 한 쇼츠에 한두 번만, 억지로 넣지 않는다.
+- 가르치려 들지 않고 같이 보는 사람처럼. 선수는 존중한다.
+- 내 경험처럼 쓰는 말은 직장인 레슬러라면 누구나 겪는 수준까지만. 대회 성적·숫자·특정 일화는 지어내지 않는다.
+- 영어로 쓸 때도 같은 사람: "a tired 30-something office worker who wrestles after work". e.g. "Tried this after work. My back said no.", "Pros make it look easy. Monday me can't."` },
   'yt-christian': { ...TALK, genre: '기독교 해설', name: '', handle: '', logo: '브랜드/christian_logo.png', watermark: null, yellow: '3DE0C0', red: 'FFFFFF', cta: '0E1B33', rules: TALK_RULES,
     tone: '존댓말, 차분하지만 단호하게. 성경과 교리는 쉬운 말로. 이단성 주장에는 날카롭게, 교단의 공식 판단과 의견은 나눠서. 사람을 조롱하지 않는다.' },
   'yt-politics': { ...TALK, genre: '보수·기독교 가치 관점의 정치·이민 시사 해설', name: '', handle: '', logo: '브랜드/politics_logo.png', watermark: ['FIELD', 'NOTE'], yellow: 'FFD400', red: 'FF3B30', rules: TALK_RULES,
@@ -588,7 +596,7 @@ ${storyTxt(plan)}
 ${plan.sheets || `원본 ${r1(plan.window[0])}초부터 0.2초 간격, 5x5 타일: ${fineList(E)}`}
 ${!noTr && transcript(E, info) ? '영어 중계 자막(원본 시각):\n' + transcript(E, info) : ''}
 말투: ${st.tone}
-${(st.rules || []).map(r => '- ' + r).join('\n')}
+${st.voice ? '화자: ' + st.voice + '\n' : ''}${(st.rules || []).map(r => '- ' + r).join('\n')}
 사실은 화면/중계 자막에서 확인된 것, 또는 조사 파일 ${E.p('조사/research.md')} 의 A·B 등급만 쓴다. 확인 못 한 숫자/기록/과장은 쓰지 않는다. 시각은 모두 완성 영상 기준 초.`;
 
 // ---------- 레퍼런스 쇼츠 분석 (작업판에 먼저 보여 주고, 고르면 그대로 적용) ----------
@@ -1052,7 +1060,7 @@ ${storyTxt(plan)}
 [편집 뇌] 인트로는 서사 질문을 던지고(답은 숨긴다), 아웃트로는 결의 펀치를 되받아 질문으로 돌려준다 (예: 인트로 "올림픽 챔피언을 / [[못 알아본]] 외국인들" → 아웃트로 "결국 알아본 방법은? / 댓글로 맞혀 봐").
 사실은 조사 파일 ${E.p('조사/research.md')} 의 A·B 등급만 쓴다 (Read 로 확인). ${st.check}
 말투: ${st.tone}
-- 인트로: 0.1초 만에 스크롤을 멈추게 하는 한 방. 결과·숫자·반전·질문 중 하나. 인사·채널 소개·"오늘은" 금지. l1 은 짧은 도발(10자 이내), l2 는 핵심 한 방(12자 이내). 강조 단어 하나만 [[단어]].
+${st.voice ? '화자: ' + st.voice + '\n' : ''}- 인트로: 0.1초 만에 스크롤을 멈추게 하는 한 방. 결과·숫자·반전·질문 중 하나. 인사·채널 소개·"오늘은" 금지. l1 은 짧은 도발(10자 이내), l2 는 핵심 한 방(12자 이내). 강조 단어 하나만 [[단어]].
 - 아웃트로: 끝까지 본 사람이 다시 보거나 구독하게 만드는 한 방. l1 은 여운/반전/질문(12자 이내), l2 는 다음 편 예고나 떡밥(12자 이내), cta 는 구독 유도 한 줄(14자 이내, 예: "구독하고 다음 기술 보기").
 JSON 하나만 답해라: {"intro":{"l1":"","l2":""},"outro":{"l1":"","l2":"","cta":""}}`,
     x => !x.intro || !x.outro ? 'intro, outro 가 있어야 해요.' : !short(x.intro.l1, 12) || !short(x.intro.l2, 14) ? '인트로 문장이 너무 길어요.' : !short(x.outro.l1, 14) || !short(x.outro.l2, 14) || !short(x.outro.cta, 16) ? '아웃트로 문장이 너무 길어요.' : '');
@@ -1135,7 +1143,7 @@ async function aithumb(E, ctx) {
 장면 정보: ${JSON.stringify({ moments: plan.moments, who: plan.who })}
 ${plan.story ? `[편집 뇌] 이 쇼츠의 질문: "${plan.story.question}" (${plan.story.engineName || plan.story.engine}). 상단 = 그 질문의 MONEY 순간, 왼쪽 = MONEY 컷, 오른쪽 = REACT 컷, 하단 = 답을 숨긴 반전/궁금증.` : ''}
 사실은 조사 파일 ${E.p('조사/research.md')} 의 A·B 등급만 (Read 로 확인). ${st.check}
-프레임 시트를 Read 로 보고 장면을 골라라:
+${st.voice ? '카피 화자: ' + st.voice + '\n' : ''}프레임 시트를 Read 로 보고 장면을 골라라:
 ${coarse.length ? `- 전체 영상 2초 간격 6x5 타일: 시트 k(1부터) 타일 i 의 시각 = ((k-1)*30 + i)*2 초\n${coarse.map(f => '  ' + f).join('\n')}\n` : ''}- 고른 구간 0.2초 간격 5x5 타일:
 ${plan.sheets || `원본 ${r1(plan.window[0])}초부터: 시트 k 타일 i 의 시각 = ${r1(plan.window[0])} + ((k-1)*25 + i)*0.2 초\n${fine.map(f => '  ' + f).join('\n')}`}
 x 는 그 프레임에서 인물이 있는 가로 위치(0=왼쪽 끝, 0.5=가운데, 1=오른쪽 끝). 썸네일 칸은 세로로 길어서 x 기준으로 잘라낸다.
