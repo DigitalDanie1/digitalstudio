@@ -8,9 +8,10 @@ import { spawnSync, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+function finish() { if (bad.length) { console.log(`\n검사 실패 ${bad.length}개. 고친 뒤 다시 올려 주세요.`); process.exit(1); } console.log('\n모든 검사 통과'); process.exit(0); }
 const bad = [], ok = msg => console.log('  ok  ' + msg), fail = msg => { bad.push(msg); console.log('  XX  ' + msg); };
 const read = p => fs.readFileSync(path.join(ROOT, p), 'utf8');
-const list = (d, re) => fs.readdirSync(path.join(ROOT, d), { withFileTypes: true }).flatMap(e => e.isDirectory() ? list(path.join(d, e.name), re) : re.test(e.name) ? [path.join(d, e.name)] : []);
+const list = (d, re) => !fs.existsSync(path.join(ROOT, d)) ? [] : fs.readdirSync(path.join(ROOT, d), { withFileTypes: true }).flatMap(e => e.isDirectory() ? list(path.join(d, e.name), re) : re.test(e.name) ? [path.join(d, e.name)] : []);
 
 console.log('1) 문법');
 const code = [...list('outputs', /\.js$/), ...list('runner', /\.mjs$/), ...list('api', /\.js$/), ...list('lib', /\.mjs$/), 'middleware.js', 'scripts/check.mjs'].filter(f => fs.existsSync(path.join(ROOT, f)));
@@ -28,6 +29,9 @@ for (const f of refs) {
 }
 ok(`${refs.length}개 파일`);
 
+// Vercel 배포에는 실행기(runner/) 가 안 올라가요 (.vercelignore). 거기서는 1·2 만 검사해요.
+const HAS_RUNNER = fs.existsSync(path.join(ROOT, 'runner/설치·업데이트.command')) && fs.existsSync(path.join(ROOT, 'runner/server.mjs'));
+if (!HAS_RUNNER) { console.log('3·4) 실행기 파일이 없는 곳이라 건너뛰어요 (Vercel 배포)'); finish(); }
 console.log('3) 실행기 파일 목록');
 const runnerFiles = fs.readdirSync(path.join(ROOT, 'runner')).filter(f => /\.(mjs|command)$/.test(f) && f !== 'test.mjs' && f !== '설치·업데이트.command');
 const inst = /^FILES=\((.*)\)$/m.exec(read('runner/설치·업데이트.command'));
@@ -55,5 +59,4 @@ if (!h) fail('실행기가 켜지지 않아요: ' + (err.trim().split('\n').slic
 else if (h.api !== want) fail(`실행기 /health 의 api 가 ${h.api} 인데 API_LEVEL 은 ${want} 예요`);
 else ok(`api ${h.api}`);
 
-if (bad.length) { console.log(`\n검사 실패 ${bad.length}개. 고친 뒤 다시 올려 주세요.`); process.exit(1); }
-console.log('\n모든 검사 통과');
+finish();
