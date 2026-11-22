@@ -65,7 +65,7 @@ try {
     assert.equal(profileOf(fakeE('nope')), CHANNEL_PROFILES['yt-wrestling']);
     assert.equal(profileOf({ s: {} }), CHANNEL_PROFILES['yt-wrestling']);
     const p = prompt(fakeE(''));
-    assert.match(p, /레슬링·주짓수·MMA/); assert.doesNotMatch(p, /한국어로만|채널 목소리|영상 속 실제 발언/);
+    assert.match(p, /30대 직장인 생활체육 레슬러/); assert.doesNotMatch(p, /한국어로만|채널 목소리|영상 속 실제 발언/);
     assert.match(p, /5\. 번호, 따옴표, 머리말/);  // 규칙은 예전처럼 5개
   });
   await check('채널 설정: 기독교 프롬프트 = 한국어만 + 충실한 번역 + 목소리', () => {
