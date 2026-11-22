@@ -337,7 +337,8 @@ document.addEventListener('click', async e => {
         const done = id => !!cur && (cur.steps || []).some(x => x.id === id && x.status === 'done');
         const steps = [...['research', 'download'].filter(id => !done(id)), 'aicut'];
         const vtype = (typeof ytPipe === 'object' && ytPipe.vtypeIdea === idea.id && ytPipe.vtype) || (cur && cur.vtype) || 'highlight';
-        await runnerFetch('/run', { ep, steps, vtype }); runnerOpenLog = steps[0]; runnerSelectedStep = null;
+        const tg = typeof ytPipe === 'object' && ytPipe.targetIdea === idea.id && ytPipe.target != null ? ytPipe.target : (cur && cur.target) || 0;
+        await runnerFetch('/run', { ep, steps, vtype, target: tg }); runnerOpenLog = steps[0]; runnerSelectedStep = null;
         toast('1차 컷을 시작했어요. Claude 가 영상을 보는 데 몇 분 걸려요.');
       } else if (a === 'fxpack') {
         // ③ 최종 결과물 레퍼런스(이펙트 팩): 고른 팩과 더 강조할 시간을 저장. 바뀌면 이펙트부터 다시 만들어요.

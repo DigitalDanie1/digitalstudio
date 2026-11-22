@@ -15,7 +15,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 // 작업판이 쓰는 기능 수준. 3 = 새 9칸 순서 (/look, /ranges, deferRanges, 단계 clip·subs·fx)
 const WH = { state: 'idle', log: [] };
 let themeBusy = false;
-const API_LEVEL = 28;   // 28 = yt-dlp 가 봇 확인으로 막히면 다른 플레이어(tv·mweb·web_safari·ios)로 다시 시도 · 27 = AI 주제 발굴: 테마별 소스 링크에서 주제 뽑기 (POST /themes/pick) · 26 = YouTube - Wrestling KOREA 채널 (yt-wrestling-kr), 영상 속 말 언어 16가지 (자동이면 제목 글자로 짐작) · 25 = 자막: Whisper 로 영상 소리 직접 받아 적기 (한국어·영어), 위 고정 제목 두 줄 고치기 (top1·top2), 자막 모양 7가지 (capStyle) · 24 = 자막: 기술 설명(tech)·영상 음성(speech) + 언어(ko|en|both) · 23 = Claude 가 지금 하는 일 실시간 (편집/진행_claude.json, stream-json) · 22 = 그리는 중인 화면 실시간 (진행_<단계>_live.jpg) · 21 = 자막 편집기 (GET /segs, run body.subs.edit) · 20 = 사이트에서 실행기 업데이트 (POST /update: GitHub 최신 runner 파일 받아서 검사 후 바꾸고 다시 켜기), 레퍼런스 분석 줄 세우기 (queued) · 19 = 모든 AI 단계 실시간 보기 (편집/진행_<단계>.json) · 18 = 1차 컷 실시간 보기 (편집/AI컷_진행.json) · 17 = 레퍼런스 쇼츠 분석 (POST /ref/analyze, GET /ref/status, GET /ref/<id>: 컷·후크·이펙트·이목 장치를 먼저 보여 주고 고르면 그대로 적용) · 16 = 자막 원문·번역·해설·내 자막 나눠 켜기 (run body.subs), 썸네일 내 카피 (run body.thumb) · 15 = 실행기 다시 켜기 (POST /restart, health.disk) · 14 = 내 영상 올리기 (POST /upload) · 13 = 레퍼런스 쇼츠 룩 (look ref-<영상ID>, view.refStyle) · 12 = 한 구간·하이라이트 길이 최대 3분(30초·1분·2분·3분), 쇼츠 최대 3분 · 11 = 하이라이트 '지난 작업' 초기화(/hl/reset, 돌고 있으면 멈추고 휴지통 한 폴더로) · 10 = AI 편집 단계(aicut·aistyle·aisubs, 맥의 Claude Code) · 9 = 유튜브 초기화(/reset, 에피소드·하이라이트 전부 휴지통 한 폴더로) · 8 = 미리보기 견본(/preview, 고른 룩·이펙트를 실제 영상 4초로) · 7 = 에피소드 완전히 지우기(/episode/delete, 휴지통으로) · 6 = 하이라이트 찾기(/hl/*) ·  4 = 7칸 순서 (/edit 1차·2차 편집, /draft, /feedback, 슬로우 구간 x0.5, 매트 스토리 룩) · 5 = 최종 결과물 레퍼런스(이펙트 팩: /fxpack, status.fxPacks)
+const API_LEVEL = 29;   // 29 = 쇼츠 길이 (run body.target, hl make target) · 1차 컷이 하이라이트 구간 안에서만 · 28 = yt-dlp 가 봇 확인으로 막히면 다른 플레이어(tv·mweb·web_safari·ios)로 다시 시도 · 27 = AI 주제 발굴: 테마별 소스 링크에서 주제 뽑기 (POST /themes/pick) · 26 = YouTube - Wrestling KOREA 채널 (yt-wrestling-kr), 영상 속 말 언어 16가지 (자동이면 제목 글자로 짐작) · 25 = 자막: Whisper 로 영상 소리 직접 받아 적기 (한국어·영어), 위 고정 제목 두 줄 고치기 (top1·top2), 자막 모양 7가지 (capStyle) · 24 = 자막: 기술 설명(tech)·영상 음성(speech) + 언어(ko|en|both) · 23 = Claude 가 지금 하는 일 실시간 (편집/진행_claude.json, stream-json) · 22 = 그리는 중인 화면 실시간 (진행_<단계>_live.jpg) · 21 = 자막 편집기 (GET /segs, run body.subs.edit) · 20 = 사이트에서 실행기 업데이트 (POST /update: GitHub 최신 runner 파일 받아서 검사 후 바꾸고 다시 켜기), 레퍼런스 분석 줄 세우기 (queued) · 19 = 모든 AI 단계 실시간 보기 (편집/진행_<단계>.json) · 18 = 1차 컷 실시간 보기 (편집/AI컷_진행.json) · 17 = 레퍼런스 쇼츠 분석 (POST /ref/analyze, GET /ref/status, GET /ref/<id>: 컷·후크·이펙트·이목 장치를 먼저 보여 주고 고르면 그대로 적용) · 16 = 자막 원문·번역·해설·내 자막 나눠 켜기 (run body.subs), 썸네일 내 카피 (run body.thumb) · 15 = 실행기 다시 켜기 (POST /restart, health.disk) · 14 = 내 영상 올리기 (POST /upload) · 13 = 레퍼런스 쇼츠 룩 (look ref-<영상ID>, view.refStyle) · 12 = 한 구간·하이라이트 길이 최대 3분(30초·1분·2분·3분), 쇼츠 최대 3분 · 11 = 하이라이트 '지난 작업' 초기화(/hl/reset, 돌고 있으면 멈추고 휴지통 한 폴더로) · 10 = AI 편집 단계(aicut·aistyle·aisubs, 맥의 Claude Code) · 9 = 유튜브 초기화(/reset, 에피소드·하이라이트 전부 휴지통 한 폴더로) · 8 = 미리보기 견본(/preview, 고른 룩·이펙트를 실제 영상 4초로) · 7 = 에피소드 완전히 지우기(/episode/delete, 휴지통으로) · 6 = 하이라이트 찾기(/hl/*) ·  4 = 7칸 순서 (/edit 1차·2차 편집, /draft, /feedback, 슬로우 구간 x0.5, 매트 스토리 룩) · 5 = 최종 결과물 레퍼런스(이펙트 팩: /fxpack, status.fxPacks)
 let VERSION = 'dev';
 try { VERSION = fs.readFileSync(path.join(HERE, 'version.txt'), 'utf8').trim() || 'dev'; } catch {}
 const PORT = +(process.env.FIELDNOTE_RUNNER_PORT || 4777);
@@ -60,7 +60,7 @@ function loadAll() {
 function view(E) {
   return {
     ep: E.s.ep, title: E.s.title, note: E.s.note || '', ideaId: E.s.ideaId || '', format: E.s.format, channel: E.s.channel || '',
-    look: E.s.look || '', lookUsed: lookKeyOf(E), vtype: E.s.vtype || '', subsOpt: E.s.subsOpt ? { en: E.s.subsOpt.en, ko: E.s.subsOpt.ko, ai: E.s.subsOpt.ai, tech: E.s.subsOpt.tech, speech: E.s.subsOpt.speech, techLang: E.s.subsOpt.techLang, speechLang: E.s.subsOpt.speechLang, mine: E.s.subsOpt.mineText || '', capStyle: E.s.subsOpt.capStyle || 'mat', top1: E.s.subsOpt.top1 || '', top2: E.s.subsOpt.top2 || '', srcLang: E.s.subsOpt.srcLang || '' } : null, aiFrame: (() => { try { return JSON.parse(fs.readFileSync(E.p(fs.existsSync(E.p('편집/AI스타일.json')) ? '편집/AI스타일.json' : '편집/AI완성.json'), 'utf8')).frame || null; } catch { return null; } })(), thumbText: E.s.thumbText || null, refStyle: E.s.refStyle && E.s.refStyle.look === E.s.look ? { name: E.s.refStyle.name, desc: E.s.refStyle.desc, base: E.s.refStyle.base } : null,
+    look: E.s.look || '', lookUsed: lookKeyOf(E), vtype: E.s.vtype || '', target: E.s.target || 0, subsOpt: E.s.subsOpt ? { en: E.s.subsOpt.en, ko: E.s.subsOpt.ko, ai: E.s.subsOpt.ai, tech: E.s.subsOpt.tech, speech: E.s.subsOpt.speech, techLang: E.s.subsOpt.techLang, speechLang: E.s.subsOpt.speechLang, mine: E.s.subsOpt.mineText || '', capStyle: E.s.subsOpt.capStyle || 'mat', top1: E.s.subsOpt.top1 || '', top2: E.s.subsOpt.top2 || '', srcLang: E.s.subsOpt.srcLang || '' } : null, aiFrame: (() => { try { return JSON.parse(fs.readFileSync(E.p(fs.existsSync(E.p('편집/AI스타일.json')) ? '편집/AI스타일.json' : '편집/AI완성.json'), 'utf8')).frame || null; } catch { return null; } })(), thumbText: E.s.thumbText || null, refStyle: E.s.refStyle && E.s.refStyle.look === E.s.look ? { name: E.s.refStyle.name, desc: E.s.refStyle.desc, base: E.s.refStyle.base } : null,
     fxPack: E.s.fxPack || '', fxPackUsed: fxPackOf(E).id, fxTimes: E.s.fxTimes || '', fxLabels: E.s.fxLabels || [],
     sources: E.s.sources.map(x => ({ url: x.url, ranges: x.ranges })),
     steps: STEP_DEFS.map(d => {
@@ -273,6 +273,7 @@ function hlMake(J, body) {
   const made = [], warns = [];
   for (const g of groups) {
     const E = createEpisode({ title: g.title, url: s.url, ranges: g.ranges, channel, format: 'shorts' }, g.name);
+    if (+body.target >= 10 && +body.target <= 180) E.s.target = Math.round(+body.target);   // 작업판에서 고른 쇼츠 길이
     const info = { url: s.url, local: isLocal, title: s.title, channel: s.channel || (isLocal ? '(내 파일)' : ''), duration: s.duration || null, id: s.videoId || path.basename(s.url), license: s.license || null, ranges: parseRanges(g.ranges) };
     if (!isLocal) {
       linkOrCopy(v, E.p('원본/full_1.mp4')); info.full = '원본/full_1.mp4';
@@ -283,7 +284,7 @@ function hlMake(J, body) {
     E.s.steps.research = { status: 'done' }; E.s.steps.download = { status: 'done' };
     save(E);
     const total = g.ranges.reduce((t, r) => { const [x, y] = r.split('-').map(z => z.split(':').reduce((a, n) => a * 60 + +n, 0)); return t + y - x; }, 0);
-    if (total > 180) warns.push(`"${g.title}" 는 합치면 ${fmtTime(total)}라서 쇼츠 한도(3분)를 넘어요. 컷 편집에서 줄여 주세요.`);
+    if (total > 180 && !E.s.target) warns.push(`"${g.title}" 는 합치면 ${fmtTime(total)}라서 쇼츠 한도(3분)를 넘어요. 컷 편집에서 줄여 주세요.`);
     made.push({ ep: E.s.ep, title: g.title, ranges: g.ranges });
   }
   return { ok: true, mode, episodes: made, warnings: warns };
@@ -553,6 +554,7 @@ const routes = {
     }
     if (ids.includes('script')) E.s.gate = false;
     if (typeof body.vtype === 'string' && /^[a-z0-9]{1,20}$/.test(body.vtype)) E.s.vtype = body.vtype;   // AI 편집: 영상 종류
+    if (body.target != null) E.s.target = +body.target >= 10 && +body.target <= 180 ? Math.round(+body.target) : 0;   // 쇼츠 길이 (초, 0 = 알아서)
     if (ids.includes('aisubs') && body.subs && typeof body.subs === 'object') {   // AI 자막: 원문(en)·번역(ko)·해설/후크(ai) 켜고 끄기 + 내 자막
       let mine; try { mine = parseMine(body.subs.mine); } catch (e) { throw new HttpError(400, e.message); }
       const b = body.subs, L = x => ['ko', 'en', 'both'].includes(x) ? x : null;

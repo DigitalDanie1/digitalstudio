@@ -65,13 +65,16 @@ async function rf(p, body) {
 }
 const secL = s => s < 60 ? s + '초' : Math.floor(s / 60) + '분' + (s % 60 ? ' ' + s % 60 + '초' : '');
 const LENS = [10, 15, 30, 60, 120, 180];
+// 작업판 1단계 '롱폼 → 하이라이트 쇼츠' 안에 들어갈 때: 쇼츠 길이를 고르면 후보 길이는 그보다 조금 길게 (1차 컷이 그 안에서 다듬어요)
+const TARGETS = [15, 30, 45, 60, 70, 90, 120];
+const hlLen = () => S.embed ? Math.min(180, Math.max(5, Math.round(S.target * 1.3))) : S.len;
 const fmt = s => { s = Math.max(0, Math.round(s)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return h ? `${h}:${String(m).padStart(2, '0')}:${String(x).padStart(2, '0')}` : `${m}:${String(x).padStart(2, '0')}`; };
 const media = (id, rel) => `${base()}/hl/${encodeURIComponent(id)}/file?path=${encodeURIComponent(rel)}`;
 const chanId = () => { let c = ''; try { c = (typeof ytLock === 'string' && ytLock) || (typeof ytTab === 'function' && ytTab()) || ''; } catch (_) {} return c || 'yt-wrestling'; };
 const chanName = c => { try { return (typeof ytChName === 'function' && ytChName(c)) || c; } catch (_) { return c; } };
 
 // ---------- 상태 (다시 그려도 남아요) ----------
-const S = { online: null, api: null, jobs: [], eps: [], cur: null, curId: '', url: '', ep: '', count: 8, len: 10, sort: 'score', checked: {}, edit: {}, busy: false, showLog: false, made: null, err: '', timer: null, loaded: false };
+const S = { online: null, api: null, jobs: [], eps: [], cur: null, curId: '', url: '', ep: '', count: 8, len: 10, embed: false, target: 60, sort: 'score', checked: {}, edit: {}, busy: false, showLog: false, made: null, err: '', timer: null, loaded: false };
 const key = c => c.a + '-' + c.b;                              // 후보의 처음 구간이 열쇠 (옮겨도 열쇠는 그대로)
 const ed = c => (S.edit[key(c)] ||= { a: c.a, b: c.b });
 const running = j => j && ['queued', 'downloading', 'analyzing', 'rendering'].includes(j.status);
@@ -90,7 +93,7 @@ async function loadAll(quiet) {
   if (!quiet) paint();
 }
 function schedule() {
-  clearTimeout(S.timer);
+  clearTimeout(S.timer); S.timer = null;
   if (!document.getElementById('hlRoot')) return;
   const live = (S.cur && running(S.cur)) || S.jobs.some(running);
   S.timer = setTimeout(async () => {
@@ -115,11 +118,11 @@ const statusTag = j => j.status === 'done' ? `<span class="hl-tag ok">후보 ${j
 function startCard() {
   const eps = S.eps.map(e => `<option value="${e_(e.ep)}" ${S.ep === e.ep ? 'selected' : ''}>${e_(e.title)}</option>`).join('');
   const busy = S.busy || (S.cur && running(S.cur)), off = dead() || S.online === null;
-  return `<section class="hl-card"><h2>① 긴 영상 넣기</h2><p class="hl-sub">긴 경기 영상을 한 번 받아서, 움직임이 크고 관중 소리가 커지는 장면을 골라 줘요. (AI 필요 없어요)</p>
+  return `<section class="hl-card"><h2>① ${S.embed ? '롱폼 영상 넣기' : '긴 영상 넣기'}</h2><p class="hl-sub">${S.embed ? '긴 영상을 한 번 받아서 움직임이 크고 소리가 커지는 장면 후보를 골라요. 체크한 장면마다 쇼츠 작업이 하나씩 생기고, 그 쇼츠는 1차 컷부터 8단계로 재가공해요.' : '긴 경기 영상을 한 번 받아서, 움직임이 크고 관중 소리가 커지는 장면을 골라 줘요. (AI 필요 없어요)'}</p>
   <div class="hl-row"><label class="hl-f hl-grow">유튜브 주소<input type="text" data-hl-url value="${e_(S.url)}" placeholder="https://www.youtube.com/watch?v=..." autocomplete="off" inputmode="url"></label>
   ${S.eps.length ? `<span class="hl-or">또는</span><label class="hl-f hl-grow">이미 받은 영상 (작업판의 에피소드)<select data-hl-ep><option value="">고르지 않음</option>${eps}</select></label>` : ''}</div>
   <div class="hl-row" style="margin-top:12px"><label class="hl-f" style="width:110px">몇 개 찾을까요<input type="number" min="1" max="30" step="1" data-hl-count value="${S.count}"></label>
-  <label class="hl-f" style="width:140px">길이<select data-hl-len>${LENS.filter(n => n <= 15 || S.api >= 12).concat(LENS.includes(S.len) ? [] : [S.len]).sort((a, b) => a - b).map(n => `<option value="${n}" ${S.len === n ? 'selected' : ''}>${secL(n)}</option>`).join('')}</select></label>
+  ${S.embed ? `<label class="hl-f" style="width:150px">쇼츠 길이<select data-hl-target>${TARGETS.map(n => `<option value="${n}" ${S.target === n ? 'selected' : ''}>${secL(n)}</option>`).join('')}</select></label>` : `<label class="hl-f" style="width:140px">길이<select data-hl-len>${LENS.filter(n => n <= 15 || S.api >= 12).concat(LENS.includes(S.len) ? [] : [S.len]).sort((a, b) => a - b).map(n => `<option value="${n}" ${S.len === n ? 'selected' : ''}>${secL(n)}</option>`).join('')}</select></label>`}
   <button type="button" class="btn primary" data-hl-act="start" ${busy || off ? 'disabled' : ''}>${busy ? '돌아가는 중…' : off ? '실행기가 켜지면 눌러져요' : '하이라이트 찾기'}</button></div>
   ${S.err ? `<div class="pl-error" role="alert">${e_(S.err)}</div>` : ''}</section>`;
 }
@@ -159,7 +162,7 @@ const chosen = () => (S.cur?.candidates || []).filter(c => S.checked[key(c)]);
 const chosenText = () => { const n = chosen().length, ch = chanName(chanId()); return `${n}개 골랐어요 · 채널: ${ch}`; };
 function madeBox() {
   const m = S.made; if (!m) return '';
-  return `<div class="hl-made" role="status">에피소드 ${m.episodes.length}개를 만들었어요. 작업판에서 편집 스타일부터 이어 가세요.<ul>${m.episodes.map(x => `<li>${e_(x.title)} <span class="small">(${e_(x.ranges.join(', '))})</span></li>`).join('')}</ul>${(m.warnings || []).map(w => `<p class="hl-note">${e_(w)}</p>`).join('')}<div class="hl-row" style="margin-top:8px"><button type="button" class="btn primary" data-hl-act="board">작업판으로 가기</button></div></div>`;
+  return `<div class="hl-made" role="status">${S.embed ? `쇼츠 작업 ${m.episodes.length}개를 만들었어요 (각 ${secL(S.target)}). 위 '작업 중' 목록에서 하나씩 골라 1차 컷부터 이어 가세요.` : `에피소드 ${m.episodes.length}개를 만들었어요. 작업판에서 편집 스타일부터 이어 가세요.`}<ul>${m.episodes.map(x => `<li>${e_(x.title)} <span class="small">(${e_(x.ranges.join(', '))})</span></li>`).join('')}</ul>${(m.warnings || []).map(w => `<p class="hl-note">${e_(w)}</p>`).join('')}<div class="hl-row" style="margin-top:8px"><button type="button" class="btn primary" data-hl-act="board">작업판으로 가기</button></div></div>`;
 }
 function offlineCard() {
   if (S.online === null) return '<section class="hl-card"><p class="hl-note">실행기를 확인하는 중…</p></section>';
@@ -179,7 +182,15 @@ function paintProgress() {
 function paintJobsOnly() { const box = document.querySelector('[data-hl-jobs]'); if (box && !S.busy) { const t = document.createElement('div'); t.innerHTML = jobsCard(); const n = t.querySelector('[data-hl-jobs]'); if (n) box.innerHTML = n.innerHTML; } }
 
 window.ytHighlightReset = () => { S.jobs = []; S.eps = []; S.cur = null; S.curId = ''; S.checked = {}; S.edit = {}; S.made = null; S.err = ''; };
+// 작업판 1단계 안에 넣는 하이라이트 찾기 (롱폼 → 하이라이트 쇼츠). data-keep-id 로 작업판이 다시 그려도 이 칸은 그대로예요.
+window.ytHighlightEmbed = function () {
+  S.embed = true;
+  setTimeout(() => { if (document.getElementById('hlRoot') && !S.timer) loadAll(true).then(() => { if (S.cur) prepare(); paint(); schedule(); }); }, 0);
+  return `<div id="hlRoot" data-keep-id="hlEmbed">${html()}</div>`;
+};
+window.ytHighlightSetUrl = u => { S.url = String(u || ''); S.ep = ''; S.err = ''; paint(); document.querySelector('[data-hl-url]')?.focus(); };
 window.ytHighlightPage = function () {
+  S.embed = false;
   setTimeout(() => { if (document.getElementById('hlRoot')) { loadAll().then(() => { if (S.cur) prepare(); paint(); schedule(); }); } }, 0);
   return head('하이라이트 찾기', '긴 경기 영상에서 볼 만한 장면을 자동으로 골라, 쇼츠 에피소드로 만들어요.', false)
     + (typeof ytTabs === 'function' ? ytTabs() : '') + `<div id="hlRoot">${html()}</div>`;
@@ -193,12 +204,12 @@ async function act(name, el) {
     if (name === 'start' || name === 'retry' || name === 'repick') {
       if (name === 'retry' || (name === 'repick' && j)) {
         S.busy = true; S.err = '';
-        await rf(name === 'repick' ? `/hl/${encodeURIComponent(j.id)}/pick` : '/hl/start', name === 'repick' ? { count: S.count, len: S.len } : { url: j.url.startsWith('http') ? j.url : undefined, episode: j.fromEpisode || undefined, count: S.count, len: S.len });
+        await rf(name === 'repick' ? `/hl/${encodeURIComponent(j.id)}/pick` : '/hl/start', name === 'repick' ? { count: S.count, len: hlLen() } : { url: j.url.startsWith('http') ? j.url : undefined, episode: j.fromEpisode || undefined, count: S.count, len: hlLen() });
         S.made = null; await loadAll(true);
       } else {
         S.err = ''; if (!S.url.trim() && !S.ep) { S.err = '유튜브 주소를 넣거나, 이미 받은 영상을 골라 주세요.'; paint(); return; }
         S.busy = true; paint(); S.made = null;
-        const r = await rf('/hl/start', S.ep && !S.url.trim() ? { episode: S.ep, count: S.count, len: S.len } : { url: S.url.trim(), count: S.count, len: S.len });
+        const r = await rf('/hl/start', S.ep && !S.url.trim() ? { episode: S.ep, count: S.count, len: hlLen() } : { url: S.url.trim(), count: S.count, len: hlLen() });
         S.curId = r.id; await loadAll(true);
       }
       S.busy = false; if (S.cur) { S.cur.candidates = running(S.cur) ? [] : S.cur.candidates; } prepare(); paint(); schedule();
@@ -216,7 +227,7 @@ async function act(name, el) {
       const picks = chosen().map(c => ({ a: ed(c).a, b: ed(c).b, rank: c.rank })); if (!picks.length) { say('먼저 후보를 체크해 주세요.'); return; }
       if (name === 'merge' && picks.length < 2 && !confirm('하나만 체크했어요. 그래도 만들까요?')) return;
       S.busy = true; el && (el.disabled = true);
-      const r = await rf(`/hl/${encodeURIComponent(j.id)}/make`, { picks, mode: name, channel: chanId() });
+      const r = await rf(`/hl/${encodeURIComponent(j.id)}/make`, { picks, mode: name, channel: chanId(), ...(S.embed ? { target: S.target } : {}) });
       S.made = r; say(`에피소드 ${r.episodes.length}개를 만들었어요.`); S.busy = false; paint();
       document.querySelector('.hl-made')?.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
@@ -248,6 +259,7 @@ document.addEventListener('change', e => {
     S.checked[t.dataset.hlCheck] = t.checked; t.closest('[data-hl-card]')?.classList.toggle('sel', t.checked);
     const cnt = document.querySelector('[data-hl-count]'); if (cnt) cnt.textContent = chosenText();
   } else if (t.matches('[data-hl-len]')) { S.len = Math.round(+t.value) || 10;
+  } else if (t.matches('[data-hl-target]')) { S.target = Math.round(+t.value) || 60;
   } else if (t.matches('[data-hl-ep]')) { S.ep = t.value; if (S.ep) { S.url = ''; const u = document.querySelector('[data-hl-url]'); if (u) u.value = ''; } }
 });
 document.addEventListener('input', e => {

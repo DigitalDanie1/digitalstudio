@@ -749,15 +749,15 @@
     const ep = it.ep, off = runnerOnline === false;
     const offMsg = '<p class="pl-error" role="alert"><b>실행기가 꺼져 있어요.</b> 맥에서 <code>~/Desktop/유투브/실행기/실행기 켜기.command</code> 를 더블클릭하세요. 켜진 창은 닫지 마세요.<br><span class="small">이 맥의 크롬에서만 돼요. "로컬 네트워크 접근"을 물으면 허용을 누르세요.</span></p>';
     const topic = {
-      id: 'topic', name: '원본 링크', title: '원본 링크', desc: '만들고 싶은 유튜브 영상 링크를 넣거나, 내가 받아 둔 영상 파일을 올리세요. 그 영상으로 주제를 정해요.',
+      id: 'topic', name: '원본 링크', title: '원본 링크', desc: () => ytPipe.format === 'long' ? '긴 롱폼 영상을 넣으면 하이라이트 장면 여러 개를 먼저 뽑아요. 체크한 장면마다 쇼츠 작업이 생기고, 하나씩 골라 아래 단계로 재가공해요.' : '쇼츠 영상 링크를 넣거나, 내가 받아 둔 영상 파일을 올리세요. 그 영상을 재가공해서 내 쇼츠 하나를 만들어요.',
       btn: '이 링크로 시작',
-      hideBtn: it => !!it.idea,
+      hideBtn: it => !!it.idea || ytPipe.format === 'long',
       isDone: it => !!it.idea,
       result: it => it.idea ? `<b>${esc(it.idea.title)}</b>${/^https?:/.test(ytFirstUrl(it.idea)) ? ` · <a class="pl-link" href="${esc(ytFirstUrl(it.idea))}" target="_blank" rel="noopener noreferrer">원본 링크 ↗</a>` : ytFirstUrl(it.idea) ? ' · 내 영상 파일' : ''}${it.ep ? '' : ' <button type="button" class="pl-link" data-pl-ytchange>다른 링크로 바꾸기</button>'}` : '',
       body: it => {
         if (it.idea) return '';
         const tabs = ytLock ? '' : `<div class="filters yt-tabs pl-ytabs" role="tablist" aria-label="유튜브 채널">${YT_CHANNELS.filter(y => !YT_LOCKS[y.id]).map(y => `<button class="filter ${ytTab() === y.id ? 'active' : ''}" role="tab" aria-selected="${ytTab() === y.id}" data-yt-tab="${y.id}" title="${esc(ytChName(y.id))}">${esc(y.tab)}</button>`).join('')}</div>`;
-        const fmt = f => `<button type="button" class="pl-chip ${ytPipe.format === f ? 'on' : ''}" data-yp-format="${f}" aria-pressed="${ytPipe.format === f}">${f === 'long' ? '🎬 롱폼' : '📱 쇼츠'}</button>`;
+        const fmt = f => `<button type="button" class="pl-chip ${ytPipe.format === f ? 'on' : ''}" data-yp-format="${f}" aria-pressed="${ytPipe.format === f}">${f === 'long' ? '🎬 롱폼 → 하이라이트 쇼츠 여러 개' : '📱 쇼츠 재가공'}</button>`;
         const vids = ytLinkSources(ytLock || ytTab());
         const chips = vids.length ? `<div class="pl-chips" role="group" aria-label="추천 소스 영상">${vids.map(x => `<button type="button" class="pl-chip" data-pl-ylchip="${esc(x.candidate.url)}" title="${esc(x.candidate.title || '')}">${esc(x.name)}</button>`).join('')}</div>` : '';
         const orig = YL.orig ? `원본: ${esc(YL.orig)}${YL.author ? ' · ' + esc(YL.author) : ''}` : '';
@@ -768,10 +768,11 @@
           <label>영상 제목<input class="pl-input" id="plYlTitle" data-yl="title" placeholder="${esc(YL.state === 'fail' ? '제목을 직접 적어 주세요' : '링크를 넣으면 제목이 들어와요')}" value="${esc(YL.title)}"></label>
           <p class="small" id="plYlHint">${esc(YL.state === 'fail' ? '제목을 직접 적어 주세요.' : '한국어 제목으로 바꿔도 돼요.')}</p>
           <label>내 관점 한 줄 (선택)<textarea class="pl-input" rows="2" id="plYlView" data-yl="view" placeholder="이 영상에서 내가 말하고 싶은 것">${esc(YL.view)}</textarea></label></div>`;
-        const list = ytIdeas(), pg = (T.page.youtube || 0) % Math.max(1, Math.ceil(list.length / PAGE)), shown = list.slice(pg * PAGE, pg * PAGE + PAGE);
+        const list = ytIdeas(), pg = (T.page.youtube || 0) % Math.max(1, Math.ceil(list.length / PAGE)), shown = list.slice(pg * PAGE, pg * PAGE + PAGE), longMode = ytPipe.format === 'long';
         const vw = v => ytLock ? ytLock + '/' + v : v;
-        const saved = `<details class="pl-peek"><summary>저장된 주제에서 고르기 (${list.length})</summary>${list.length ? `<div class="pl-topics" role="radiogroup" aria-label="주제">${shown.map(t => `<button type="button" role="radio" aria-checked="false" class="pl-topic" data-pl-ytpick="${esc(t.id)}"><span>${esc(t.title)}</span></button>`).join('')}</div>${list.length > PAGE ? `<button type="button" class="pl-link" data-pl-more>다른 주제 보기 (${pg + 1}/${Math.ceil(list.length / PAGE)})</button>` : ''}` : `<p class="small">이 채널에 저장된 ${ytPipe.format === 'long' ? '롱폼' : '쇼츠'} 주제가 아직 없어요. <button type="button" class="pl-link" data-view="${vw('youtubePlan')}">AI 주제 발굴</button>에서 찾아 저장하거나, <button type="button" class="pl-link" data-view="${vw('ytSources')}">소스</button>에서 '소재 등록'을 누르면 여기에 모여요.</p>`}</details>`;
-        return tabs + `<div class="pl-chips">${fmt('shorts')}${fmt('long')}</div>` + form + saved;
+        const saved = `<details class="pl-peek"><summary>저장된 주제에서 고르기 (${list.length})</summary>${list.length ? `<div class="pl-topics" role="radiogroup" aria-label="주제">${shown.map(t => longMode ? `<button type="button" class="pl-topic" data-pl-hlurl="${esc(ytFirstUrl(t))}" ${ytFirstUrl(t) ? '' : 'disabled'}><span>${esc(t.title)}</span></button>` : `<button type="button" role="radio" aria-checked="false" class="pl-topic" data-pl-ytpick="${esc(t.id)}"><span>${esc(t.title)}</span></button>`).join('')}</div>${list.length > PAGE ? `<button type="button" class="pl-link" data-pl-more>다른 주제 보기 (${pg + 1}/${Math.ceil(list.length / PAGE)})</button>` : ''}` : `<p class="small">이 채널에 저장된 ${ytPipe.format === 'long' ? '롱폼' : '쇼츠'} 주제가 아직 없어요. <button type="button" class="pl-link" data-view="${vw('youtubePlan')}">AI 주제 발굴</button>에서 찾아 저장하거나, <button type="button" class="pl-link" data-view="${vw('ytSources')}">소스</button>에서 '소재 등록'을 누르면 여기에 모여요.</p>`}</details>`;
+        if (longMode) return tabs + `<div class="pl-chips" role="group" aria-label="작업 방식">${fmt('shorts')}${fmt('long')}</div>` + (typeof window.ytHighlightEmbed === 'function' ? window.ytHighlightEmbed() : '<p class="pl-error">하이라이트 찾기 코드를 못 불러왔어요. 새로고침해 주세요.</p>') + saved;
+        return tabs + `<div class="pl-chips" role="group" aria-label="작업 방식">${fmt('shorts')}${fmt('long')}</div>` + form + saved;
       },
       run: it => ytLinkStart(it),
     };
@@ -1176,6 +1177,9 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
     ];
     const vpick = (it.idea && ytPipe.vtypeIdea === it.idea.id && ytPipe.vtype) || (ep && ep.vtype) || 'highlight';
     const vtChips = () => sport ? `<p class="small"><b>어떤 영상을 원하세요?</b> 고른 종류로 1차 컷을 짜요. 바꾸면 "AI 가 다시 자르기"로 다시 짜요.</p><div class="pl-looks" role="radiogroup" aria-label="영상 종류">${VT.map(v => `<button type="button" role="radio" aria-checked="${vpick === v.id}" class="pl-topic ${vpick === v.id ? 'on' : ''}" data-ya-vtype="${v.id}"><span class="pl-lk-txt"><b>${esc(v.name)}</b><span class="small">${esc(v.desc)}</span></span></button>`).join('')}</div><p class="small">레퍼런스: ${VT.filter(v => v.ref).map(v => `<a href="${esc(v.ref)}" target="_blank" rel="noopener">${esc(v.name)}</a>`).join(' · ')}</p>` : '';
+    // 쇼츠 길이: 1차 컷의 출력 길이 목표 (0 = 영상 종류에 맞게 알아서)
+    const tpick = it.idea && ytPipe.targetIdea === it.idea.id && ytPipe.target != null ? ytPipe.target : (ep && ep.target) || 0;
+    const lenChips = () => runnerApi >= 29 ? `<p class="small" style="margin-top:12px"><b>쇼츠 길이</b> · 1차 컷을 이 길이에 맞춰 잘라요. 바꾸면 "AI 가 다시 자르기"로 다시 잘라요.</p><div class="pl-chips" role="radiogroup" aria-label="쇼츠 길이">${[[0, '알아서'], [15, '15초'], [30, '30초'], [45, '45초'], [60, '1분'], [70, '1분 10초'], [90, '1분 30초'], [120, '2분']].map(([v, l]) => `<button type="button" role="radio" aria-checked="${tpick === v}" class="pl-chip ${tpick === v ? 'on' : ''}" data-ya-target="${v}">${l}</button>`).join('')}</div>` : '';
     const c1 = card(0, {
       desc: !it.idea ? '앞 단계를 끝내면 열려요.' : (sport ? `먼저 어떤 영상을 원하는지 고르세요. Claude 가 영상을 처음부터 끝까지 보고 그 종류(지금: ${(VT.find(v => v.id === vpick) || VT[0]).name})로 1차 컷을 만들어요. 인트로는 제일 충격적인 순간부터, 아웃트로는 다시 보고 싶게 잘라요.` : 'Claude 가 영상과 영어 자막을 처음부터 끝까지 보고 가장 센 발언을 골라 1차 컷을 만들어요. 인트로는 가장 센 한 마디부터, 문장 중간에서 끊지 않고, 아웃트로는 결론 한 마디나 반박 직전에서 끊어요.'),
       btn: () => runIn(CUT) ? '실행 멈춤' : cutDone ? 'AI 가 다시 자르기' : '1차 컷 만들기',
@@ -1185,7 +1189,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
       isDone: () => cutDone,
       statusLine: runLine(CUT),
       result: () => ep ? errOf(CUT) + (runnerApi >= 18 && (runIn(CUT) || cutDone) ? ytCutLive(ep, runIn(CUT)) : '') + (cutDone ? `<p><b>1차 컷이 나왔어요.</b> 인트로·아웃트로가 후크인지 보고, 아니면 "AI 가 다시 자르기"를 누르세요.</p>` + ba('src', '', 'aicut', '편집/AI1차컷.mp4', '원본 (같은 순간)', '1차 컷', 'cut') + getf('aicut', [['편집/AI1차컷.mp4', '1차 컷 영상']]) : '') + logs(CUT) : '',
-      body: () => (off ? '<p class="pl-error" role="alert"><b>실행기가 꺼져 있어요.</b></p>' : old ? oldMsg : '') + (it.idea ? vtChips() : ''),
+      body: () => (off ? '<p class="pl-error" role="alert"><b>실행기가 꺼져 있어요.</b></p>' : old ? oldMsg : '') + (it.idea ? vtChips() + lenChips() : ''),
     });
     const refWait = id => runnerApi >= 17 && (RA.st[id.slice(4)] || {}).status !== 'done';
     const refLooks = ytRefLooks(chId), choices = [myLook, ...(sport ? YT_AI_LOOKS.map(l => l.id) : []), ...refLooks.map(r => r.id)];
@@ -1818,6 +1822,8 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
     if (t.dataset.plOutmode) { YP.mode = t.dataset.plOutmode === 'mock' ? 'mock' : 'real'; ytOutRefresh(); return; }
     if (t.dataset.yaFxpick) { const { it } = ctx(); ytPipe.fxPack = t.dataset.yaFxpick; ytPipe.fxIdea = it.idea ? it.idea.id : ''; repaint('youtube', true); return; }
     if (t.dataset.yaVtype) { const { it } = ctx(); ytPipe.vtype = t.dataset.yaVtype; ytPipe.vtypeIdea = it.idea ? it.idea.id : ''; repaint('youtube', true); return; }
+    if (t.dataset.yaTarget != null) { const { it } = ctx(); ytPipe.target = +t.dataset.yaTarget || 0; ytPipe.targetIdea = it.idea ? it.idea.id : ''; repaint('youtube', true); return; }
+    if (t.dataset.plHlurl != null) { if (typeof window.ytHighlightSetUrl === 'function') window.ytHighlightSetUrl(t.dataset.plHlurl); return; }
     if (t.dataset.yaLookpick) { const { it } = ctx(); ytPipe.look = t.dataset.yaLookpick; ytPipe.lookIdea = it.idea ? it.idea.id : ''; if (isRef(ytPipe.look) && (RA.st[ytPipe.look.slice(4)] || {}).status === 'done') RA.open = ytPipe.look.slice(4); repaint('youtube', true); return; }
     if (t.dataset.yaRefopen) { RA.open = RA.open === t.dataset.yaRefopen ? '' : t.dataset.yaRefopen; repaint('youtube', true); return; }
     if (t.dataset.yaRefan) { if (t.dataset.yaConfirm && !confirm(t.dataset.yaConfirm)) return; const { it } = ctx(), id = t.dataset.yaRefan; t.disabled = true;
