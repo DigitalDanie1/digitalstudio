@@ -1069,3 +1069,44 @@ Dialogue: 1,0:00:00.00,0:00:05.00,B,,0,0,0,,{\\an5\\pos(${TW / 2},${TH - BOT / 2
 }
 
 export const AI_FN = { aicut, aistyle, aisubs, aibrand, aithumb };
+
+// ---------- 테마별 소스 링크 -> 주제 뽑기 (작업판 'AI 주제 발굴') ----------
+// 링크(채널·영상·재생목록)에서 영상 목록을 yt-dlp 로 모으고, Claude 가 테마에 맞는 영상을 골라 주제(한국어 제목·각도·후크)로 만들어요.
+const vidOf = u => (/(?:youtu\.be\/|[?&]v=|\/shorts\/|\/live\/)([\w-]{11})/.exec(u) || [])[1] || '';
+async function linkVideos(u, format, ctx) {
+  const rows = async (url, flat) => { try { const r = await run(YTDLP, [...(flat ? ['--flat-playlist', '-I', '1:30'] : ['--skip-download']), '--no-warnings', '--print', '%(id)s\t%(view_count)s\t%(channel,uploader,playlist_uploader)s\t%(title)s', url], ctx);
+    return r.out.split('\n').map(l => l.split('\t')).filter(x => /^[\w-]{11}$/.test(x[0] || '')).map(([id, v, ch, ...t]) => ({ id, views: +v || 0, from: ch && ch !== 'NA' ? ch : '', title: t.join(' ').trim() })); } catch { return []; } };
+  const v = vidOf(u);
+  if (v && !/[?&]list=/.test(u)) return rows(`https://www.youtube.com/watch?v=${v}`, false);
+  if (/[?&]list=/.test(u)) return rows(u, true);
+  const base = u.replace(/[?#].*$/, '').replace(/\/(shorts|videos|featured|streams)\/?$/i, '').replace(/\/$/, '');
+  const tabs = format === 'long' ? ['videos', 'shorts'] : ['shorts', 'videos'];
+  for (const t of tabs) { const a = await rows(`${base}/${t}`, true); if (a.length) return a.map(x => ({ ...x, from: x.from || base.split('/').pop() })); }
+  return [];
+}
+export async function pickThemeTopics({ channelName, persona, theme, note, format, links, count, existing, used }, ctx) {
+  const seen = new Set(used || []), cands = [];
+  for (const u of links) { ctx.log('영상 목록 모으는 중: ' + u); for (const x of await linkVideos(u, format, ctx)) if (!seen.has(x.id) && x.title) { seen.add(x.id); cands.push(x); } }
+  if (!cands.length) throw new StepError('링크에서 아직 안 쓴 영상을 찾지 못했어요. 유튜브 채널·영상·재생목록 주소인지 확인해 주세요.');
+  const list = cands.slice(0, 120), n = Math.min(count, list.length);
+  const dir = path.join(HOME, '.fieldnote', 'themes'); fs.mkdirSync(dir, { recursive: true });
+  const j = await askClaude({ dir }, ctx, `너는 유튜브 "${channelName}" 채널의 기획자다.
+채널 성격: ${persona}
+이번 할 일: 테마 "${theme}" 에 맞는 ${format === 'long' ? '롱폼(8~10분)' : '쇼츠(60초)'} 주제 ${n}개를, 아래 소스 영상 목록에서 골라 만든다.
+테마 설명: ${note || '(없음)'}
+소스 영상 목록 (번호. [조회수] 제목 · 출처):
+${list.map((x, i) => `${i + 1}. [${x.views}] ${x.title} · ${x.from}`).join('\n')}
+이미 있는 주제 제목 (겹치지 않게):
+${(existing || []).slice(0, 80).map(t => '- ' + t).join('\n') || '(없음)'}
+규칙:
+- 영상 하나에 주제 하나. 테마에 잘 맞고 조회수·장면이 좋은 영상을 고른다. 서로 다른 각도로.
+- title: 우리 채널에 올릴 한국어 영상 제목. 구체적으로, 과장·낚시 없이, 40자 이내.
+- angle: 이 영상으로 무엇을 보여 줄지 1~2문장. hook: 첫 3초에 할 말 한 문장. why: 이 영상을 고른 이유 한 문장.
+- 영상 제목에 없는 사실(선수 이름·대회·결과·숫자)은 지어내지 않는다. 필요하면 "[확인 필요: …]" 로 남긴다.
+- 파일을 읽거나 검색하지 말고 목록만 보고 답한다.
+JSON 하나만 답해라: {"topics":[{"n":번호,"title":"","angle":"","hook":"","why":""}]}`,
+    x => { const t = Array.isArray(x && x.topics) ? x.topics : []; if (!t.length) return 'topics 가 비었어요.';
+      const ns = t.map(y => +y.n); if (ns.some(k => !(k >= 1 && k <= list.length))) return '없는 번호가 있어요.'; if (new Set(ns).size !== ns.length) return '같은 영상을 두 번 골랐어요.';
+      return t.some(y => !String(y.title || '').trim()) ? '제목이 빈 주제가 있어요.' : ''; });
+  return { scanned: cands.length, topics: j.topics.slice(0, n).map(y => { const x = list[+y.n - 1]; return { videoId: x.id, url: `https://www.youtube.com/watch?v=${x.id}`, srcTitle: x.title, views: x.views, from: x.from, title: String(y.title).trim().slice(0, 80), angle: String(y.angle || '').trim(), hook: String(y.hook || '').trim(), why: String(y.why || '').trim() }; }) };
+}
