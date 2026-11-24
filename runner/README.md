@@ -39,7 +39,7 @@ FIELDNOTE 작업판의 "⚡ 이 주제 제작" 버튼이 이 맥에서 실제 �
   - 제목 = 상황 / 질문 키워드, 자막 = L2 내레이션(컷이 점프하는 자리마다 "그 모습을 보고", "이번엔 ~") + L3 대사·리액션 + 결의 펀치 한 줄. 인트로는 질문, 아웃트로는 펀치를 되받아 질문으로.
   - 결과: `편집/AI컷.json` 의 `story`(engine·question·punch) 와 컷마다 `beat`·`tag`. 작업판 "컷 실시간 보기"에 서사 칸으로 보여요.
 - 결과: `편집/AI컷.json` · `AI1차컷.mp4` → `AI완성.json` · `AI스타일본.mp4` → `AI완성.mp4`. 자막을 직접 고치려면 `AI완성.json` 을 고치고 "자막 다시 쓰기" 대신 그 파일로 다시 그리면 돼요.
-- 인트로(2.2초)·아웃트로(3.2초): Claude 가 후크 문장을 쓰고, 채널 로고 `~/Desktop/유투브/브랜드/matstory_logo.png` 와 @matstoryhq 를 넣어 그려요. 결과: `AI인트로.mp4` · `AI아웃트로.mp4` · 붙인 `AI최종.mp4`.
+- 인트로(2.2초)·아웃트로(3.2초): Claude 가 후크 문장을 쓰고, 채널 애셋을 넣어 그려요 — 프로필 `~/Desktop/유투브/브랜드/matstory_avatar.png`, 핸들 `matstory_handle.png`, 아웃트로 배너 문구 `matstory_lockup.png`, 강조어는 빨간 테이프. 본편 워터마크는 `matstory_mark.png`(MAT/STORY + 빨간 막대). 이 그림들은 `브랜드/시안_채널애셋/브랜드조각.html` 에서 구워요. 없으면 옛 로고 `matstory_logo.png` 와 글자 워터마크로 그려요. 결과: `AI인트로.mp4` · `AI아웃트로.mp4` · 붙인 `AI최종.mp4`.
 - 배경음악: `~/Desktop/유투브/소리/BGM/` 의 첫 파일을 원본 경기 소리 아래에 깔아요.
 
 ## 끄는 법

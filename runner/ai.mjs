@@ -47,7 +47,9 @@ const TALK = {
 };
 const TALK_RULES = ['자막과 문장은 모두 한국어로만. 영어 문장을 그대로 두지 않는다.', '화자의 말을 옮길 때 누가 한 말인지 분명히 밝힌다.', '영상에 없는 발언을 지어내지 않는다.'];
 export const AI_STYLES = {
-  'yt-mat': { ...SPORT, genre: '레슬링', name: 'MAT STORY', handle: '@matstoryhq', logo: '브랜드/matstory_logo.png', watermark: ['MAT', 'STORY'], yellow: 'FFD600', red: 'FF3B30', tone: '반말, 짧고 세게. 레슬링을 모르는 사람도 알아듣게. 위 제목 2줄 끝에 "ㄷㄷ" 가능.',
+  'yt-mat': { ...SPORT, genre: '레슬링', name: 'MAT STORY', handle: '@matstoryhq', logo: '브랜드/matstory_avatar.png', logoAlt: '브랜드/matstory_logo.png', watermark: ['MAT', 'STORY'],
+    // 채널 애셋(프로필 구두·레슬링화 + 배너 MAT/STORY·빨간 막대): ~/Desktop/유투브/브랜드 의 투명 PNG, 없으면 예전처럼 글자·옛 로고로
+    brand: { mark: '브랜드/matstory_mark.png', lockup: '브랜드/matstory_lockup.png', handle: '브랜드/matstory_handle.png', tape: 'D3242E', cream: 'F1EBDD' }, yellow: 'FFD600', red: 'FF3B30', tone: '반말, 짧고 세게. 레슬링을 모르는 사람도 알아듣게. 위 제목 2줄 끝에 "ㄷㄷ" 가능.',
     // 화자: 채널이 아니라 퇴근하고 매트에 가는 30대 직장인 생활체육 레슬러 (MAT STORY | Wrestling Breakdowns After Work)
     voice: `이 채널은 방송·해설 채널이 아니라, 퇴근하고 매트에 가는 30대 직장인 생활체육 레슬러 한 사람이 운영한다 (20대 후반에 레슬링을 시작한 일반인, 주 5회 운동).
 - 말투는 운동 끝나고 친구한테 영상 보여 주며 하는 말. 프로 해설자·뉴스 말투, "여러분", "오늘은 ~를 알아보겠습니다" 금지.
@@ -885,6 +887,16 @@ const capQ = (cs, t) => cs?.cap?.q ? cs.cap.q + t + cs.cap.q : t;
 
 // ---------- 그리기 (ASS) ----------
 const bgr = hex => `&H00${hex.slice(4, 6)}${hex.slice(2, 4)}${hex.slice(0, 2)}&`;
+// 브랜드 그림: 브랜드 폴더(~/Desktop/유투브) 기준 상대 경로들 중 처음으로 있는 파일 (없으면 null)
+const brandFile = (root, ...rels) => rels.filter(Boolean).map(r => path.join(root, r)).find(exists) || null;
+// 한 줄 글자 폭 (Apple SD Gothic Neo Bold, 글자 크기 1 기준 실측): 한글 0.72 · 띄어쓰기 0.25 · 영문 대문자·숫자 0.47 · 소문자 0.38
+const textW = t => [...String(t)].reduce((a, c) => a + (c === ' ' ? 0.25 : /[A-Z0-9]/.test(c) ? 0.47 : /[a-z]/.test(c) ? 0.38 : /[ -~]/.test(c) ? 0.4 : 0.72), 0);
+// [[강조]] 단어 뒤에 깔 빨간 테이프 (ASS 그리기). 줄은 가운데(540, y) 정렬, fs = 그 줄 글자 크기
+const tapeDraw = (t, y, fs, col) => { const m = /\[\[(.+?)\]\]/.exec(String(t)); if (!m) return null;
+  // 글씨 쪽(hiT)에서 강조어 앞뒤에 띄어쓰기 폭(\\h)을 넣어 테이프 자리를 만들어요 → 폭 계산에도 같은 띄어쓰기를 넣어요
+  const plain = String(t).replace(/\[\[(.+?)\]\]/, ' $1 ').replace(/\[\[|\]\]/g, ''), pre = String(t).slice(0, m.index).replace(/\[\[|\]\]/g, '');
+  const x = Math.round(540 - textW(plain) * fs / 2 + textW(pre) * fs + 0.04 * fs), w = Math.round(textW(' ' + m[1] + ' ') * fs - 0.08 * fs), y0 = Math.round(y - 0.56 * fs), h = Math.round(fs);
+  return `{\\an7\\pos(${x},${y0})\\org(${x + w / 2},${y0 + h / 2})\\frz1.5\\bord0\\shad0\\1c${col}\\fad(60,0)\\p1}m 0 0 l ${w} 0 ${w} ${h} 0 ${h}{\\p0}`; };
 const esc = s => String(s ?? '').replace(/\\n/g, '\n').replace(/[{}\\]/g, '').replace(/\r?\n/g, '\\N');
 // 작은 영어 원문 줄: 한 줄 38자 안팎으로 접어요 (ASS 는 자동 줄바꿈을 끔)
 const wrapEn = t => { const ls = ['']; for (const w of String(t).split(/\s+/)) { if (ls[ls.length - 1] && (ls[ls.length - 1] + ' ' + w).length > 38) ls.push(w); else ls[ls.length - 1] = (ls[ls.length - 1] + ' ' + w).trim(); } return ls.slice(0, 3).map(esc).join('\\N'); };
@@ -1034,20 +1046,24 @@ async function render(E, ctx, st, plan, fin, outRel) {
     if (t(base) < t('편집/AI컷.json')) await renderCut(E, ctx, info, lay, base);
   }
   const pr = await probe(info.file, ctx), src = { w: pr.width || 1920, h: pr.height || 1080, cb: Math.min(0.25, Math.max(0, +plan.crop_bottom || 0)) };
-  const root = E.homeRoot || path.join(HOME, 'Desktop/유투브'), logoPath = path.join(root, st.logo || ''), logo = st.lay === 'post' && st.logo && exists(logoPath);
-  const assF = E.p('편집/AI완성.ass'); fs.writeFileSync(assF, buildAss(fin, plan, st, src));
+  const root = E.homeRoot || path.join(HOME, 'Desktop/유투브'), logoPath = brandFile(root, st.logo, st.logoAlt), logo = st.lay === 'post' && !!logoPath;
+  // 워터마크: 채널 애셋 PNG(배너 MAT/STORY + 빨간 막대)가 있으면 그림으로, 없으면 예전처럼 글자로
+  const markPath = lay === LAY.mat && !logo ? brandFile(root, st.brand?.mark) : null;
+  const assF = E.p('편집/AI완성.ass'); fs.writeFileSync(assF, buildAss(fin, plan, markPath ? { ...st, watermark: null } : st, src));
   const bgmDir = path.join(E.homeRoot || path.join(HOME, 'Desktop/유투브'), '소리/BGM');
   const bgm = exists(bgmDir) ? fs.readdirSync(bgmDir).filter(f => /\.(mp3|m4a|wav|aac)$/i.test(f)).sort()[0] : null;
   const d = plan.duration, q = p => p.replace(/\\/g, '/').replace(/:/g, '\\:').replace(/'/g, "\\'");
   const sub = `subtitles=filename='${q(assF)}':fontsdir='${q(process.env.FIELDNOTE_AI_FONT_DIR || FONT_DIR)}'`, li = bgm ? 2 : 1;
   const sub2 = lay === LAY.mat && CAP_STYLES[fin.capStyle]?.top === 'white' ? `drawbox=x=0:y=0:w=${W}:h=${VY}:color=white:t=fill,${sub}` : sub;   // 흰 위 칸 자막 모양
-  const vf = logo ? `[${li}:v]scale=110:-1,format=rgba[lg];[0:v][lg]overlay=x=70:y=118[vl];[vl]${sub2}[vo]` : `[0:v]${sub2}[vo]`;
+  // 워터마크 그림 (오른쪽 끝 1050, 아래 1428 = 경기 화면 오른쪽 아래). 로고(post 틀)와는 같이 쓰이지 않아요 (워터마크는 mat 틀만)
+  const v0 = markPath ? `[${li}:v]format=rgba,colorchannelmixer=aa=0.92[mk];[0:v][mk]overlay=x=908:y=1326[vm];[vm]` : '[0:v]';
+  const vf = logo ? `[${li}:v]scale=110:-1,format=rgba[lg];[0:v][lg]overlay=x=70:y=118[vl];[vl]${sub2}[vo]` : `${v0}${sub2}[vo]`;
   // BGM 도 슬로우 구간에서는 꺼요
   const slowOff = plan.cuts.filter(c => (+c.speed || 1) < 1 && c.out).map(c => `volume=0:enable='between(t,${c.out[0]},${c.out[1]})'`).join(',');
   const af = bgm ? `;[1:a]volume=0.22,atrim=0:${d},${slowOff ? slowOff + ',' : ''}afade=t=out:st=${Math.max(0, d - 1.5)}:d=1.5[b];[0:a][b]amix=inputs=2:duration=first:normalize=0[ao]` : ';[0:a]anull[ao]';
   ctx.log(`그리는 중 (${st.name}${bgm ? ' · BGM ' + bgm : ' · BGM 없음: ~/Desktop/유투브/소리/BGM 에 넣으면 깔려요'})…`);
   try {
-    await ff(['-i', E.p(base), ...(bgm ? ['-stream_loop', '-1', '-i', path.join(bgmDir, bgm)] : []), ...(logo ? ['-i', logoPath] : []), '-filter_complex', vf + af,
+    await ff(['-i', E.p(base), ...(bgm ? ['-stream_loop', '-1', '-i', path.join(bgmDir, bgm)] : []), ...(logo ? ['-i', logoPath] : []), ...(markPath ? ['-i', markPath] : []), '-filter_complex', vf + af,
       '-map', '[vo]', '-map', '[ao]', '-c:v', 'libx264', '-crf', '19', '-preset', 'veryfast', '-c:a', 'aac', '-b:a', '160k', '-t', String(d), '-movflags', '+faststart', E.p(outRel)], ctx);
   } catch (e) {
     if (e instanceof StopError) throw e;
@@ -1063,8 +1079,13 @@ async function aibrand(E, ctx) {
   // 본편: 자막 단계를 했으면 AI완성.mp4, 안 했으면 스타일본 (자막 단계는 작업판에서 뺐어요)
   const MAIN = exists(E.p('편집/AI완성.mp4')) ? '편집/AI완성.mp4' : '편집/AI스타일본.mp4';
   if (!exists(E.p(MAIN))) throw new StepError('스타일 입히기를 먼저 해 주세요.');
-  const root = E.homeRoot || path.join(HOME, 'Desktop/유투브'), logoPath = path.join(root, st.logo), hasLogo = exists(logoPath);
-  if (!hasLogo) ctx.log(`  채널 로고가 없어서 글자만 넣어요 (${logoPath} 에 넣으면 들어가요)`);
+  const root = E.homeRoot || path.join(HOME, 'Desktop/유투브'), logoPath = brandFile(root, st.logo, st.logoAlt), hasLogo = !!logoPath;
+  if (!hasLogo) ctx.log(`  채널 로고가 없어서 글자만 넣어요 (${path.join(root, st.logo || '')} 에 넣으면 들어가요)`);
+  // 채널 애셋 (있는 것만): 핸들·배너 문구 그림, 강조어 빨간 테이프, 크림색 글씨
+  const B = st.brand || {}, handleImg = brandFile(root, B.handle), lockImg = brandFile(root, B.lockup);
+  const TAPE = B.tape ? bgr(B.tape) : null, CREAM = B.cream ? bgr(B.cream) : '&HFFFFFF&';
+  const stillIn = (p, d) => ['-loop', '1', '-t', String(d), '-i', p];
+  const fadeIn = at => `format=rgba,fade=in:st=${at}:d=0.2:alpha=1`;
   const logoIn = d => hasLogo ? ['-loop', '1', '-t', String(d), '-i', logoPath] : ['-f', 'lavfi', '-t', String(d), '-i', 'color=c=black@0.0:s=16x16,format=rgba'];
   const fin = readJson(E.p('편집/AI완성.json'));
   const prog = progOf(E, 'aibrand', [['hook', '후크 문장 쓰기'], ['intro', '인트로 그리기'], ['outro', '아웃트로 그리기'], ['join', '붙이기'], ['done', '끝']]);
@@ -1086,40 +1107,53 @@ JSON 하나만 답해라: {"intro":{"l1":"","l2":""},"outro":{"l1":"","l2":"","c
   writeJson(E.p('편집/AI인트로아웃트로.json'), j);
   prog({ stage: 'intro', info: [['인트로 후크', [j.intro.l1, j.intro.l2].join(' / ')], ['아웃트로 후크', [j.outro.l1, j.outro.l2, j.outro.cta].filter(Boolean).join(' / ')]] });
   const Y = bgr(st.yellow), R = bgr(st.red), hi = t => esc(t).replace(/\[\[(.+?)\]\]/g, `{\\c${Y}}$1{\\c&HFFFFFF&}`);
+  // 테이프 강조: 강조어는 외곽선 없이 크림색, 그 뒤에 빨간 테이프(tapeDraw). 아웃트로 강조어는 빨간 글씨
+  const hiT = (t, bord) => `{\\c${CREAM}}` + esc(t).replace(/\[\[(.+?)\]\]/, `\\h{\\bord0\\shad0}$1{\\bord${bord}}\\h`).replace(/\[\[|\]\]/g, '');
+  const hiR = t => `{\\c${CREAM}}` + esc(t).replace(/\[\[(.+?)\]\]/g, `{\\c${R}}$1{\\c${CREAM}}`);
   const ass = (d, lines) => `[Script Info]\nScriptType: v4.00+\nPlayResX: ${W}\nPlayResY: ${H}\nWrapStyle: 2\nScaledBorderAndShadow: yes\n\n[V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: Big,${FONT},156,&H00FFFFFF&,&H000000FF&,&H00000000&,&H00000000&,-1,0,0,0,100,100,0,0,1,11,0,5,0,0,0,1
 Style: Mid,${FONT},100,&H00FFFFFF&,&H000000FF&,&H00000000&,&H00000000&,-1,0,0,0,100,100,0,0,1,9,0,5,0,0,0,1
 Style: Small,${FONT},56,&H00FFFFFF&,&H000000FF&,&H00000000&,&H00000000&,-1,0,0,0,100,100,0,0,1,4,0,5,0,0,0,1
-
+${TAPE ? `Style: Tape,${FONT},76,${CREAM},&H000000FF&,${TAPE},&H00000000&,-1,0,0,0,100,100,0,0,3,16,0,5,0,0,0,1\n` : ''}
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-${lines.map(([a, sty, txt]) => `Dialogue: 1,${ts(a)},${ts(d)},${sty},,0,0,0,,${txt}`).join('\n')}
+${lines.filter(Boolean).map(([a, sty, txt, layer = 1]) => `Dialogue: ${layer},${ts(a)},${ts(d)},${sty},,0,0,0,,${txt}`).join('\n')}
 `;
   const q = p => p.replace(/\\/g, '/').replace(/:/g, '\\:').replace(/'/g, "\\'"), fd = q(process.env.FIELDNOTE_AI_FONT_DIR || FONT_DIR);
   // 한 줄이 화면 폭(약 960px)을 넘지 않게 글자 크기를 줄여요 (한글 한 글자 ≈ 글자 크기 1칸, 띄어쓰기 ≈ 0.35칸)
   const fit = (t, base) => { const n = [...String(t).replace(/\[\[|\]\]/g, '')].reduce((a, c) => a + (c === ' ' ? 0.35 : /[ -~]/.test(c) ? 0.6 : 1), 0); return Math.min(base, Math.floor(960 / Math.max(1, n))); };
   const pop = (x, y, t, base) => `{\\an5\\pos(${x},${y})\\fs${fit(t, base)}\\fscx130\\fscy130\\t(0,140,\\fscx100\\fscy100)}`;
-  const logoF = (size, at) => `scale=w='${size}*min(1\\,0.55+max(0\\,t-${at})*3)':h=-1:eval=frame,format=rgba,fade=in:st=${at}:d=0.15:alpha=1`;
+  const logoF = (size, at) => TAPE ? `scale=${size}:-2,format=rgba,fade=in:st=${at}:d=0.2:alpha=1`
+    : `scale=w='${size}*min(1\\,0.55+max(0\\,t-${at})*3)':h=-1:eval=frame,format=rgba,fade=in:st=${at}:d=0.15:alpha=1`;
   // 인트로: 본편 인트로 장면을 꽉 채워 살짝 줌인 + 흰 섬광 + 후크 2줄 + 로고
   const inAss = E.p('편집/AI인트로.ass');
-  fs.writeFileSync(inAss, ass(IN_D, [[0, 'Mid', pop(540, 460, j.intro.l1, 100) + hi(j.intro.l1)], [0.12, 'Big', pop(540, 640, j.intro.l2, 156) + `{\\c${Y}}` + hi(j.intro.l2)], ...(st.handle ? [[0.5, 'Small', `{\\an5\\pos(540,1570)}${esc(st.handle)}`]] : []), ...(!hasLogo && st.name ? [[0.45, 'Mid', `{\\an5\\pos(540,1290)}${esc(st.name)}`]] : [])]));
+  const tapeAt = (a, y, t, base) => { const d = TAPE && tapeDraw(t, y, fit(t, base), TAPE); return d ? [a + 0.14, 'Small', d, 0] : null; };
+  fs.writeFileSync(inAss, ass(IN_D, TAPE ? [[0, 'Mid', pop(540, 460, j.intro.l1, 100) + hiT(j.intro.l1, 9)], tapeAt(0, 460, j.intro.l1, 100), [0.12, 'Big', pop(540, 640, j.intro.l2, 156) + hiT(j.intro.l2, 11)], tapeAt(0.12, 640, j.intro.l2, 156),
+      ...(st.handle && !handleImg ? [[0.5, 'Small', `{\\an5\\pos(540,1500)}${esc(st.handle)}`]] : []), ...(!hasLogo && st.name ? [[0.45, 'Mid', `{\\an5\\pos(540,1290)}${esc(st.name)}`]] : [])]
+    : [[0, 'Mid', pop(540, 460, j.intro.l1, 100) + hi(j.intro.l1)], [0.12, 'Big', pop(540, 640, j.intro.l2, 156) + `{\\c${Y}}` + hi(j.intro.l2)], ...(st.handle ? [[0.5, 'Small', `{\\an5\\pos(540,1570)}${esc(st.handle)}`]] : []), ...(!hasLogo && st.name ? [[0.45, 'Mid', `{\\an5\\pos(540,1290)}${esc(st.name)}`]] : [])]));
   ctx.log('인트로 그리는 중…');
-  await ff(['-ss', '0', '-t', String(IN_D), '-i', E.p('편집/AI1차컷.mp4'), ...logoIn(IN_D), '-filter_complex',
+  const inHd = TAPE && handleImg ? `[2:v]${fadeIn(0.5)}[hd];[lv][hd]overlay=x='(W-w)/2':y='1500-h/2'[lv2];[lv2]` : '[lv]';
+  await ff(['-ss', '0', '-t', String(IN_D), '-i', E.p('편집/AI1차컷.mp4'), ...logoIn(IN_D), ...(TAPE && handleImg ? stillIn(handleImg, IN_D) : []), '-filter_complex',
     `[0:v]crop=${W}:${VH}:0:${VY},scale=w='${H}*16/9*(1+0.05*t)':h=-2:eval=frame,crop=${W}:${H},eq=brightness=-0.13:saturation=1.25,fade=in:st=0:d=0.18:color=white,fps=30,setsar=1[bg];` +
-    `[1:v]${logoF(470, 0.45)}[lg];[bg][lg]overlay=x='(W-w)/2':y='1290-h/2':eval=frame,subtitles=filename='${q(inAss)}':fontsdir='${fd}',format=yuv420p[v];` +
+    `[1:v]${logoF(TAPE ? 330 : 470, 0.45)}[lg];[bg][lg]overlay=x='(W-w)/2':y='${TAPE ? 1300 : 1290}-h/2':eval=frame[lv];${inHd}subtitles=filename='${q(inAss)}':fontsdir='${fd}',format=yuv420p[v];` +
     `[0:a]aresample=48000,aformat=channel_layouts=stereo,afade=t=out:st=${IN_D - 0.3}:d=0.3[a]`,
     '-map', '[v]', '-map', '[a]', '-t', String(IN_D), '-c:v', 'libx264', '-crf', '19', '-preset', 'veryfast', '-c:a', 'aac', '-b:a', '160k', E.p('편집/AI인트로.mp4')], liveCtx(ctx, E, 'aibrand', '인트로 그리는 중', IN_D, prog));
   // 아웃트로: 본편 마지막 장면을 흐리게 멈추고 후크 + 큰 로고 + 구독 유도
   const outAss = E.p('편집/AI아웃트로.ass');
-  fs.writeFileSync(outAss, ass(OUT_D, [[0, 'Mid', pop(540, 360, j.outro.l1, 100) + hi(j.outro.l1)], [0.15, 'Mid', pop(540, 470, j.outro.l2, 100) + `{\\c${Y}}` + hi(j.outro.l2)],
+  fs.writeFileSync(outAss, ass(OUT_D, TAPE ? [[0, 'Mid', pop(540, 300, j.outro.l1, 92) + hiR(j.outro.l1)], [0.15, 'Mid', pop(540, 420, j.outro.l2, 92) + hiR(j.outro.l2)],
+      [0.7, 'Tape', `{\\an5\\pos(540,1460)\\frz1.5\\fs${fit(j.outro.cta, 76)}}` + esc(j.outro.cta)], ...(st.handle && !handleImg ? [[0.7, 'Small', `{\\an5\\pos(540,1590)}${esc(st.handle)}`]] : []), ...(!hasLogo && st.name ? [[0.3, 'Big', `{\\an5\\pos(540,810)}${esc(st.name)}`]] : [])]
+    : [[0, 'Mid', pop(540, 360, j.outro.l1, 100) + hi(j.outro.l1)], [0.15, 'Mid', pop(540, 470, j.outro.l2, 100) + `{\\c${Y}}` + hi(j.outro.l2)],
     [0.7, 'Mid', `{\\an5\\pos(540,1420)\\3c${st.cta ? bgr(st.cta) : R}\\bord10}` + esc(j.outro.cta)], ...(st.handle ? [[0.7, 'Small', `{\\an5\\pos(540,1540)}${esc(st.handle)}`]] : []), ...(!hasLogo && st.name ? [[0.3, 'Big', `{\\an5\\pos(540,930)}${esc(st.name)}`]] : [])]));
   await prog.snap(ctx, '편집/AI인트로.mp4', IN_D * 0.6, '인트로');
   prog({ stage: 'outro' });
   ctx.log('아웃트로 그리는 중…');
-  await ff(['-sseof', '-0.2', '-i', E.p(MAIN), ...logoIn(OUT_D), '-f', 'lavfi', '-t', String(OUT_D), '-i', 'anullsrc=r=48000:cl=stereo', '-filter_complex',
+  // 채널 애셋이 있으면: 프로필(가운데 위) + 배너 문구 MAT STORY · AFTER WORK. ON THE MAT. + 핸들 (입력 3·4번)
+  const outX = TAPE ? [lockImg, handleImg].filter(Boolean) : [];
+  const outOv = outX.map((p, i) => `[${3 + i}:v]${fadeIn(p === lockImg ? 0.45 : 0.7)}[x${i}];[o${i}][x${i}]overlay=x='(W-w)/2':y='${p === lockImg ? 1190 : 1590}-h/2'[o${i + 1}];`).join('');
+  await ff(['-sseof', '-0.2', '-i', E.p(MAIN), ...logoIn(OUT_D), '-f', 'lavfi', '-t', String(OUT_D), '-i', 'anullsrc=r=48000:cl=stereo', ...outX.flatMap(p => stillIn(p, OUT_D)), '-filter_complex',
     `[0:v]trim=end_frame=1,loop=loop=-1:size=1,trim=duration=${OUT_D},setpts=PTS-STARTPTS,crop=${W}:${layOf(st).vh}:0:${layOf(st).vy},scale=-2:${H},crop=${W}:${H},boxblur=24:2,eq=brightness=-0.32,fps=30,setsar=1[bg];` +
-    `[1:v]${logoF(660, 0.3)}[lg];[bg][lg]overlay=x='(W-w)/2':y='930-h/2':eval=frame,subtitles=filename='${q(outAss)}':fontsdir='${fd}',fade=out:st=${OUT_D - 0.25}:d=0.25,format=yuv420p[v]`,
+    `[1:v]${logoF(TAPE ? 420 : 660, 0.3)}[lg];[bg][lg]overlay=x='(W-w)/2':y='${TAPE ? 810 : 930}-h/2':eval=frame[o0];${outOv}[o${outX.length}]subtitles=filename='${q(outAss)}':fontsdir='${fd}',fade=out:st=${OUT_D - 0.25}:d=0.25,format=yuv420p[v]`,
     '-map', '[v]', '-map', '2:a', '-t', String(OUT_D), '-c:v', 'libx264', '-crf', '19', '-preset', 'veryfast', '-c:a', 'aac', '-b:a', '160k', E.p('편집/AI아웃트로.mp4')], liveCtx(ctx, E, 'aibrand', '아웃트로 그리는 중', OUT_D, prog));
   await prog.snap(ctx, '편집/AI아웃트로.mp4', OUT_D * 0.7, '아웃트로');
   prog({ stage: 'join' });
