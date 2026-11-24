@@ -35,6 +35,10 @@
       "destination": "/outputs/fieldnote-ytformula.js"
     },
     {
+      "source": "/fieldnote-stickman.js",
+      "destination": "/outputs/fieldnote-stickman.js"
+    },
+    {
       "source": "/fieldnote-ytrefs.js",
       "destination": "/outputs/fieldnote-ytrefs.js"
     },
