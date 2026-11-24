@@ -1607,7 +1607,8 @@ const YT_STAGE_TOOLS = [
 function ytStageTools(idx) { return `<div class="tl-stage">${(YT_STAGE_TOOLS[idx] || []).map(([l, ids, j]) => toolLayer(l, ids, j)).join('')}</div>`; }
 function ytOrchestration() { return `<div class="tl-orch">${toolLayer('오케스트레이션', ['claudecode'])}${toolLayer('대량 작업', ['codex'])}<span class="small">모든 단계를 지휘하고 반복 작업을 돌립니다</span></div>`; }
 
-// ===== YouTube 'GitHub 모음집' 탭 (별 수는 2026.11.08 GitHub API 기준) =====
+// ===== YouTube 'GitHub 모음집' 탭 (별 수: 기존 2026.11.08 / 새 항목 2026.11.24 GitHub API 기준) =====
+// rate: 제작 라인 우선순위 평점(1~5). 그룹 안에서는 평점 높은 순으로 정렬해 보여줌.
 const GH_GROUPS = [
   { icon:'🔍', title:'소재·트렌드 찾기', stage:'01 자료조사', color:'#4fb3ff', items:[
     { star:true, name:'Agent-Reach', repo:'Panniantong/Agent-Reach', stars:110055, desc:'레딧·유튜브·X 글을 AI가 모아 정리. "요즘 이 주제로 뭐가 뜨냐"를 실제 글로 확인할 때 가장 많이 씀.', tip:'한 번에 너무 많이 긁으면 IP가 막힘(1시간 차단 경험). 조금씩.' },
@@ -1619,15 +1620,36 @@ const GH_GROUPS = [
   { icon:'🎙', title:'목소리', stage:'03 편집 · 음성', color:'#ff7ac8', items:[
     { star:true, name:'Voicebox', repo:'jamiepine/voicebox', stars:60023, desc:'내 목소리 몇 개 녹음 → 클로닝하는 AI 보이스 스튜디오. 내 컴퓨터에서 돌아가 무료·무제한, API로 문장마다 자동 생성.', tip:'시드 고정 + "숨소리 없이 첫 음절부터 바로" 지시를 넣으면 톤이 일정해짐.' },
     { star:false, name:'Qwen3-TTS', repo:'QwenLM/Qwen3-TTS', stars:14279, desc:'Voicebox 안에서 실제로 목소리를 만드는 모델. 원리가 궁금할 때.' },
-    { star:false, name:'edge-tts', repo:'rany2/edge-tts', stars:12484, desc:'API 키 없는 무료 TTS. 영어 원문·댓글을 다른 목소리로 구분해 읽힐 때.' },
+    { star:false, rate:2, name:'Chatterbox', repo:'resemble-ai/chatterbox', stars:28066, desc:'캐릭터 목소리를 로컬에서 만드는 음성 합성.' },
+    { star:false, rate:1, name:'edge-tts', repo:'rany2/edge-tts', stars:12633, desc:'API 키 없는 무료 TTS. 시험용 내레이션을 빠르게 뽑거나, 영어 원문·댓글을 다른 목소리로 구분해 읽힐 때.' },
+    { star:false, rate:1, name:'Seed-VC', repo:'Plachtaa/seed-vc', stars:3906, desc:'녹음한 목소리를 캐릭터 목소리로 바꾸는 음성 변환.' },
+    { star:false, rate:1, name:'Supertonic', repo:'supertone-oss-archive/supertonic', stars:13760, desc:'가볍게 돌아가는 로컬 음성 합성.' },
   ]},
   { icon:'🖼', title:'영상 소스·이미지', stage:'02 소스 다운로드', color:'#ff6b6b', items:[
-    { star:true, name:'yt-dlp', repo:'yt-dlp/yt-dlp', stars:206063, desc:'원하는 구간만 잘라 받기. 공식 클립에서 몇 초만 따올 때. 이 컴퓨터에 설치됨, /yt-source-download 스킬이 사용.' },
+    { star:false, rate:3, name:'yt-dlp', repo:'yt-dlp/yt-dlp', stars:210371, desc:'쇼츠에 넣을 실사 영상 자료를 원하는 구간만 잘라 받기. 이 컴퓨터에 설치됨, /yt-source-download 스킬이 사용.' },
+    { star:false, rate:2, name:'Real-ESRGAN', repo:'xinntao/Real-ESRGAN', stars:37631, desc:'오래되거나 흐린 자료 사진을 선명하게 키우는 업스케일러.' },
+    { star:false, rate:1, name:'rembg', repo:'danielgatis/rembg', stars:25658, desc:'사진 배경을 자동으로 지우는 누끼 도구.' },
+  ]},
+  { icon:'🧊', title:'3D·프리비즈', stage:'03 편집 · 장면 설계', color:'#5fd4c4', items:[
+    { star:true, rate:5, name:'three.js', repo:'mrdoob/three.js', stars:119275, desc:'3D 장면의 카메라와 움직임을 실시간으로 잡는 프리비즈 엔진.' },
+    { star:true, rate:4, name:'Blender', repo:'blender/blender', stars:22409, desc:'프리비즈를 옮겨 실사 렌더하는 툴.' },
+    { star:false, rate:3, name:'Playwright', repo:'microsoft/playwright', stars:100963, desc:'화면 없이 브라우저를 돌려 프리비즈 정지컷과 웹 캡처를 자동으로 뽑는 도구.' },
+    { star:false, rate:1, name:'blender-mcp', repo:'ahujasid/mcp-for-blender', stars:35623, desc:'Claude가 Blender를 직접 조작하게 이어 주는 연결 도구. (옛 주소 ahujasid/blender-mcp)' },
+    { star:false, rate:1, name:'blender-skills', repo:'arjun988/blender-skills', stars:4812, desc:'Blender 작업 요령을 담은 Claude용 스킬 모음.' },
   ]},
   { icon:'🎬', title:'편집·렌더', stage:'03 편집 · 렌더', color:'#b9a1f5', items:[
-    { star:true, name:'Remotion', repo:'remotion-dev/remotion', stars:71554, desc:'코드로 영상 만들기. 자막·레이아웃 템플릿을 한 번 만들면 대본·목소리·이미지만 갈아 끼워 계속 렌더.', tip:'AI가 Remotion을 잘 다루게 하는 공식 스킬: remotion-dev/skills', extra:['Remotion 공식 스킬', 'remotion-dev/skills'] },
+    { star:true, rate:5, name:'FFmpeg', repo:'FFmpeg/FFmpeg', stars:68038, desc:'모든 영상의 컷 조립, 자막 입히기, 오디오 믹스, 인코딩을 맡는 기본 도구. /rough-cut 스킬이 사용.' },
+    { star:true, rate:4, name:'Pillow', repo:'python-pillow/Pillow', stars:14011, desc:'자막 카드, 타이틀 카드, 썸네일을 그리고 프레임을 합성하는 이미지 라이브러리.' },
+    { star:false, rate:2, name:'Remotion', repo:'remotion-dev/remotion', stars:75367, desc:'React 코드로 모션 그래픽을 렌더하는 영상 프레임워크. 자막·레이아웃 템플릿을 한 번 만들면 대본·목소리·이미지만 갈아 끼워 계속 렌더.', tip:'AI가 Remotion을 잘 다루게 하는 공식 스킬: remotion-dev/skills', extra:['Remotion 공식 스킬', 'remotion-dev/skills'] },
+    { star:false, rate:2, name:'OpenCV', repo:'opencv/opencv', stars:91703, desc:'프레임을 비교하고 잘라내고 색을 보정하는 영상 처리 라이브러리.' },
+    { star:false, rate:2, name:'Hahmlet', repo:'hyper-type/hahmlet', stars:81, desc:'쇼츠 한 줄 자막에 쓰는 한글 폰트.' },
     { star:false, name:'HyperFrames', repo:'heygen-com/hyperframes', stars:80666, desc:'HTML로 모션그래픽. 인트로·타이틀 같은 짧은 장면. Claude Code에 스킬로 설치되어 있음.' },
     { star:false, name:'video-use', repo:'browser-use/video-use', stars:30713, desc:'"앞부분 자르고 자막 넣어 줘"처럼 말로 시키는 편집 스킬. 찍어 둔 영상 다듬기.' },
+  ]},
+  { icon:'🎧', title:'자막·음악 분석', stage:'03 편집 · 자막·사운드', color:'#7fa8ff', items:[
+    { star:false, rate:3, name:'faster-whisper', repo:'SYSTRAN/faster-whisper', stars:26980, desc:'내레이션을 받아쓰고 자막 타이밍을 맞추는 음성 인식.' },
+    { star:false, rate:1, name:'Demucs', repo:'facebookresearch/demucs', stars:10423, desc:'음악에서 보컬과 반주를 분리하는 도구.' },
+    { star:false, rate:1, name:'librosa', repo:'librosa/librosa', stars:9148, desc:'음악 박자와 음량을 분석해 컷 타이밍을 맞추는 오디오 분석 라이브러리.' },
   ]},
   { icon:'✅', title:'검수', stage:'03 편집 · 품질 검사', color:'#f5b560', items:[
     { star:false, name:'mlx-whisper', repo:'ml-explore/mlx-examples', path:'/tree/main/whisper', stars:9059, desc:'맥에서 돌아가는 받아쓰기. 만든 목소리를 다시 받아써 대본과 비교 → 발음이 이상하면 다시 생성. 일일이 안 들어도 됨.' },
@@ -1638,19 +1660,20 @@ const GH_GROUPS = [
     { star:false, name:'caveman', repo:'JuliusBrussee/caveman', stars:118197, desc:'AI 답변을 짧게 핵심만. 작업이 길어질수록 토큰 차이가 큼.' },
   ]},
 ];
+GH_GROUPS.forEach(g => g.items.sort((a, b) => (b.star - a.star) || ((b.rate || 0) - (a.rate || 0))));
 function ghStars(n) { return n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + 'k' : String(n); }
 function ghBadge(name, color) { const m = name.replace(/[^A-Za-z가-힣0-9]/g, '').slice(0, 2); return `<svg class="tl-svg" width="34" height="34" viewBox="0 0 26 26" aria-hidden="true"><rect x="0.5" y="0.5" width="25" height="25" rx="7" fill="#0f1216" stroke="${color}"/><text x="13" y="13.5" text-anchor="middle" dominant-baseline="central" font-family="ui-monospace,Menlo,monospace" font-weight="800" font-size="10" fill="${color}">${esc(m)}</text></svg>`; }
 function ytGithubPage() {
   const total = GH_GROUPS.reduce((a, g) => a + g.items.length, 0);
   const card = (g, it) => { const url = `https://github.com/${it.repo}${it.path || ''}`; return `<article class="gh-card" style="--gc:${g.color}">
-    <div class="gh-head">${ghBadge(it.name, g.color)}<div><h3>${it.star ? '⭐️ ' : '➕ '}${esc(it.name)}</h3><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(it.repo)} ↗</a></div><span class="gh-stars">★ ${ghStars(it.stars)}</span></div>
+    <div class="gh-head">${ghBadge(it.name, g.color)}<div><h3>${it.star ? '⭐️ ' : '➕ '}${esc(it.name)}${it.rate ? ` <span class="gh-rate" title="우선순위 ${it.rate}/5">${'★'.repeat(it.rate)}<i>${'★'.repeat(5 - it.rate)}</i></span>` : ''}</h3><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(it.repo)} ↗</a></div><span class="gh-stars">★ ${ghStars(it.stars)}</span></div>
     <p>${esc(it.desc)}</p>${it.tip ? `<p class="gh-tip">💡 ${esc(it.tip)}</p>` : ''}
     ${it.extra ? `<a class="gh-extra" href="https://github.com/${esc(it.extra[1])}" target="_blank" rel="noopener noreferrer">${esc(it.extra[0])} ↗</a>` : ''}
     <button class="btn ghost gh-copy" data-gh-copy="https://github.com/${esc(it.repo)}.git">git clone 주소 복사</button></article>`; };
-  return head('GitHub 모음집', `영상 제작에 쓰는 오픈소스 ${total}개 · ⭐️ 주력 / ➕ 보조 · 제작 라인 단계 순서`, false)
+  return head('GitHub 모음집', `영상 제작에 쓰는 오픈소스 ${total}개 · ⭐️ 주력 / ➕ 보조 · ★ 우선순위(5점) · 제작 라인 단계 순서`, false)
     + `<nav class="gh-jump">${GH_GROUPS.map((g, i) => `<button class="filter" style="--gc:${g.color}" data-yp-jump="gh-${i}">${g.icon} ${esc(g.title)} <b>${g.items.length}</b></button>`).join('')}</nav>`
     + GH_GROUPS.map((g, i) => `<section class="gh-group" id="gh-${i}" style="--gc:${g.color}"><div class="gh-group-head"><h2>${g.icon} ${i + 1}. ${esc(g.title)}</h2><span class="gh-stage">제작 라인 · ${esc(g.stage)}</span></div><div class="gh-grid">${g.items.map(it => card(g, it)).join('')}</div></section>`).join('')
-    + `<p class="small" style="margin-top:16px">별 수는 2026년 11월 8일 GitHub 기준입니다. 설치 전 각 저장소의 README와 라이선스를 확인하세요.</p>`;
+    + `<p class="small" style="margin-top:16px">GitHub 별 수는 2026년 11월 8일 기준(11월 24일 추가분은 그날 기준)입니다. 설치 전 각 저장소의 README와 라이선스를 확인하세요.</p>`;
 }
 document.addEventListener('click', async e => { const b = e.target.closest('button[data-gh-copy]'); if (!b) return; const ok = await copyText('git clone ' + b.dataset.ghCopy); toast(ok ? 'git clone 명령을 복사했어요.' : '복사에 실패했어요.'); });
 
