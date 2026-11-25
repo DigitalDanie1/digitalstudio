@@ -1674,7 +1674,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
     const prog = yt && it.idea ? `<div class="pl-prog"><span><b>${doneN}/${N}</b> 단계 끝 · 지금 <b>${esc(steps[Math.min(now, lastIdx)].name)}</b></span><i><i style="width:${Math.round(doneN / N * 100)}%"></i></i></div>` : '';
     const runBox = statusLine ? (yt ? `<div class="pl-run" role="status">${statusLine}</div>` : `<p class="small pl-status">${statusLine}</p>`) : '';
     return `<section class="pl ${c === 'youtube' ? 'pl-yt' : ''}" id="plRoot" data-c="${c}" data-v="${v}" style="--pc:${pc}">${c === 'youtube' ? '<i id="ytAuto" hidden></i>' : ''}
-      <div class="pl-top">${items}${insta}</div>${c === 'youtube' ? ytPlayerHtml(it) : ''}${prog}${bar}
+      <div class="pl-top">${items}${insta}</div>${c === 'insta' && window.CodexImg ? CodexImg.refsHtml(igCur()) : ''}${c === 'youtube' ? ytPlayerHtml(it) : ''}${prog}${bar}
       <article class="pl-card" aria-live="polite"><div class="pl-steplabel">${v + 1} / ${N} 단계 ${lastLabel}</div>
         <h2>${esc(val(s.title, it))}</h2><p class="pl-desc">${esc(val(s.desc, it))}</p>${yt ? runBox : ''}
         ${c === 'youtube' && !AI_CH[it.idea ? ytCh(it.idea) : ytTab()] ? ytOutHtml(it) : ''}${val(s.body || '', it) || ''}${err}

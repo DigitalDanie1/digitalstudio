@@ -226,6 +226,16 @@
     const sel = list.find(s => s.id === cur);
     return `<div class="cx-styles" role="radiogroup" aria-label="그림체">${groups.map(g => `<div class="cx-group"><span class="cx-gname">${e(g)}</span><div class="cx-row">${list.filter(s => (s.group || '그림체') === g).map(s => `<button type="button" role="radio" aria-checked="${s.id === cur}" class="cx-style ${s.id === cur ? 'on' : ''}" data-cx-style="${e(s.id)}" title="${e(s.desc || '')}">${X.online && s.refs[0] ? `<img loading="lazy" alt="" src="${e(imgUrl(s.refs[0], true))}">` : '<i class="cx-noimg"></i>'}<span>${e(s.name)}</span></button>`).join('')}</div></div>`).join('')}</div>${sel ? `<p class="small cx-desc"><b>${e(sel.name)}</b> · ${e(sel.desc || '설명 없음')}</p>` : ''}`;
   }
+  // 그림 레퍼런스: 이야기·카드가 없어도 인스타 화면 위에 항상 보이는 그림체 모음 (실행기 그림 폴더에서 읽음)
+  function refsHtml(account) {
+    if (X.styles === null && !X.loading) setTimeout(loadStyles, 0);
+    const list = styleList(), base = lastStyleOf(account) || FALLBACK_STYLE[account] || '';
+    const head = `<summary><b>그림 레퍼런스</b> <span class="small">${list.length ? list.length + '개' : ''} · 실행기 그림 폴더(instagram-toon/styles, otter-couple-assets)</span></summary>`;
+    let body;
+    if (!list.length) body = X.online === null || X.loading ? '<p class="small">그림 레퍼런스를 불러오는 중…</p>' : X.online ? '<p class="small">이 맥 실행기에 그림이 없어요. ~/Documents/Codex/instagram-toon/styles/&lt;이름&gt;/ 폴더에 그림을 넣으면 여기에 나와요.</p>' : '<p class="small">실행기가 꺼져 있어서 그림 레퍼런스를 못 불러왔어요. 맥 실행기를 켜면 나와요.</p>';
+    else body = `<div class="cx-refs">${[...list].sort((a, b) => (b.id === base) - (a.id === base)).map(s => { const r = s.refs[0]; return `<figure class="cx-ref ${s.id === base ? 'base' : ''}">${X.online && r ? `<a href="${e(imgUrl(r))}" target="_blank" rel="noopener noreferrer"><img loading="lazy" alt="${e(s.name)}" src="${e(imgUrl(r, true))}"></a>` : '<i class="cx-noimg"></i>'}<figcaption>${s.id === base ? '<em>기본</em> ' : ''}${e(s.name)}${s.refs.length > 1 ? ` <span class="small">· ${s.refs.length}장</span>` : ''}</figcaption></figure>`; }).join('')}</div>${X.online ? '' : '<p class="small">실행기가 꺼져 있어 저장해 둔 목록만 보여요 (그림 미리보기 없음).</p>'}`;
+    return `<details class="cx-refbox" open>${head}${body}</details>`;
+  }
   function cardHtml(ctx, i) {
     const c = chosen(ctx, i), d = cardData(ctx, i), vers = doneJobs(ctx, i), own = hasOwn(ctx, i), off = X.online === false;
     const preview = c ? (c.own ? `<img data-cx-ownimg="${i}" alt="${i + 1}번 카드 내 그림">` : `<a href="${e(imgUrl(c.job.file))}" target="_blank" rel="noopener noreferrer"><img alt="${i + 1}번 카드 그림" src="${e(imgUrl(c.job.file, true))}"></a>`) : `<div class="cx-ph">${activeJob(ctx, i) ? '…' : '그림 없음'}</div>`;
@@ -331,6 +341,10 @@
   css.textContent = `
 .cx{margin:0 0 10px}.cx-on{color:var(--green)}
 .cx-h3{font-size:16px;margin:16px 0 8px}.cx-h3 small{font-weight:400;color:var(--muted);font-size:13px}
+.cx-refbox{margin:0 0 14px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--panel2)}.cx-refbox summary{cursor:pointer;font-size:14px}
+.cx-refs{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-top:10px}
+.cx-ref{margin:0;display:flex;flex-direction:column;gap:5px;font-size:12px;line-height:1.3}.cx-ref img,.cx-ref .cx-noimg{width:100%;aspect-ratio:4/5;object-fit:cover;border-radius:8px;border:2px solid var(--line);background:#0f1216;display:block}
+.cx-ref.base img{border-color:var(--pc)}.cx-ref em{font-style:normal;font-weight:700;color:var(--pc)}.cx-ref figcaption{overflow-wrap:anywhere}
 .cx-styles{display:grid;gap:10px;max-height:320px;overflow:auto;padding:4px;border:1px solid var(--line);border-radius:12px;background:var(--panel2)}
 .cx-gname{display:block;font-size:12px;color:var(--muted);font-weight:700;margin:2px 2px 6px}
 .cx-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px}
@@ -352,5 +366,5 @@
 @media(max-width:620px){.cx-card{grid-template-columns:1fr}.cx-prev{max-width:200px}}`;
   document.head.append(css);
 
-  window.CodexImg = { panel, gallery, btnLabel, btnDisabled, drawAll, doneCount, downloadAll, chosenBlobs, hydrate, splitDraft, postCards, loadStyles, loadJobs, copyEvery, state: X, instruction };
+  window.CodexImg = { panel, gallery, refsHtml, btnLabel, btnDisabled, drawAll, doneCount, downloadAll, chosenBlobs, hydrate, splitDraft, postCards, loadStyles, loadJobs, copyEvery, state: X, instruction };
 })();
