@@ -53,19 +53,25 @@ export const exists = p => { try { fs.accessSync(p); return true; } catch { retu
 
 // 외부 프로그램 실행. ctx.log(줄), ctx.setChild(child), ctx.aborted() 를 사용
 // YouTube 가 "봇이 아닌지 확인" 으로 막으면 yt-dlp 의 다른 플레이어(tv, 모바일 웹, 사파리 웹)로 차례대로 다시 시도해요 (로그인 쿠키는 쓰지 않아요)
-const BOT_RE = /Sign in to confirm you.re not a bot/i, YT_CLIENTS = ['tv', 'mweb', 'web_safari', 'ios'];
+// 2026-11 YouTube 플레이어 코드가 바뀌어 기본(main) 코드로는 n 챌린지를 못 풀어 모든 포맷이 사라졌어요 ("Requested format is not available", yt-dlp#18123).
+// → 늘 tv 플레이어 코드(player_js_variant=tv)로 풀어요. yt-dlp 2026.11.23 부터는 이게 기본이라 새 버전에서도 그대로 둬도 돼요.
+const BOT_RE = /Sign in to confirm you.re not a bot/i, FMT_RE = /Requested format is not available|No video formats found/i, YT_CLIENTS = ['tv', 'mweb', 'web_safari', 'ios'];
+const JS_VARIANT = 'player_js_variant=tv';
+const ytArgs = (client, args) => ['--extractor-args', `youtube:${client ? `player_client=${client};` : ''}${JS_VARIANT}`, ...args];
 export async function run(cmd, args, ctx = {}, opts = {}) {
   if (cmd !== YTDLP || args.includes('--extractor-args')) return run1(cmd, args, ctx, opts);
-  try { return await run1(cmd, args, ctx, opts); }
+  try { return await run1(cmd, ytArgs('', args), ctx, opts); }
   catch (e) {
-    if (e instanceof StopError || !BOT_RE.test(e.err || '')) throw e;
+    if (e instanceof StopError || !(BOT_RE.test(e.err || '') || FMT_RE.test(e.err || ''))) throw e;
+    const bot = BOT_RE.test(e.err || '');
     let last = e;
     for (const c of YT_CLIENTS) {
-      ctx.log?.(`YouTube 가 봇 확인으로 막아서 다른 방식(${c})으로 다시 받아요…`);
-      try { return await run1(cmd, ['--extractor-args', `youtube:player_client=${c}`, ...args], ctx, opts); }
-      catch (e2) { if (e2 instanceof StopError) throw e2; last = e2; if (!BOT_RE.test(e2.err || '') && !/Requested format|not available/i.test(e2.err || '')) throw e2; }
+      ctx.log?.(bot ? `YouTube 가 봇 확인으로 막아서 다른 방식(${c})으로 다시 받아요…` : `받을 수 있는 화질이 안 보여서 다른 방식(${c})으로 다시 찾아요…`);
+      try { return await run1(cmd, ytArgs(c, args), ctx, opts); }
+      catch (e2) { if (e2 instanceof StopError) throw e2; last = e2; if (!BOT_RE.test(e2.err || '') && !FMT_RE.test(e2.err || '') && !/not available/i.test(e2.err || '')) throw e2; }
     }
-    last.err = (last.err || '') + '\n→ 이 맥에서 ~/Desktop/유투브/실행기/유튜브 로그인 연결.command 를 한 번 더블클릭하세요 (맥마다 한 번).';
+    last.err = (last.err || '') + (bot ? '\n→ 이 맥에서 ~/Desktop/유투브/실행기/유튜브 로그인 연결.command 를 한 번 더블클릭하세요 (맥마다 한 번).'
+      : '\n→ yt-dlp 가 YouTube 변경을 못 따라가고 있어요. 맥 터미널에서 brew upgrade yt-dlp 로 yt-dlp 를 최신으로 바꿔 주세요.');
     throw last;
   }
 }
