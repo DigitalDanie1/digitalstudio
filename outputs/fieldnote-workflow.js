@@ -1349,7 +1349,7 @@ function commonPage() {
 
 
 // ===== YouTube 제작 라인: 자료조사 → 소스 다운로드 → 편집 → 업로드 (쇼츠/롱폼, 단계마다 스킬 바로 쓰기) =====
-let ytPipe = { ideaId: '', url: '', ranges: '', format: 'shorts' };
+let ytPipe = { ideaId: '', url: '', ranges: '', format: 'shorts', resub: false };   // resub = 쇼츠 재가공 · 자막·음성 있음
 const YT_AUDIENCE = '레슬링·주짓수·MMA를 취미로 하는 생활체육인(20~40대 직장인, 입문~중급)';
 function ytFolder(t) { return String(t || '새 주제').replace(/[\\/:*?"<>|#%&{}$!'`@+=]/g, '').replace(/\s+/g, ' ').trim().slice(0, 40) || '새 주제'; }
 function ytFmtIdeas(f) { return db.ideas.filter(i => ideaPlatform(i) === 'YouTube' && (!f || ytFormatOf(i) === f)).sort((a, b) => ytRank(a) - ytRank(b) || (b.created || 0) - (a.created || 0)); }
@@ -1429,14 +1429,14 @@ function ytSkillsPage() {
     + `<section class="panel sk-how"><h2>쓰는 법</h2><ol><li><b>Claude Code</b>: '명령 복사' → 새 대화에 붙여 넣기. 또는 그냥 "하빕 주제 자료조사해줘"처럼 말해도 맞는 스킬이 실행됩니다.</li><li><b>claude.ai / 데스크톱 채팅</b>: 바탕화면 CLAUDE 폴더의 fieldnote-youtube-skills.zip을 풀어 각 폴더를 ZIP으로 설정 → 기능 → 스킬에 업로드. 다운로드·러프컷은 내 컴퓨터 파일을 다뤄서 Claude Code에서만 됩니다.</li><li>스킬 원본: sphereai.work 무료 스킬 5개 + FIELDNOTE용 2개(소스 다운로드, 러프컷).</li></ol></section>`;
 }
 function ytPipeRefresh() { document.querySelectorAll('[data-yp-cmd]').forEach(el => { el.textContent = ytPipeText(el.dataset.ypCmd); }); const f = document.querySelector('[data-yp-folder]'); if (f) f.textContent = ytFolder(ytPipeIdea()?.title); }
-function ytPick(id) { const i = db.ideas.find(x => x.id === id); if (!i) return; ytPipe.format = ytFormatOf(i); ytPipe.ideaId = id; ytPipe.url = ytFirstUrl(i); ytPipe.ranges = ''; }
+function ytPick(id) { const i = db.ideas.find(x => x.id === id); if (!i) return; ytPipe.format = ytFormatOf(i); ytPipe.resub = ytPipe.format !== 'long' && !!i.ytResub; ytPipe.ideaId = id; ytPipe.url = ytFirstUrl(i); ytPipe.ranges = ''; }
 document.addEventListener('input', e => { const f = e.target.closest?.('[data-yp-field]'); if (!f) return; ytPipe[f.dataset.ypField] = f.value; ytPipeRefresh(); });
 document.addEventListener('change', e => {
   const s = e.target.closest?.('select[data-yp-idea]'); if (s) { ytPick(s.value); render(); return; }
   const f = e.target.closest?.('select[data-yt-format-set]'); if (f) { const i = db.ideas.find(x => x.id === f.dataset.ytFormatSet); if (i) { i.ytFormat = f.value; persist(); render(); } }
 });
 document.addEventListener('click', async e => {
-  const fm = e.target.closest('button[data-yp-format]'); if (fm) { ytPipe.format = fm.dataset.ypFormat; ytPipe.ideaId = ''; ytPipe.url = ''; ytPipe.ranges = ''; render(); return; }
+  const fm = e.target.closest('button[data-yp-format]'); if (fm) { ytPipe.format = fm.dataset.ypFormat; ytPipe.resub = fm.dataset.ypResub === '1'; ytPipe.ideaId = ''; ytPipe.url = ''; ytPipe.ranges = ''; render(); return; }
   const pk = e.target.closest('button[data-yp-pick]'); if (pk) { ytPick(pk.dataset.ypPick); render(); document.querySelector('.yp')?.scrollIntoView({ behavior: 'smooth' }); return; }
   const j = e.target.closest('button[data-yp-jump]'); if (j) { const d = document.getElementById(j.dataset.ypJump); if (d) { const disclosure = d.closest('details'); if (disclosure) disclosure.open = true; d.scrollIntoView({ behavior: 'smooth' }); } return; }
   const b = e.target.closest('button[data-yp-copy]'); if (!b) return;

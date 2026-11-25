@@ -79,3 +79,4 @@ FIELDNOTE 작업판의 "⚡ 이 주제 제작" 버튼이 이 맥에서 실제 �
 - 그림체 = 내가 만든 그림 묶음 (`~/Documents/Codex/instagram-toon/*`, `otter-couple-assets/*`). 이름·설명은 `styles.json` 에서 고쳐요. 새 그림체는 작업판에서 "이 그림을 새 스타일로 저장".
 - 결과 그림: `~/Documents/Codex/instagram-toon/fieldnote/<계정>/<작업>/NN-시각.png` (옛 버전도 남아요).
 - 주소: `GET /img/styles`, `POST /img/styles`, `POST /img/generate`, `GET /img/jobs?projectId=`, `POST /img/cancel`, `GET /file?path=…[&thumb=1]` (읽기 전용 폴더만).
+- 쇼츠 재가공 · 자막·음성 있음 (작업판 칩, 에피소드 `resub`): 남이 이미 편집한 쇼츠용. 1차 컷에서 Claude 가 진짜 영상 칸(`area`)과 박힌 자막 띠(`burned`)를 적고, 그리기에서 틀은 잘라내고 자막 띠는 흐리게 덮어요(썸네일도). 말이 끊기지 않게 자르고, BGM 은 0.1 로 낮춰요.

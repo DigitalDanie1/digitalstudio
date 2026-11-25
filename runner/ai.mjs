@@ -511,7 +511,7 @@ ${fine}
 ${trTxt}
 
 할 일: 세로 쇼츠 1차 컷 편집안을 짠다. 인트로와 아웃트로가 제일 중요하다. 둘 다 후크여야 한다. 스크롤을 멈추게 하는 장면으로 시작한다.
-${brainCut(st, T)}
+${brainCut(st, T)}${E.s.resub ? '\n' + RESUB_CUT : ''}
 ${story ? `앞에서 정한 서사 (따르되, 프레임을 보고 더 맞는 게 있으면 바꿔도 된다): ${JSON.stringify(story)}\n` : ''}장르 규칙 (MONEY 를 보여 주는 방법):
 ${st.cut}
 ${T ? `목표 출력 길이: ${T}초 (${T - tol}~${T + tol}초). 위 설명에 적힌 전체 길이보다 이 목표를 따른다. 원속도 컷을 늘리거나 줄여서 맞춘다.\n` : ''}각 컷의 출력 길이는 (b-a)/speed. 첫 컷은 반드시 intro, 마지막 컷은 반드시 outro.
@@ -522,7 +522,7 @@ JSON 하나만 답해라:
  "moments":[{"t":원본초,"what":"그 순간 화면에 보이는 것","tag":"TAUNT 등 태그"}],
  "cuts":[{"a":원본초,"b":원본초,"speed":1,"role":"${st.roles}","beat":"hook|기|승|전|결","tag":"MONEY 등 태그","step":"슬로우 단계 이름(slow 일 때만)"}],
  "who":"${st.who}",
- "crop_bottom": 화면 아래쪽 중계 띠(뉴스 티커·광고 띠 등)가 차지하는 높이 비율 0~0.25 (없으면 0. 장면이 잘리지 않게)}`,
+ "crop_bottom": 화면 아래쪽 중계 띠(뉴스 티커·광고 띠 등)가 차지하는 높이 비율 0~0.25 (없으면 0. 장면이 잘리지 않게)${E.s.resub ? RESUB_JSON : ''}}`,
     j => {
       const c = j.cuts;
       if (!Array.isArray(c) || c.length < 3) return 'cuts 가 3개 이상 있어야 해요.';
@@ -541,6 +541,7 @@ JSON 하나만 답해라:
         if (!(+x.speed >= 0.1 && +x.speed <= 1)) return `${i + 1}번째 컷 speed 는 0.1~1 이어야 해요.`;
       }
       if (j.crop_bottom != null && !(+j.crop_bottom >= 0 && +j.crop_bottom <= 0.25)) return 'crop_bottom 은 0~0.25 여야 해요.';
+      if (E.s.resub) { const bad = resubCheck(j); if (bad) return bad; }
       const total = c.reduce((t, x) => t + (x.b - x.a) / x.speed, 0);
       if (T) return total > T + tol ? `출력 길이가 ${r1(total)}초예요. ${T + tol}초 이하로 줄여라.` : total < T - tol ? `출력 길이가 ${r1(total)}초예요. ${T - tol}초 이상으로 늘려라.` : '';
       return total > 58 ? `출력 길이가 ${r1(total)}초예요. 58초 이하로 줄여라.` : total < 15 ? `출력 길이가 ${r1(total)}초예요. 너무 짧아요.` : '';
@@ -554,17 +555,47 @@ JSON 하나만 답해라:
   prog({ stage: 'done', live: null });
 }
 
+// ---------- 남의 쇼츠 재가공 (자막·음성 있음, E.s.resub) ----------
+// 박힌 자막은 지울 수 없어서, 그 가로 띠만 흐리게 덮어요. 올린 사람이 씌운 틀(위 제목 띠·종이 무늬·출처 칸)은 잘라내고 진짜 영상 칸만 써요. 원본 목소리는 그대로 둬요.
+const RESUB_CUT = `[재가공] 이 원본은 남이 이미 편집한 쇼츠다. 화면에 박힌 자막과 사람 목소리가 있다.
+- 말이 문장 중간에서 끊기지 않게 문장 단위로 자른다. 말하는 구간에는 슬로우(speed<1)를 쓰지 않는다 (목소리가 늘어진다).
+- 프레임을 보고 아래 area 와 burned 를 꼭 적는다. 위치는 프레임 높이 비율(0=맨 위, 1=맨 아래).`;
+const RESUB_JSON = `,
+ "area": [위, 아래] 진짜 영상이 나오는 칸의 위·아래 끝 비율. 올린 사람이 씌운 틀(위 제목 띠, 아래 종이 무늬·출처 칸, 검은 여백)은 뺀다. 틀이 없으면 [0, 1],
+ "burned": [[위, 아래], ...] 화면에 박힌 자막·글자가 나오는 가로 띠 (영상 칸 안, 0~3개, 없으면 []). 자막 글자 전체가 들어가게 넉넉히. 영상 칸 밖의 제목은 area 로 잘리니 넣지 않는다`;
+const resubCheck = j => {
+  const a = j.area, ok = (x, y) => +x >= 0 && +y <= 1 && +y > +x;
+  if (!Array.isArray(a) || !ok(a[0], a[1]) || +a[1] - +a[0] < 0.3) return 'area 는 [위, 아래] 비율 (0~1, 높이 0.3 이상) 이어야 해요.';
+  if (!Array.isArray(j.burned) || j.burned.length > 3 || j.burned.some(b => !Array.isArray(b) || !ok(b[0], b[1]) || +b[1] - +b[0] > 0.3)) return 'burned 는 [[위, 아래], ...] 비율 0~3개 (띠 높이 0.3 이하) 여야 해요.';
+  return '';
+};
+// 틀 가장자리(찢긴 종이 테두리 등)가 비치지 않게 위·아래를 1.2%씩 더 안쪽으로 잘라요
+const srcArea = plan => { const a = plan.area; return Array.isArray(a) && (+a[0] > 0.01 || +a[1] < 0.99) ? [+a[0] > 0.01 ? +a[0] + 0.012 : 0, +a[1] < 0.99 ? +a[1] - 0.012 : 1] : null; };
+// 원본 한 장면 입력(inL)에 붙일 앞부분: 박힌 자막 띠 흐리게 → 영상 칸만 자르기. 끝은 라벨이나 'filter,' 라서 뒤에 필터를 바로 이어 써요
+function srcPre(plan, pr, inL, tag) {
+  const sw = pr.width, sh = pr.height; if (!sw || !sh) return inL;
+  const ev = x => Math.max(0, Math.min(sh, 2 * Math.round(x * sh / 2)));
+  let cur = inL, out = '';
+  (Array.isArray(plan.burned) ? plan.burned : []).slice(0, 3).forEach(([a, b], k) => {
+    const y = ev(+a - 0.015), h = ev(+b + 0.015) - y; if (!(h >= 2)) return;
+    out += `${cur}split[${tag}s${k}][${tag}t${k}];[${tag}t${k}]crop=${sw}:${h}:0:${y},gblur=sigma=16:steps=3[${tag}g${k}];[${tag}s${k}][${tag}g${k}]overlay=0:${y}[${tag}o${k}];`;
+    cur = `[${tag}o${k}]`;
+  });
+  const ar = srcArea(plan); if (ar) { const y = ev(ar[0]), h = ev(ar[1]) - y; if (h >= 2) return `${out}${cur}crop=${sw}:${h}:0:${y},`; }
+  return out + cur;
+}
+
 // 화면 틀: 영상 칸 y(vy)·높이(vh)·바탕. mat 이 기본 (1차 컷은 늘 이 틀로 만들고, 다른 틀은 스타일을 입힐 때 같은 컷으로 다시 그려요)
 const LAY = { mat: { vy: VY, vh: VH, bg: 'black' }, full: { vy: 0, vh: H, bg: 'black' }, rank: { vy: 430, vh: 608, bg: 'blur' }, post: { vy: 500, vh: 866, bg: 'white' } };
 const layOf = st => LAY[st.lay] || LAY.mat;
 async function renderCut(E, ctx, info, lay = LAY.mat, outRel = '편집/AI1차컷.mp4') {
   const VY = lay.vy, VH = lay.vh;
-  const plan = readJson(E.p('편집/AI컷.json')), hasA = (await probe(info.file, ctx)).hasAudio, args = [], fc = [];
-  const cb = Math.min(0.25, Math.max(0, +plan.crop_bottom || 0)), crop = cb ? `crop=iw:trunc(ih*${(1 - cb).toFixed(3)}/2)*2:0:0,` : '';
+  const plan = readJson(E.p('편집/AI컷.json')), pr = await probe(info.file, ctx), hasA = pr.hasAudio, args = [], fc = [];
+  const cb = srcArea(plan) ? 0 : Math.min(0.25, Math.max(0, +plan.crop_bottom || 0)), crop = cb ? `crop=iw:trunc(ih*${(1 - cb).toFixed(3)}/2)*2:0:0,` : '';
   plan.cuts.forEach((c, i) => {
     const s = Math.min(1, Math.max(0.1, +c.speed || 1));
     args.push('-ss', String(c.a), '-t', String(r1(c.b - c.a + 0.05)), '-i', info.file);
-    fc.push(`[${i}:v]${crop}setpts=(PTS-STARTPTS)/${s},scale=${W}:${VH}:force_original_aspect_ratio=increase,crop=${W}:${VH},fps=30,setsar=1,format=yuv420p[v${i}]`);
+    fc.push(`${srcPre(plan, pr, `[${i}:v]`, 'r' + i)}${crop}setpts=(PTS-STARTPTS)/${s},scale=${W}:${VH}:force_original_aspect_ratio=increase,crop=${W}:${VH},fps=30,setsar=1,format=yuv420p[v${i}]`);
     const at = []; let x = s; while (x < 0.5) { at.push('atempo=0.5'); x /= 0.5; } if (x < 0.999) at.push(`atempo=${+x.toFixed(3)}`);
     // 슬로우 구간은 배경음 없이 (늘어진 현장음은 지저분해요)
     fc.push(hasA && s >= 1 ? `[${i}:a]asetpts=PTS-STARTPTS${at.length ? ',' + at.join(',') : ''},aresample=48000,aformat=channel_layouts=stereo[a${i}]`
@@ -1045,7 +1076,7 @@ async function render(E, ctx, st, plan, fin, outRel) {
     const t = f => { try { return fs.statSync(E.p(f)).mtimeMs; } catch { return 0; } };
     if (t(base) < t('편집/AI컷.json')) await renderCut(E, ctx, info, lay, base);
   }
-  const pr = await probe(info.file, ctx), src = { w: pr.width || 1920, h: pr.height || 1080, cb: Math.min(0.25, Math.max(0, +plan.crop_bottom || 0)) };
+  const pr = await probe(info.file, ctx), ar = srcArea(plan), src = ar ? { w: pr.width || 1920, h: Math.round((pr.height || 1080) * (ar[1] - ar[0])), cb: 0 } : { w: pr.width || 1920, h: pr.height || 1080, cb: Math.min(0.25, Math.max(0, +plan.crop_bottom || 0)) };
   const root = E.homeRoot || path.join(HOME, 'Desktop/유투브'), logoPath = brandFile(root, st.logo, st.logoAlt), logo = st.lay === 'post' && !!logoPath;
   // 워터마크: 채널 애셋 PNG(배너 MAT/STORY + 빨간 막대)가 있으면 그림으로, 없으면 예전처럼 글자로
   const markPath = lay === LAY.mat && !logo ? brandFile(root, st.brand?.mark) : null;
@@ -1060,7 +1091,7 @@ async function render(E, ctx, st, plan, fin, outRel) {
   const vf = logo ? `[${li}:v]scale=110:-1,format=rgba[lg];[0:v][lg]overlay=x=70:y=118[vl];[vl]${sub2}[vo]` : `${v0}${sub2}[vo]`;
   // BGM 도 슬로우 구간에서는 꺼요
   const slowOff = plan.cuts.filter(c => (+c.speed || 1) < 1 && c.out).map(c => `volume=0:enable='between(t,${c.out[0]},${c.out[1]})'`).join(',');
-  const af = bgm ? `;[1:a]volume=0.22,atrim=0:${d},${slowOff ? slowOff + ',' : ''}afade=t=out:st=${Math.max(0, d - 1.5)}:d=1.5[b];[0:a][b]amix=inputs=2:duration=first:normalize=0[ao]` : ';[0:a]anull[ao]';
+  const af = bgm ? `;[1:a]volume=${E.s.resub ? 0.1 : 0.22},atrim=0:${d},${slowOff ? slowOff + ',' : ''}afade=t=out:st=${Math.max(0, d - 1.5)}:d=1.5[b];[0:a][b]amix=inputs=2:duration=first:normalize=0[ao]` : ';[0:a]anull[ao]';
   ctx.log(`그리는 중 (${st.name}${bgm ? ' · BGM ' + bgm : ' · BGM 없음: ~/Desktop/유투브/소리/BGM 에 넣으면 깔려요'})…`);
   try {
     await ff(['-i', E.p(base), ...(bgm ? ['-stream_loop', '-1', '-i', path.join(bgmDir, bgm)] : []), ...(logo ? ['-i', logoPath] : []), ...(markPath ? ['-i', markPath] : []), '-filter_complex', vf + af,
@@ -1221,8 +1252,8 @@ Dialogue: 1,0:00:00.00,0:00:05.00,T,,0,0,0,,{\\an5\\pos(${TW / 2},${TOP / 2 + 2}
 Dialogue: 1,0:00:00.00,0:00:05.00,B,,0,0,0,,{\\an5\\pos(${TW / 2},${TH - BOT / 2 + 2})\\fs${fitT(j.bot, 88, 1220)}}${esc(j.bot)}
 `);
   const q = p => p.replace(/\\/g, '/').replace(/:/g, '\\:').replace(/'/g, "\\'"), MH = TH - TOP - BOT, half = TW / 2;
-  const cb = Math.min(0.25, Math.max(0, +plan.crop_bottom || 0));
-  const cell = (i, x) => `[${i}:v]trim=end_frame=1,setpts=PTS-STARTPTS,${cb ? `crop=iw:trunc(ih*${(1 - cb).toFixed(3)}/2)*2:0:0,` : ''}scale=w=${half}:h=${MH}:force_original_aspect_ratio=increase,crop=${half}:${MH}:x='(iw-${half})*${(+x).toFixed(3)}':y='(ih-${MH})/2',setsar=1[c${i}]`;
+  const cb = srcArea(plan) ? 0 : Math.min(0.25, Math.max(0, +plan.crop_bottom || 0)), spr = await probe(info.file, ctx);
+  const cell = (i, x) => `${srcPre(plan, spr, `[${i}:v]`, 't' + i)}trim=end_frame=1,setpts=PTS-STARTPTS,${cb ? `crop=iw:trunc(ih*${(1 - cb).toFixed(3)}/2)*2:0:0,` : ''}scale=w=${half}:h=${MH}:force_original_aspect_ratio=increase,crop=${half}:${MH}:x='(iw-${half})*${(+x).toFixed(3)}':y='(ih-${MH})/2',setsar=1[c${i}]`;
   ctx.log('썸네일 그리는 중…');
   await ff(['-ss', String(j.left.t), '-i', info.file, '-ss', String(j.right.t), '-i', info.file, '-filter_complex',
     `${cell(0, j.left.x)};${cell(1, j.right.x)};color=c=black:s=${TW}x${TH}:d=1[bg];[bg][c0]overlay=0:${TOP}:shortest=1[a];[a][c1]overlay=${half}:${TOP}[b];` +

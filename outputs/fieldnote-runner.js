@@ -33,7 +33,7 @@ async function runnerSyncIdeas() {
       const id = e.ideaId && !db.ideas.some(i => i.id === e.ideaId) ? e.ideaId : 'ep-' + e.ep;
       const ch = epCh(e) || 'yt-wrestling';
       if (!db.ideas.some(i => i.id === id)) db.ideas.unshift({ id, title: e.title, note: e.note || '', sources: e.sources.map(s => s.url).join('\n'),
-        preferredChannel: 'youtube', ytChannel: ch, ytFormat: e.format === 'long' ? 'long' : 'shorts', topicId: epTopic(ch), sample: false, created: Date.now() });
+        preferredChannel: 'youtube', ytChannel: ch, ytFormat: e.format === 'long' ? 'long' : 'shorts', ...(e.resub ? { ytResub: true } : {}), topicId: epTopic(ch), sample: false, created: Date.now() });
       if (e.ideaId !== id) { await runnerFetch('/link', { ep: e.ep, ideaId: id }); e.ideaId = id; }
     }
     persist(); render();
@@ -317,7 +317,7 @@ document.addEventListener('click', async e => {
           let channel = ''; try { channel = (typeof ytValidCh === 'function' && ytValidCh(idea.ytChannel)) || (typeof ytChannelOfTopic === 'function' && ytChannelOfTopic(idea.topicId)) || (typeof ytTab === 'function' && ytTab()) || ''; } catch (e) { channel = ''; }
           let voice = ''; try { voice = typeof ytChVoice === 'function' && channel ? ytChVoice(channel) : ''; } catch (e) { voice = ''; }
           const url = (typeof ytPipe === 'object' && ytPipe.url) || ytFirstUrl(idea);
-          const r = await runnerFetch('/episodes', { title: idea.title, note: idea.note || '', url, deferRanges: true, ideaId: idea.id, channel, voice, format: idea.ytFormat === 'long' ? 'long' : 'shorts', look });
+          const r = await runnerFetch('/episodes', { title: idea.title, note: idea.note || '', url, deferRanges: true, ideaId: idea.id, channel, voice, format: idea.ytFormat === 'long' ? 'long' : 'shorts', resub: !!idea.ytResub, look });
           if (!idea.ytStarted || idea.ytHidden) { idea.ytStarted = idea.ytStarted || Date.now(); delete idea.ytHidden; persist(); }
           runnerSelectedStep = runnerOpenLog = null; toast('룩을 정했어요: ' + r.ep);
         }
@@ -330,7 +330,7 @@ document.addEventListener('click', async e => {
         if (!ep) {
           const url = (typeof ytPipe === 'object' && ytPipe.url) || ytFirstUrl(idea);
           let channel = 'yt-wrestling'; try { channel = (typeof ytValidCh === 'function' && ytValidCh(idea.ytChannel)) || (typeof ytChannelOfTopic === 'function' && ytChannelOfTopic(idea.topicId)) || (typeof ytTab === 'function' && ytTab()) || channel; } catch (e) {}
-          const r = await runnerFetch('/episodes', { title: idea.title, note: idea.note || '', url, deferRanges: true, ideaId: idea.id, channel, format: 'shorts' });
+          const r = await runnerFetch('/episodes', { title: idea.title, note: idea.note || '', url, deferRanges: true, ideaId: idea.id, channel, format: 'shorts', resub: !!idea.ytResub });
           ep = r.ep;
           if (!idea.ytStarted || idea.ytHidden) { idea.ytStarted = idea.ytStarted || Date.now(); delete idea.ytHidden; persist(); }
         }

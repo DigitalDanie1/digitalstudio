@@ -725,7 +725,7 @@
       const def = typeof ytTabDefs === 'function' ? ytTabDefs(ch)[0] : null;
       const topicId = (hit && hit.candidate.topic) || (def && def.id) || (g && g.sources[0] && g.sources[0].topics[0]) || '';
       const note = [YL.view.trim(), YL.orig ? '원본 영상: ' + YL.orig + (YL.author ? ' · ' + YL.author : '') : ''].filter(Boolean).join('\n\n');
-      idea = { id: uid(), title, note, sources: url, preferredChannel: 'youtube', ytChannel: ch, ytFormat: ytPipe.format === 'long' ? 'long' : 'shorts', topicId, sample: false, created: Date.now() };
+      idea = { id: uid(), title, note, sources: url, preferredChannel: 'youtube', ytChannel: ch, ytFormat: ytPipe.format === 'long' ? 'long' : 'shorts', ...(ytPipe.format !== 'long' && ytPipe.resub ? { ytResub: true } : {}), topicId, sample: false, created: Date.now() };
       db.ideas.unshift(idea);
     }
     if (!idea.ytStarted) idea.ytStarted = Date.now();
@@ -733,7 +733,7 @@
     selectYt(idea.id); ytPipe.url = url; T.view.youtube = null; ytLinkReset();
   }
   function ytCh(i) { return ytValidCh(i.ytChannel) || (typeof ytChannelOfTopic === 'function' && ytChannelOfTopic(i.topicId)) || 'yt-wrestling'; }
-  function ytIdeas() { return db.ideas.filter(i => ideaPlatform(i) === 'YouTube' && ytFormatOf(i) === ytPipe.format && ytCh(i) === ytTab()).sort((a, b) => ytRank(a) - ytRank(b) || (b.created || 0) - (a.created || 0)); }
+  function ytIdeas() { return db.ideas.filter(i => ideaPlatform(i) === 'YouTube' && ytFormatOf(i) === ytPipe.format && (ytPipe.format === 'long' || !!i.ytResub === !!ytPipe.resub) && ytCh(i) === ytTab()).sort((a, b) => ytRank(a) - ytRank(b) || (b.created || 0) - (a.created || 0)); }
   function ytEp(idea) { return idea && runnerData ? (runnerData.episodes || []).find(e => e.ideaId === idea.id) || null : null; }
   function ytItem() {
     const s = S.sel.youtube = S.sel.youtube || {};
@@ -749,7 +749,7 @@
     const ep = it.ep, off = runnerOnline === false;
     const offMsg = '<p class="pl-error" role="alert"><b>실행기가 꺼져 있어요.</b> 맥에서 <code>~/Desktop/유투브/실행기/실행기 켜기.command</code> 를 더블클릭하세요. 켜진 창은 닫지 마세요.<br><span class="small">이 맥의 크롬에서만 돼요. "로컬 네트워크 접근"을 물으면 허용을 누르세요.</span></p>';
     const topic = {
-      id: 'topic', name: '원본 링크', title: '원본 링크', desc: () => ytPipe.format === 'long' ? '긴 롱폼 영상을 넣으면 하이라이트 장면 여러 개를 먼저 뽑아요. 체크한 장면마다 쇼츠 작업이 생기고, 하나씩 골라 아래 단계로 재가공해요.' : '쇼츠 영상 링크를 넣거나, 내가 받아 둔 영상 파일을 올리세요. 그 영상을 재가공해서 내 쇼츠 하나를 만들어요.',
+      id: 'topic', name: '원본 링크', title: '원본 링크', desc: () => ytPipe.format === 'long' ? '긴 롱폼 영상을 넣으면 하이라이트 장면 여러 개를 먼저 뽑아요. 체크한 장면마다 쇼츠 작업이 생기고, 하나씩 골라 아래 단계로 재가공해요.' : ytPipe.resub ? '남이 만든 쇼츠(자막·목소리가 이미 있는 영상) 링크를 넣으세요. 올린 사람이 씌운 틀(위 제목 띠·종이 무늬)은 잘라내고, 화면에 박힌 자막 띠는 흐리게 덮은 뒤 내 포맷으로 다시 만들어요. 원본 목소리는 그대로 두고 말이 끊기지 않게 잘라요.' : '쇼츠 영상 링크를 넣거나, 내가 받아 둔 영상 파일을 올리세요. 그 영상을 재가공해서 내 쇼츠 하나를 만들어요.',
       btn: '이 링크로 시작',
       hideBtn: it => !!it.idea,
       get noBtn() { return ytPipe.format === 'long'; },   // 롱폼 → 하이라이트: 시작은 아래 '하이라이트 찾기'로
@@ -758,7 +758,9 @@
       body: it => {
         if (it.idea) return '';
         const tabs = ytLock ? '' : `<div class="filters yt-tabs pl-ytabs" role="tablist" aria-label="유튜브 채널">${YT_CHANNELS.filter(y => !YT_LOCKS[y.id]).map(y => `<button class="filter ${ytTab() === y.id ? 'active' : ''}" role="tab" aria-selected="${ytTab() === y.id}" data-yt-tab="${y.id}" title="${esc(ytChName(y.id))}">${esc(y.tab)}</button>`).join('')}</div>`;
-        const fmt = f => `<button type="button" class="pl-chip ${ytPipe.format === f ? 'on' : ''}" data-yp-format="${f}" aria-pressed="${ytPipe.format === f}">${f === 'long' ? '🎬 롱폼 → 하이라이트 쇼츠 여러 개' : '📱 쇼츠 재가공'}</button>`;
+        // 쇼츠 재가공 두 가지: 그냥(경기 원본 등) / 자막·음성 있음(남이 이미 편집한 쇼츠). 둘 다 format 은 shorts, 뒤엣것만 ytPipe.resub
+        const fmt = f => { const on = f === 'resub' ? ytPipe.format === 'shorts' && !!ytPipe.resub : ytPipe.format === f && !(f === 'shorts' && ytPipe.resub);
+          return `<button type="button" class="pl-chip ${on ? 'on' : ''}" data-yp-format="${f === 'resub' ? 'shorts' : f}" data-yp-resub="${f === 'resub' ? 1 : 0}" aria-pressed="${on}">${f === 'long' ? '🎬 롱폼 → 하이라이트 쇼츠 여러 개' : f === 'resub' ? '💬 쇼츠 재가공 · 자막·음성 있음' : '📱 쇼츠 재가공'}</button>`; };
         const vids = ytLinkSources(ytLock || ytTab());
         const chips = vids.length ? `<div class="pl-chips" role="group" aria-label="추천 소스 영상">${vids.map(x => `<button type="button" class="pl-chip" data-pl-ylchip="${esc(x.candidate.url)}" title="${esc(x.candidate.title || '')}">${esc(x.name)}</button>`).join('')}</div>` : '';
         const orig = YL.orig ? `원본: ${esc(YL.orig)}${YL.author ? ' · ' + esc(YL.author) : ''}` : '';
@@ -772,8 +774,8 @@
         const list = ytIdeas(), pg = (T.page.youtube || 0) % Math.max(1, Math.ceil(list.length / PAGE)), shown = list.slice(pg * PAGE, pg * PAGE + PAGE), longMode = ytPipe.format === 'long';
         const vw = v => ytLock ? ytLock + '/' + v : v;
         const saved = `<details class="pl-peek"><summary>저장된 주제에서 고르기 (${list.length})</summary>${list.length ? `<div class="pl-topics" role="radiogroup" aria-label="주제">${shown.map(t => longMode ? `<button type="button" class="pl-topic" data-pl-hlurl="${esc(ytFirstUrl(t))}" ${ytFirstUrl(t) ? '' : 'disabled'}><span>${esc(t.title)}</span></button>` : `<button type="button" role="radio" aria-checked="false" class="pl-topic" data-pl-ytpick="${esc(t.id)}"><span>${esc(t.title)}</span></button>`).join('')}</div>${list.length > PAGE ? `<button type="button" class="pl-link" data-pl-more>다른 주제 보기 (${pg + 1}/${Math.ceil(list.length / PAGE)})</button>` : ''}` : `<p class="small">이 채널에 저장된 ${ytPipe.format === 'long' ? '롱폼' : '쇼츠'} 주제가 아직 없어요. <button type="button" class="pl-link" data-view="${vw('youtubePlan')}">AI 주제 발굴</button>에서 찾아 저장하거나, <button type="button" class="pl-link" data-view="${vw('ytSources')}">소스</button>에서 '소재 등록'을 누르면 여기에 모여요.</p>`}</details>`;
-        if (longMode) return tabs + `<div class="pl-chips" role="group" aria-label="작업 방식">${fmt('shorts')}${fmt('long')}</div>` + (typeof window.ytHighlightEmbed === 'function' ? window.ytHighlightEmbed() : '<p class="pl-error">하이라이트 찾기 코드를 못 불러왔어요. 새로고침해 주세요.</p>') + saved;
-        return tabs + `<div class="pl-chips" role="group" aria-label="작업 방식">${fmt('shorts')}${fmt('long')}</div>` + form + saved;
+        if (longMode) return tabs + `<div class="pl-chips" role="group" aria-label="작업 방식">${fmt('shorts')}${fmt('resub')}${fmt('long')}</div>` + (typeof window.ytHighlightEmbed === 'function' ? window.ytHighlightEmbed() : '<p class="pl-error">하이라이트 찾기 코드를 못 불러왔어요. 새로고침해 주세요.</p>') + saved;
+        return tabs + `<div class="pl-chips" role="group" aria-label="작업 방식">${fmt('shorts')}${fmt('resub')}${fmt('long')}</div>` + form + saved;
       },
       run: it => ytLinkStart(it),
     };
