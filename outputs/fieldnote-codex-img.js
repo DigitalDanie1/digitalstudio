@@ -6,7 +6,16 @@
   'use strict';
   const R = () => (typeof RUNNER !== 'undefined' ? RUNNER : 'http://127.0.0.1:4777');
   const LS_STYLES = 'fieldnote-codex-styles-v1';
-  const FALLBACK_STYLE = { 'insta-sing': 'otter-c', 'insta-jury': 'set-carousel-v2', 'insta-krsg': 'set-cute-carousel' };
+  const FALLBACK_STYLE = { 'insta-sing': 'otter-c', 'insta-bird': 'saved-bird-싱가포르-하루', 'insta-jury': 'set-carousel-v2', 'insta-krsg': 'set-cute-carousel' };
+  // 그림체 → 계정. 여기 없는 그림체는 '<계정 이름> …' 폴더(saved-<계정 이름>-…)면 그 계정 것, 아니면 모든 계정이 같이 써요.
+  const STYLE_ACCOUNT = { 'otter-c': 'insta-sing', 'otter-a': 'insta-sing', 'otter-b': 'insta-sing', 'saved-밀키-대만중국어-레퍼런스': 'insta-sing', 'saved-미루-대만생활-레퍼런스': 'insta-sing' };
+  const igAccts = () => (typeof IG_ACCOUNTS !== 'undefined' && Array.isArray(IG_ACCOUNTS) ? IG_ACCOUNTS : []);
+  const nameSlug = t => String(t).toLowerCase().replace(/[^a-z0-9가-힣]+/g, '-').replace(/^-|-$/g, '');
+  function styleAccount(id) {
+    if (STYLE_ACCOUNT[id]) return STYLE_ACCOUNT[id];
+    const a = igAccts().find(k => k && k.name && String(id).startsWith('saved-' + nameSlug(k.name) + '-'));
+    return a ? a.id : '';
+  }
   const X = { styles: null, online: null, cached: false, loading: false, jobs: {}, ctx: null, err: '', timer: null, tick: 0, ownUrl: {}, savingStyle: false };
   const e = s => (typeof esc === 'function' ? esc(s) : String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])));
   const emit = () => window.dispatchEvent(new Event('cx-change'));
@@ -54,14 +63,14 @@
   }
 
   // ----- 그림체 -----
-  const styleList = () => X.styles || [];
+  const styleList = account => (X.styles || []).filter(s => { const a = styleAccount(s.id); return !account || !a || a === account; });
   function lastStyleOf(account) { const a = Array.isArray(db.igAccounts) && db.igAccounts.find(k => k && k.id === account); return (a && a.lastStyle) || ''; }
   function styleId(ctx) {
-    const list = styleList(), ok = id => id && (!list.length || list.some(s => s.id === id));
+    const list = styleList(ctx.account), ok = id => id && (!list.length || list.some(s => s.id === id));
     const first = [ctx.item.styleId, lastStyleOf(ctx.account), FALLBACK_STYLE[ctx.account]].find(ok);
     return first || (list[0] && list[0].id) || '';
   }
-  const styleObj = ctx => styleList().find(s => s.id === styleId(ctx)) || null;
+  const styleObj = ctx => styleList(ctx.account).find(s => s.id === styleId(ctx)) || null;
   function setStyle(ctx, id) {
     ctx.item.styleId = id;
     const a = Array.isArray(db.igAccounts) && db.igAccounts.find(k => k && k.id === ctx.account); if (a) a.lastStyle = id;
@@ -220,7 +229,7 @@
     return `<span class="cx-st ok" data-cx-status="${i}">완료 ✓</span>`;
   }
   function styleGrid(ctx) {
-    const list = styleList(), cur = styleId(ctx);
+    const list = styleList(ctx.account), cur = styleId(ctx);
     if (!list.length) return X.online === null ? '<p class="small">그림체를 불러오는 중…</p>' : '<p class="small">그림체 목록을 못 불러왔어요. 실행기를 켜면 내가 만든 그림들이 여기에 나와요.</p>';
     const groups = [...new Set(list.map(s => s.group || '그림체'))];
     const sel = list.find(s => s.id === cur);
@@ -229,7 +238,7 @@
   // 그림 레퍼런스: 이야기·카드가 없어도 인스타 화면 위에 항상 보이는 그림체 모음 (실행기 그림 폴더에서 읽음)
   function refsHtml(account) {
     if (X.styles === null && !X.loading) setTimeout(loadStyles, 0);
-    const list = styleList(), base = lastStyleOf(account) || FALLBACK_STYLE[account] || '';
+    const list = styleList(account), base = lastStyleOf(account) || FALLBACK_STYLE[account] || '';
     const head = `<summary><b>그림 레퍼런스</b> <span class="small">${list.length ? list.length + '개' : ''} · 실행기 그림 폴더(instagram-toon/styles, otter-couple-assets)</span></summary>`;
     let body;
     if (!list.length) body = X.online === null || X.loading ? '<p class="small">그림 레퍼런스를 불러오는 중…</p>' : X.online ? '<p class="small">이 맥 실행기에 그림이 없어요. ~/Documents/Codex/instagram-toon/styles/&lt;이름&gt;/ 폴더에 그림을 넣으면 여기에 나와요.</p>' : '<p class="small">실행기가 꺼져 있어서 그림 레퍼런스를 못 불러왔어요. 맥 실행기를 켜면 나와요.</p>';
