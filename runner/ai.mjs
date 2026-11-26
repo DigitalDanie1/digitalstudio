@@ -759,7 +759,25 @@ async function refStyle(E, ctx) {
   E.s.refStyle = { look: E.s.look, id, at: a.at, title: a.title, base: a.style.base, lay: a.style.lay, name: a.name, desc: a.desc, over: a.style.over };
 }
 
+// 내가 스타일 단계에서 적은 위 제목 두 줄 (빈 줄은 Claude 것 그대로)
+const myTitle = (E, frame) => { const t = E.s.titleText || {}; return { ...(frame || {}), ...(t.l1 ? { l1: t.l1 } : {}), ...(t.l2 ? { l2: t.l2 } : {}) }; };
 async function aistyle(E, ctx) {
+  if (E.s.titleOnly) {   // 제목만 바꿔 다시 그리기: 조사·라벨·팝업은 그대로, Claude 없이
+    E.s.titleOnly = false;
+    const prog = progOf(E, 'aistyle', [['render', '바꾼 제목으로 다시 그리기'], ['done', '끝']]);
+    const st = styleOf(E), plan = readJson(E.p('편집/AI컷.json')), j = readJson(E.p('편집/AI스타일.json'));
+    j.frame = myTitle(E, j.frame); j.captions = [];
+    writeJson(E.p('편집/AI완성.json'), j); writeJson(E.p('편집/AI스타일.json'), j);
+    fs.rmSync(E.p('편집/AI완성.mp4'), { force: true });
+    for (const id of ['aisubs', 'aibrand']) if (E.s.steps[id]) E.s.steps[id] = { status: 'todo' };
+    ctx.log(`위 제목만 바꿔요: ${[j.frame.l1, j.frame.l2].filter(Boolean).join(' / ')}`);
+    prog({ stage: 'render', info: [['위 제목', [j.frame.l1, j.frame.l2].filter(Boolean).join(' / ')]] });
+    await render(E, liveCtx(ctx, E, 'aistyle', '제목 바꿔 그리는 중', plan.duration, prog), st, plan, j, '편집/AI스타일본.mp4');
+    prog({ live: null });
+    await prog.snap(ctx, '편집/AI스타일본.mp4', 0.8, '0.8초');
+    prog({ stage: 'done' });
+    return;
+  }
   const prog = progOf(E, 'aistyle', [['ref', '레퍼런스 스타일'], ['research', '조사 + 제목·라벨·팝업 정하기'], ['render', '스타일 입혀 그리기'], ['done', '끝']]);
   await refStyle(E, ctx);
   const st = styleOf(E), info = source(E), plan = readJson(E.p('편집/AI컷.json'));
@@ -777,7 +795,7 @@ async function aistyle(E, ctx) {
 - fx: ${st.fx} 남발 금지. 아웃트로에는 fx 를 두지 않는다.${st.extra ? '\n- ' + st.extra : ''}
 - credits: [[0, ${plan.duration}, "원본 채널명"]]
 JSON 하나만 답해라: {"frame":{"l1":"","l2":""},"fx":[[시작,끝,{"type":"label","k":"","s":""}],[시작,끝,{"type":"pop","text":"","sub":"","y":660}]${st.lay && st.lay !== 'mat' ? ',[시작,끝,{"type":"ring","x":0.5,"y":0.5}],[시작,끝,{"type":"arrow","x":0.5,"y":0.5}]' : ''}]${st.extraJson || ''},"credits":[[0,${plan.duration},"${info.channel || ''}"]],"facts":["쓴 사실과 근거 한 줄씩"]}`, checkFinal(plan, false, st));
-  j.captions = [];
+  j.captions = []; j.frame = myTitle(E, j.frame);   // 내가 적은 제목이 있으면 그걸로
   writeJson(E.p('편집/AI완성.json'), j); writeJson(E.p('편집/AI스타일.json'), j);   // 자막 단계는 늘 이 원본에서 시작
   fs.rmSync(E.p('편집/AI완성.mp4'), { force: true });
   for (const id of ['aisubs', 'aibrand']) if (E.s.steps[id]) E.s.steps[id] = { status: 'todo' };
