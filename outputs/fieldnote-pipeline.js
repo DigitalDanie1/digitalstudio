@@ -914,7 +914,7 @@
   const ytRefLooks = ch => (typeof window.ytRefShorts === 'function' ? window.ytRefShorts(ch) : []).filter(r => !YT_AI_LOOKS.some(l => l.ref.includes(r.id))).map(r => ({ id: 'ref-' + r.id, vid: r.id, title: r.title, from: r.from }));
   // 자막·썸네일 입력 칸 초안 (화면이 다시 그려져도 남게): 에피소드별
   const YD = {};
-  function ytSubDraft(ep) { const k = 's:' + (ep ? ep.ep : ''); if (!YD[k]) { const o = (ep && ep.subsOpt) || {}; YD[k] = { tech: o.tech != null ? !!o.tech : true, techLang: o.techLang || 'ko', speech: o.speech != null ? !!o.speech : true, speechLang: o.speechLang || (ep && ep.channel === 'yt-wrestling-kr' ? 'ko' : 'both'), srcLang: o.srcLang || '', capStyle: o.capStyle || 'mat', top1: o.top1 || '', top2: o.top2 || '', nobottom: !!o.nobottom, mine: '' }; } return YD[k]; }
+  function ytSubDraft(ep) { const k = 's:' + (ep ? ep.ep : ''); if (!YD[k]) { const o = (ep && ep.subsOpt) || {}; const chLang = (ep && typeof ytChTarget === 'function' && ytChTarget(ep.channel).lang) || 'both'; YD[k] = { tech: o.tech != null ? !!o.tech : true, techLang: o.techLang || chLang, speech: o.speech != null ? !!o.speech : true, speechLang: o.speechLang || chLang, srcLang: o.srcLang || '', capStyle: o.capStyle || 'mat', top1: o.top1 || '', top2: o.top2 || '', nobottom: !!o.nobottom, mine: '' }; } return YD[k]; }
   function ytThumbDraft(ep) { const k = 't:' + (ep ? ep.ep : ''); if (!YD[k]) { const o = (ep && ep.thumbText) || {}; YD[k] = { top: o.top || '', bot: o.bot || '' }; } return YD[k]; }
   // 위 고정 제목 두 줄 (스타일 단계에서 내가 직접 · 비우면 Claude 가 써요)
   function ytTitleDraft(ep) { const k = 'h:' + (ep ? ep.ep : ''); if (!YD[k]) { const o = (ep && ep.titleText) || {}; YD[k] = { l1: o.l1 || '', l2: o.l2 || '' }; } return YD[k]; }
@@ -1699,7 +1699,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
   }
   function pageFor(c) {
     const pf = PF_NAME[c], book = PLATFORM_PLAYBOOK[pf], ig = c === 'insta' ? IG_BY_ID[igCur()] : null, yh = c === 'youtube' ? ytHeader() : null;
-    return `<div class="pl-head" style="--pc:${platformColor(pf)}"><div class="eyebrow">${esc(pf)}</div><h1>${esc(yh ? yh.title : ig ? igName(ig.id) : platformLabel(pf))}</h1><p>${esc(yh ? yh.desc : ig ? ig.role : book.role)}</p></div>${frame(c)}`;
+    return `<div class="pl-head" style="--pc:${platformColor(pf)}"><div class="eyebrow">${esc(pf)}</div><h1>${esc(yh ? yh.title : ig ? igName(ig.id) : platformLabel(pf))}</h1><p ${yh ? `data-yt-desc="${esc(yh.auto)}"` : ''}>${esc(yh ? yh.desc : ig ? ig.role : book.role)}</p>${yh && yh.ch && typeof ytTargetForm === 'function' ? ytTargetForm(yh.ch, yh.auto) : ''}</div>${frame(c)}`;
   }
 
   // 다시 그리기 (타이핑 중이면 건드리지 않음)
