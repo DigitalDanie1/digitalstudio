@@ -794,6 +794,19 @@ async function aisubs(E, ctx) {
   const st = styleOf(E), info = source(E), plan = readJson(E.p('편집/AI컷.json'));
   let base; try { base = readJson(E.p(exists(E.p('편집/AI스타일.json')) ? '편집/AI스타일.json' : '편집/AI완성.json')); } catch { throw new StepError('스타일 입히기를 먼저 해 주세요.'); }
   const o = { en: true, ko: true, ai: true, mine: [], ...(E.s.subsOpt || {}) };
+  if (o.nobottom) {   // 하단 자막 안 함: 위 고정 제목만 그리고 아래 자막 자리는 비워요 (캡컷에서 직접 넣어요)
+    const prog = progOf(E, 'aisubs', [['render', '위 제목만 그리기 (하단 비움)'], ['done', '끝']]);
+    const j = { frame: topOf(base, o), capStyle: CAP_STYLES[o.capStyle] ? o.capStyle : 'mat', fx: base.fx, credits: base.credits, captions: [], mine: [] };
+    if (base.ranks) j.ranks = base.ranks; if (base.note) j.note = base.note;
+    writeJson(E.p('편집/AI자막.json'), { opt: { en: false, ko: false, ai: false, nobottom: true }, speech: [], ai: [], mine: [] });
+    if (E.s.steps.aibrand) E.s.steps.aibrand = { status: 'todo' };
+    writeJson(E.p('편집/AI완성.json'), j);
+    ctx.log('하단 자막 안 함: 위 제목만 그리고 아래는 비워 둬요 (캡컷에서 직접).');
+    prog({ stage: 'render', info: [['하단 자막', '안 함 (캡컷에서 직접)'], ['위 제목', [j.frame && j.frame.l1, j.frame && j.frame.l2].filter(Boolean).join(' / ') || '없음']] });
+    await render(E, liveCtx(ctx, E, 'aisubs', '위 제목 그리는 중', plan.duration, prog), st, plan, j, '편집/AI완성.mp4');
+    prog({ live: null, stage: 'done' });
+    return;
+  }
   if (Array.isArray(o.edit)) {   // 작업판 자막 편집기에서 내가 고친 그대로: Claude 없이 바로 그려요
     const prog = progOf(E, 'aisubs', [['render', '내가 고친 자막 입혀 그리기'], ['done', '끝']]), d = plan.duration;
     const rows = o.edit.filter(r => r.e > r.s && r.s < d + 0.5 && (r.ko || r.en)).sort((a, b) => a.s - b.s);

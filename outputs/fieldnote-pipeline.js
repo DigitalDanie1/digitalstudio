@@ -914,7 +914,7 @@
   const ytRefLooks = ch => (typeof window.ytRefShorts === 'function' ? window.ytRefShorts(ch) : []).filter(r => !YT_AI_LOOKS.some(l => l.ref.includes(r.id))).map(r => ({ id: 'ref-' + r.id, vid: r.id, title: r.title, from: r.from }));
   // 자막·썸네일 입력 칸 초안 (화면이 다시 그려져도 남게): 에피소드별
   const YD = {};
-  function ytSubDraft(ep) { const k = 's:' + (ep ? ep.ep : ''); if (!YD[k]) { const o = (ep && ep.subsOpt) || {}; YD[k] = { tech: o.tech != null ? !!o.tech : true, techLang: o.techLang || 'ko', speech: o.speech != null ? !!o.speech : true, speechLang: o.speechLang || (ep && ep.channel === 'yt-wrestling-kr' ? 'ko' : 'both'), srcLang: o.srcLang || '', capStyle: o.capStyle || 'mat', top1: o.top1 || '', top2: o.top2 || '', mine: '' }; } return YD[k]; }
+  function ytSubDraft(ep) { const k = 's:' + (ep ? ep.ep : ''); if (!YD[k]) { const o = (ep && ep.subsOpt) || {}; YD[k] = { tech: o.tech != null ? !!o.tech : true, techLang: o.techLang || 'ko', speech: o.speech != null ? !!o.speech : true, speechLang: o.speechLang || (ep && ep.channel === 'yt-wrestling-kr' ? 'ko' : 'both'), srcLang: o.srcLang || '', capStyle: o.capStyle || 'mat', top1: o.top1 || '', top2: o.top2 || '', nobottom: !!o.nobottom, mine: '' }; } return YD[k]; }
   function ytThumbDraft(ep) { const k = 't:' + (ep ? ep.ep : ''); if (!YD[k]) { const o = (ep && ep.thumbText) || {}; YD[k] = { top: o.top || '', bot: o.bot || '' }; } return YD[k]; }
   window.ytAiExtra = (ep, ids) => { const x = {}; if (ids.includes('aisubs')) x.subs = { ...ytSubDraft(ep) }; if (ids.includes('aithumb')) x.thumb = { ...ytThumbDraft(ep) }; return x; };
   // 만든 자막 목록 (편집/AI자막.json) 은 실행기에서 받아 와서 기억해요
@@ -1251,16 +1251,20 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
     const opt = (k, title, hint, lk) => `<div style="border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin:0 0 10px">
       <div style="display:flex;gap:10px;align-items:baseline"><input type="checkbox" id="plSub_${k}" data-pl-sub="${k}" ${SO[k] ? 'checked' : ''} style="width:18px;height:18px;flex:none;position:relative;top:3px"><label for="plSub_${k}" style="cursor:pointer"><b>${title}</b> <span class="small">${hint}</span></label></div>
       <div role="radiogroup" aria-label="${title} 언어" style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 0 28px">${LANGS.map(([v, l]) => `<label class="pl-chip ${SO[lk] === v ? 'on' : ''}" style="cursor:pointer"><input type="radio" name="plSub_${lk}" data-pl-sub="${lk}" value="${v}" ${SO[lk] === v ? 'checked' : ''} style="margin-right:5px">${l}</label>`).join('')}</div></div>`;
-    const subForm = `${opt('tech', '기술 설명 자막', '자동. 레퍼런스처럼 하이라이트·기술을 하나하나 짚어 줘요 (원속도는 상황 한 줄, 슬로우는 ① ② ③ 단계).', 'techLang')}
+    // 하단 자막 안 함: 위 제목만 그리고 아래는 비워 둬요 (캡컷에서 직접). 실행기 API 38 부터
+    const nbOk = runnerApi >= 38, nb = nbOk && !!SO.nobottom;
+    const nbBox = `<div style="border:1px solid ${nb ? 'var(--accent,#3b82f6)' : 'var(--line)'};border-radius:10px;padding:10px 14px;margin:0 0 10px">
+      <div style="display:flex;gap:10px;align-items:baseline"><input type="checkbox" id="plSub_nobottom" data-pl-sub="nobottom" ${nb ? 'checked' : ''} ${nbOk ? '' : 'disabled'} style="width:18px;height:18px;flex:none;position:relative;top:3px"><label for="plSub_nobottom" style="cursor:pointer"><b>하단 자막 안 함</b> <span class="small">${nbOk ? '아무것도 안 넣어요. 위 고정 제목만 그리고 아래 자막 자리는 비워 둬요 (캡컷에서 직접 작업). 소리 받아 적기·Claude 도 안 돌아서 빨라요.' : '맥 실행기를 업데이트하면 쓸 수 있어요 (실행기 업데이트 버튼).'}</span></label></div></div>`;
+    const subForm = `${nbBox}<div ${nb ? 'style="opacity:.4;pointer-events:none" aria-disabled="true"' : ''}>${opt('tech', '기술 설명 자막', '자동. 레퍼런스처럼 하이라이트·기술을 하나하나 짚어 줘요 (원속도는 상황 한 줄, 슬로우는 ① ② ③ 단계).', 'techLang')}
       ${opt('speech', '영상 음성 자막 (아래)', runnerApi >= 25 ? '자동. 맥에서 Whisper 가 영상 소리를 직접 받아 적어요 (한국어·영어 영상, 내 파일도). 말이 거의 없는 영상은 아래를 기술 설명 자막으로 채워요. 처음 한 번은 Whisper 설치·모델(약 1GB) 받느라 몇 분 더 걸려요.' : '자동. 영상 속 말(중계·인터뷰)을 그대로, 말하는 시각에 맞춰요. 유튜브 자막이 있는 영상만 돼요.', 'speechLang')}
       ${runnerApi >= 25 ? `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:-4px 0 12px 14px"><span class="small">영상 속 말 언어</span><select class="pl-input" style="width:auto" data-pl-sub="srcLang" aria-label="영상 속 말 언어">${(runnerApi >= 26 ? [['', '자동 (제목 글자로 짐작)'], ['english', '영어'], ['russian', '러시아어'], ['kazakh', '카자흐어'], ['japanese', '일본어'], ['turkish', '튀르키예어'], ['persian', '페르시아어 (이란)'], ['mongolian', '몽골어'], ['georgian', '조지아어'], ['azerbaijani', '아제르바이잔어'], ['ukrainian', '우크라이나어'], ['spanish', '스페인어'], ['french', '프랑스어'], ['hindi', '힌디어'], ['arabic', '아랍어'], ['chinese', '중국어'], ['korean', '한국어']] : [['', '자동 (제목 보고)'], ['korean', '한국어'], ['english', '영어']]).map(([v, l]) => `<option value="${v}" ${SO.srcLang === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>` : ''}
-      ${capPick}
+      </div>${capPick}
       <p class="small">둘 다 켜면 말이 나오는 곳은 음성 자막, 나머지는 기술 설명이 들어가요. "한국어 + 영어"는 큰 한국어 아래 작은 영어 줄로 나와요. 자막이 필요 없으면 아래 "자막 없이 다음 단계로".</p>
       ${!subDone && !subSkip ? '<p><button type="button" class="pl-link" data-pl-subskip>자막 없이 다음 단계로 →</button></p>' : ''}`;
     const c4 = card(3, {
       body: () => styDone ? subForm : '',
       desc: !styDone ? '스타일을 입히면 열려요.' : subSkip && !subDone ? '자막 없이 넘어갔어요. 넣고 싶으면 골라서 "자막 넣기"를 누르세요.' : '넣을 자막을 고르세요. 두 가지 모두 자동으로 만들고, 각각 한국어·영어·한+영을 고를 수 있어요.',
-      btn: () => runIn(SU) ? '실행 멈춤' : subDone ? '자막 다시 쓰기' : '자막 넣기',
+      btn: () => runIn(SU) ? '실행 멈춤' : nb ? (subDone ? '하단 비우고 다시 그리기' : '하단 비우고 그리기') : subDone ? '자막 다시 쓰기' : '자막 넣기',
       attrs: stopOr(SU, 'data-ya-steps="aisubs"'), cls: runIn(SU) ? 'danger' : '',
       disabled: () => off || !styDone || busyElse(SU),
       isDone: () => subDone || subSkip || ok('aibrand'), statusLine: runLine(SU),
@@ -1882,7 +1886,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
     else if (t.dataset.plUrlinput) T.url[t.dataset.plUrlinput] = t.value;
     else if (t.hasAttribute('data-pl-caption')) { const p = c === 'insta' && window.InstaToon.current(); if (p) { p.caption = t.value; persist(); } }
     else if (t.id === 'plYlFile') ylUpload(t.files && t.files[0]);
-    else if (t.dataset.plSub) { const { it } = evalSteps('youtube'), d = ytSubDraft(it.ep); d[t.dataset.plSub] = t.type === 'checkbox' ? t.checked : t.value; if (t.type === 'radio') t.closest('[role=radiogroup]')?.querySelectorAll('label').forEach(l => { l.classList.toggle('on', l.contains(t)); if (l.hasAttribute('data-cap-card')) l.style.borderColor = l.contains(t) ? 'var(--accent,#3b82f6)' : 'var(--line)'; }); }
+    else if (t.dataset.plSub) { const { it } = evalSteps('youtube'), d = ytSubDraft(it.ep); d[t.dataset.plSub] = t.type === 'checkbox' ? t.checked : t.value; if (t.dataset.plSub === 'nobottom') { persist(); repaint('youtube', true); return; } if (t.type === 'radio') t.closest('[role=radiogroup]')?.querySelectorAll('label').forEach(l => { l.classList.toggle('on', l.contains(t)); if (l.hasAttribute('data-cap-card')) l.style.borderColor = l.contains(t) ? 'var(--accent,#3b82f6)' : 'var(--line)'; }); }
     else if (t.dataset.plTh) { const { it } = evalSteps('youtube'); ytThumbDraft(it.ep)[t.dataset.plTh] = t.value; }
     else if (t.dataset.yl) { if (t.dataset.yl === 'url') ylSetUrl(t.value); else if (t.dataset.yl === 'title') { YL.title = t.value; YL.edited = true; } else YL.view = t.value; }
     else if (t.dataset.yaNew === 'fxtimes') { const { it } = evalSteps('youtube'); ytPipe.fxTimes = t.value; ytPipe.fxIdea = it.idea ? it.idea.id : ''; if (!ytPipe.fxPack) ytPipe.fxPack = ytFxPick(it, it.ep); document.querySelector('#plRoot [data-ya-act="fxpack"]')?.removeAttribute('disabled'); ytOutRefresh(); ytPrevSync(); }
