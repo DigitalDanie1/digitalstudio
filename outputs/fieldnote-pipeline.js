@@ -1064,7 +1064,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
     if (!base) { box.innerHTML = '<p class="small">스타일을 입히면 자막 편집기가 열려요.</p>'; return; }
     const t1 = x => (Math.round((+x || 0) * 10) / 10).toFixed(1), clamp = x => Math.max(0, Math.round((+x || 0) * 10) / 10);
     box.innerHTML = `<section style="border:1px solid var(--line);border-radius:12px;padding:12px;margin:12px 0">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h3 style="margin:0;font-size:16px">자막 편집기</h3>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h3 style="margin:0;font-size:16px">자막 편집기 <span class="small" style="font-weight:400">— 내가 직접 쓰기: "모두 지우기" → 영상 멈추고 "＋ 지금 위치에 자막" → 글 쓰기 → "이 자막으로 그리기"</span></h3>
         <div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="btn" data-se="load-ai">자동 자막 불러오기</button><button type="button" class="btn" data-se="load-src">영어 원문만 불러오기</button><button type="button" class="btn ghost" data-se="clear">모두 지우기</button></div></div>
       <div style="display:grid;grid-template-columns:minmax(220px,300px) 1fr;gap:14px;margin-top:10px;align-items:start">
         <div style="position:sticky;top:8px"><div style="position:relative;aspect-ratio:9/16;background:#000;border-radius:10px;overflow:hidden;container-type:inline-size">
@@ -1092,10 +1092,10 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
     };
     const paint = () => {
       const rows = st.rows || [];
-      list.innerHTML = rows.length ? rows.map((r, i) => `<div data-row="${i}" style="border:1px solid var(--line);border-radius:8px;padding:6px 8px;display:grid;grid-template-columns:auto auto 1fr auto;gap:6px;align-items:center">
+      list.innerHTML = rows.length ? rows.map((r, i) => `<div data-row="${i}" style="border:1px solid var(--line);border-radius:8px;padding:6px 8px;display:grid;grid-template-columns:auto 1fr auto;gap:6px;align-items:center">
         <button type="button" class="btn ghost" data-se="seek" data-i="${i}" title="여기로 가기" style="padding:2px 6px;font-size:12px">▶</button>
         <span style="display:flex;gap:3px;align-items:center;font-size:12px"><input class="pl-input" data-sef="s" data-i="${i}" type="number" step="0.1" min="0" value="${t1(r.s)}" style="width:62px;padding:3px 4px" aria-label="시작 초"><button type="button" class="btn ghost" data-se="now-s" data-i="${i}" title="지금 시각을 시작으로" style="padding:2px 4px;font-size:11px">⏱</button>~<input class="pl-input" data-sef="e" data-i="${i}" type="number" step="0.1" min="0" value="${t1(r.e)}" style="width:62px;padding:3px 4px" aria-label="끝 초"><button type="button" class="btn ghost" data-se="now-e" data-i="${i}" title="지금 시각을 끝으로" style="padding:2px 4px;font-size:11px">⏱</button></span>
-        <span style="display:grid;gap:3px"><input class="pl-input" data-sef="ko" data-i="${i}" value="${escH(String(r.ko || '').replace(/\\n|\n/g, ' / '))}" placeholder="${r.kind === 'sp' ? '한국어 번역' : '자막 글'} ( / 로 줄바꿈, [[단어]] 강조)" style="padding:4px 6px">${r.kind === 'sp' ? `<input class="pl-input" data-sef="en" data-i="${i}" value="${escH(r.en)}" placeholder="영어 원문" style="padding:3px 6px;font-size:12px;opacity:.85">` : ''}</span>
+        <span style="display:grid;gap:3px;grid-column:1/-1;order:9"><input class="pl-input" data-sef="ko" data-i="${i}" value="${escH(String(r.ko || '').replace(/\\n|\n/g, ' / '))}" placeholder="${r.kind === 'sp' ? '한국어 번역' : '자막 글'} ( / 로 줄바꿈, [[단어]] 강조)" style="padding:6px 8px;font-size:15px">${r.kind === 'sp' ? `<input class="pl-input" data-sef="en" data-i="${i}" value="${escH(r.en)}" placeholder="영어 원문" style="padding:3px 6px;font-size:12px;opacity:.85">` : ''}</span>
         <span style="display:grid;gap:3px;justify-items:end"><select class="pl-input" data-sef="kind" data-i="${i}" style="padding:2px 4px;font-size:11px">${Object.entries(KIND).map(([k, v]) => `<option value="${k}" ${r.kind === k ? 'selected' : ''}>${v}</option>`).join('')}</select><button type="button" class="btn ghost" data-se="del" data-i="${i}" aria-label="이 자막 지우기" style="padding:2px 6px;font-size:11px">지우기</button></span></div>`).join('')
         : '<p class="small">자막이 없어요. 위에서 불러오거나, 영상을 멈추고 "＋ 지금 위치에 자막"을 누르세요.</p>';
       draw();
@@ -1260,7 +1260,8 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
       ${runnerApi >= 25 ? `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:-4px 0 12px 14px"><span class="small">영상 속 말 언어</span><select class="pl-input" style="width:auto" data-pl-sub="srcLang" aria-label="영상 속 말 언어">${(runnerApi >= 26 ? [['', '자동 (제목 글자로 짐작)'], ['english', '영어'], ['russian', '러시아어'], ['kazakh', '카자흐어'], ['japanese', '일본어'], ['turkish', '튀르키예어'], ['persian', '페르시아어 (이란)'], ['mongolian', '몽골어'], ['georgian', '조지아어'], ['azerbaijani', '아제르바이잔어'], ['ukrainian', '우크라이나어'], ['spanish', '스페인어'], ['french', '프랑스어'], ['hindi', '힌디어'], ['arabic', '아랍어'], ['chinese', '중국어'], ['korean', '한국어']] : [['', '자동 (제목 보고)'], ['korean', '한국어'], ['english', '영어']]).map(([v, l]) => `<option value="${v}" ${SO.srcLang === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>` : ''}
       </div>${capPick}
       <p class="small">둘 다 켜면 말이 나오는 곳은 음성 자막, 나머지는 기술 설명이 들어가요. "한국어 + 영어"는 큰 한국어 아래 작은 영어 줄로 나와요. 자막이 필요 없으면 아래 "자막 없이 다음 단계로".</p>
-      ${!subDone && !subSkip ? '<p><button type="button" class="pl-link" data-pl-subskip>자막 없이 다음 단계로 →</button></p>' : ''}`;
+      ${!subDone && !subSkip ? '<p><button type="button" class="pl-link" data-pl-subskip>자막 없이 다음 단계로 →</button></p>' : ''}
+      ${ep && !nb && runnerApi >= 21 ? `<div data-keep-id="subed-${esc(ep.ep)}" id="plSubEd" data-ep="${esc(ep.ep)}"></div>` : ''}`;
     const c4 = card(3, {
       body: () => styDone ? subForm : '',
       desc: !styDone ? '스타일을 입히면 열려요.' : subSkip && !subDone ? '자막 없이 넘어갔어요. 넣고 싶으면 골라서 "자막 넣기"를 누르세요.' : '넣을 자막을 고르세요. 두 가지 모두 자동으로 만들고, 각각 한국어·영어·한+영을 고를 수 있어요.',
