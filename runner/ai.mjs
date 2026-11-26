@@ -366,6 +366,21 @@ export function guessLang(t) {
 }
 const HALLU = /^(감사합니다\.?|시청해\s?주셔서 감사합니다\.?|구독과 좋아요.*|MBC 뉴스.*|thank you( for watching)?\.?|thanks for watching!?|you|\.+)$/i;
 const cleanAsr = t => String(t || '').replace(/>>/g, ' ').replace(/[\[(](noise|applause|music|laughter|cheering|박수|음악|웃음)[\])]/gi, ' ').replace(/[♪♫]/g, ' ').replace(/\s+/g, ' ').trim();
+// Whisper 가 음악·소음 위에 지어내는 말 (여러 언어): "채널 구독해", "시청해 주셔서 감사합니다", "자막 제공" 같은 것. 들어 있으면 버려요
+const HALLU_ANY = /(구독|좋아요\s*(와|랑)?\s*알림|시청해\s?주셔서|자막\s*(제공|by)|subscribe|thanks? for watching|subtitles? by|amara\.org|подпис(ывайтесь|ывайся|аться)|субтитр|продолжение следует|редактор субтитров|اشترك|ترجمة|abone ol|izlediğiniz için|チャンネル登録|ご視聴|مشترک|زیرنویس|захиалаарай|жазылыңыз)/i;
+const HALLU_ONLY = /^(음악|music|музыка|موسيقى|موسیقی|müzik|音楽|[\s.,!?…-]+)$/i;   // 이 말 하나뿐인 줄
+// 받아 적은 덩어리([{s,e,t}], 구간 시작 a 초) → 자막 후보. 지어낸 말·말이 너무 성긴 긴 덩어리·3번 넘게 똑같은 줄은 빼요
+export function asrCues(chunks, a = 0) {
+  const out = [];
+  for (const c of chunks || []) {
+    const t = cleanAsr(c.t), dur = Math.max(0, (+c.e || 0) - (+c.s || 0)), words = t ? t.split(/\s+/).length : 0;
+    if (!t || HALLU.test(t) || HALLU_ONLY.test(t) || HALLU_ANY.test(t)) continue;
+    if (dur > 10 && words / dur < 0.5) continue;   // 10초 넘게 몇 단어뿐: 음악 위에 지어낸 말
+    out.push({ start: r1(a + c.s), end: r1(a + Math.max(c.e, c.s + 0.4)), text: t });
+  }
+  const n = new Map(); for (const q of out) { const k = q.text.toLowerCase().replace(/[^\p{L}\p{N}]/gu, ''); n.set(k, (n.get(k) || 0) + 1); }
+  return out.filter(q => (n.get(q.text.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '')) || 0) < 4);
+}
 // 컷에 쓰인 원본 구간만 받아 적어요 (구간마다 앞뒤 1초 여유, 가까운 구간은 합쳐서). 결과는 분석/whisper_*.json 에 남겨 다시 안 해요.
 async function whisperCues(E, ctx, info, plan, lang, prog) {
   await ensureWhisper(ctx);
@@ -384,7 +399,7 @@ async function whisperCues(E, ctx, info, plan, lang, prog) {
       catch (e) { if (e instanceof StopError) throw e; throw new StepError('소리를 받아 적지 못했어요: ' + (lastLines(e.err) || e.message)); }
       finally { fs.rmSync(raw, { force: true }); }
     }
-    for (const c of readJson(out).chunks || []) { const t = cleanAsr(c.t); if (t && !HALLU.test(t)) cues.push({ start: r1(a + c.s), end: r1(a + Math.max(c.e, c.s + 0.4)), text: t }); }
+    cues.push(...asrCues(readJson(out).chunks, a));
   }
   return cues.sort((x, y) => x.start - y.start);
 }
