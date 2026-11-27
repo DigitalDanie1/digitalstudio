@@ -919,14 +919,13 @@
   // 포스터 썸네일 글꼴 (실행기 ai.mjs THUMB_FONTS / THUMB_LATIN 와 같은 값)
   const TF_KO = {
     gasoek: { name: '가석체 (조각처럼 두꺼움)', family: "'Gasoek One'", weight: 400, ls: -4, lh: 1.02, css: 'https://fonts.googleapis.com/css2?family=Gasoek+One&display=swap' },
-    eastsea: { name: '동해 독도 (붓 · 격투)', family: "'East Sea Dokdo'", weight: 400, ls: 0, lh: 0.95, css: 'https://fonts.googleapis.com/css2?family=East+Sea+Dokdo&display=swap' },
-    dokdo: { name: '독도 (거친 붓)', family: "'Dokdo'", weight: 400, ls: 0, lh: 1.0, css: 'https://fonts.googleapis.com/css2?family=Dokdo&display=swap' },
-    bwpicture: { name: '흑백사진 (옛 영화 포스터)', family: "'Black And White Picture'", weight: 400, ls: -2, lh: 1.0, css: 'https://fonts.googleapis.com/css2?family=Black+And+White+Picture&display=swap' },
+    eastsea: { name: '동해 독도 (붓 · 격투)', family: "'East Sea Dokdo'", weight: 400, ls: 0, lh: 0.95, sz: 1.32, css: 'https://fonts.googleapis.com/css2?family=East+Sea+Dokdo&display=swap' },
+    dokdo: { name: '독도 (거친 붓)', family: "'Dokdo'", weight: 400, ls: 0, lh: 1.0, sz: 1.25, css: 'https://fonts.googleapis.com/css2?family=Dokdo&display=swap' },
+    bwpicture: { name: '흑백사진 (옛 영화 포스터)', family: "'Black And White Picture'", weight: 400, ls: -2, lh: 1.0, sz: 1.08, css: 'https://fonts.googleapis.com/css2?family=Black+And+White+Picture&display=swap' },
     songmyung: { name: '송명 (먹 명조)', family: "'Song Myung'", weight: 400, ls: -4, lh: 1.08, css: 'https://fonts.googleapis.com/css2?family=Song+Myung&display=swap' },
-    moirai: { name: '모이라이 (미래·각)', family: "'Moirai One'", weight: 400, ls: 0, lh: 1.05, css: 'https://fonts.googleapis.com/css2?family=Moirai+One&display=swap' },
     bagel: { name: '베이글 (두툼·통통)', family: "'Bagel Fat One'", weight: 400, ls: -2, lh: 1.02, css: 'https://fonts.googleapis.com/css2?family=Bagel+Fat+One&display=swap' },
     gugi: { name: '구기 (각진 장식)', family: "'Gugi'", weight: 400, ls: -2, lh: 1.05, css: 'https://fonts.googleapis.com/css2?family=Gugi&display=swap' },
-    nanumbrush: { name: '나눔 붓글씨', family: "'Nanum Brush Script'", weight: 400, ls: 0, lh: 0.95, css: 'https://fonts.googleapis.com/css2?family=Nanum+Brush+Script&display=swap' },
+    nanumbrush: { name: '나눔 붓글씨', family: "'Nanum Brush Script'", weight: 400, ls: 0, lh: 0.95, sz: 1.45, css: 'https://fonts.googleapis.com/css2?family=Nanum+Brush+Script&display=swap' },
     hahmlet: { name: '함렛 (세리프)', family: "'Hahmlet'", weight: 800, ls: -6, lh: 1.06, css: 'https://fonts.googleapis.com/css2?family=Hahmlet:wght@800&display=swap' },
     pretendard: { name: '프리텐다드 블랙 (깔끔)', family: "'Pretendard'", weight: 900, ls: -7, lh: 1.02, css: 'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css' },
     bhs: { name: '검은고딕 (처음 것)', family: "'Black Han Sans'", weight: 400, ls: -2, lh: 0.98, css: 'https://fonts.googleapis.com/css2?family=Black+Han+Sans&display=swap' }, };
@@ -1156,9 +1155,9 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
     const pv = box.querySelector('[data-pv]'), W = pv ? pv.clientWidth * 950 / 1080 : 0;
     const fitEl = (el, px) => { el.style.fontSize = (px / 10.8) + 'cqw'; el.style.display = 'inline-block'; let f = px; while (W && el.scrollWidth > W + 1 && f > 40) { f -= 4; el.style.fontSize = (f / 10.8) + 'cqw'; } };
     const top = box.querySelector('[data-th="top"]'), bot = box.querySelector('[data-th="bot"]');
-    if (top) { top.style.lineHeight = FK.lh; top.innerHTML = lines.map(l => escH(l).replace(/\[\[(.+?)\]\]/g, `<span style="color:${red}">$1</span>`)).join('<br>'); top.style.opacity = real ? 1 : .45; fitEl(top, 190); }
+    if (top) { top.style.lineHeight = FK.lh; top.innerHTML = lines.map(l => escH(l).replace(/\[\[(.+?)\]\]/g, `<span style="color:${red}">$1</span>`)).join('<br>'); top.style.opacity = real ? 1 : .45; fitEl(top, Math.round(190 * (FK.sz || 1))); }
     const bt = String(T.bot || '').trim() || J.bot || '아래 한 줄 (비우면 Claude)';
-    if (bot) { bot.textContent = bt.replace(/\[\[|\]\]/g, ''); bot.style.opacity = (String(T.bot || '').trim() || J.bot) ? 1 : .45; fitEl(bot, 84); }
+    if (bot) { bot.textContent = bt.replace(/\[\[|\]\]/g, ''); bot.style.opacity = (String(T.bot || '').trim() || J.bot) ? 1 : .45; fitEl(bot, Math.round(84 * (FK.sz || 1))); }
     const fk = T.font + T.fontEn; if (document.fonts && box.dataset.fw !== fk) { box.dataset.fw = fk; setTimeout(() => document.fonts.ready.then(() => ytThPrevMount()), 300); }
     const note = box.querySelector('[data-th-note]');
     if (note) note.innerHTML = ['위 제목은 띄어쓰기에서 두 줄로 나뉘어요. 직접 나누려면 <b>/</b> (예: 전설의 / 방어).', '<b>[[단어]]</b> 는 빨강.', step('aithumb').status === 'done' && J.layout !== 'poster' ? '지금 썸네일은 예전 모양이에요. "다시 만들기"를 누르면 이 모양으로 다시 그려요.' : ''].filter(Boolean).join('<br>');

@@ -1274,14 +1274,13 @@ const TW = 1080, TH = 1920, TY = 300, BB = [455, 175], VB = [680, 760];   // TY 
 // 포스터 제목 글꼴 (작업판에서 골라요 · 웹 글꼴, 모두 Google Fonts OFL 이라 상업 이용 가능 · 프리텐다드만 jsDelivr). 기억에 남는 것 위주. css = 불러올 주소, ls = 190px 기준 자간, lh = 줄 간격
 export const THUMB_FONTS = {
   gasoek: { name: '가석체 (조각처럼 두꺼움)', family: "'Gasoek One'", weight: 400, ls: -4, lh: 1.02, css: 'https://fonts.googleapis.com/css2?family=Gasoek+One&display=block' },
-  eastsea: { name: '동해 독도 (붓 · 격투)', family: "'East Sea Dokdo'", weight: 400, ls: 0, lh: 0.95, css: 'https://fonts.googleapis.com/css2?family=East+Sea+Dokdo&display=block' },
-  dokdo: { name: '독도 (거친 붓)', family: "'Dokdo'", weight: 400, ls: 0, lh: 1.0, css: 'https://fonts.googleapis.com/css2?family=Dokdo&display=block' },
-  bwpicture: { name: '흑백사진 (옛 영화 포스터)', family: "'Black And White Picture'", weight: 400, ls: -2, lh: 1.0, css: 'https://fonts.googleapis.com/css2?family=Black+And+White+Picture&display=block' },
+  eastsea: { name: '동해 독도 (붓 · 격투)', family: "'East Sea Dokdo'", weight: 400, ls: 0, lh: 0.95, sz: 1.32, css: 'https://fonts.googleapis.com/css2?family=East+Sea+Dokdo&display=block' },
+  dokdo: { name: '독도 (거친 붓)', family: "'Dokdo'", weight: 400, ls: 0, lh: 1.0, sz: 1.25, css: 'https://fonts.googleapis.com/css2?family=Dokdo&display=block' },
+  bwpicture: { name: '흑백사진 (옛 영화 포스터)', family: "'Black And White Picture'", weight: 400, ls: -2, lh: 1.0, sz: 1.08, css: 'https://fonts.googleapis.com/css2?family=Black+And+White+Picture&display=block' },
   songmyung: { name: '송명 (먹 명조)', family: "'Song Myung'", weight: 400, ls: -4, lh: 1.08, css: 'https://fonts.googleapis.com/css2?family=Song+Myung&display=block' },
-  moirai: { name: '모이라이 (미래·각)', family: "'Moirai One'", weight: 400, ls: 0, lh: 1.05, css: 'https://fonts.googleapis.com/css2?family=Moirai+One&display=block' },
   bagel: { name: '베이글 (두툼·통통)', family: "'Bagel Fat One'", weight: 400, ls: -2, lh: 1.02, css: 'https://fonts.googleapis.com/css2?family=Bagel+Fat+One&display=block' },
   gugi: { name: '구기 (각진 장식)', family: "'Gugi'", weight: 400, ls: -2, lh: 1.05, css: 'https://fonts.googleapis.com/css2?family=Gugi&display=block' },
-  nanumbrush: { name: '나눔 붓글씨', family: "'Nanum Brush Script'", weight: 400, ls: 0, lh: 0.95, css: 'https://fonts.googleapis.com/css2?family=Nanum+Brush+Script&display=block' },
+  nanumbrush: { name: '나눔 붓글씨', family: "'Nanum Brush Script'", weight: 400, ls: 0, lh: 0.95, sz: 1.45, css: 'https://fonts.googleapis.com/css2?family=Nanum+Brush+Script&display=block' },
   hahmlet: { name: '함렛 (세리프)', family: "'Hahmlet'", weight: 800, ls: -6, lh: 1.06, css: 'https://fonts.googleapis.com/css2?family=Hahmlet:wght@800&display=block' },
   pretendard: { name: '프리텐다드 블랙 (깔끔)', family: "'Pretendard'", weight: 900, ls: -7, lh: 1.02, css: 'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css' },
   bhs: { name: '검은고딕 (처음 것)', family: "'Black Han Sans'", weight: 400, ls: -2, lh: 0.98, css: 'https://fonts.googleapis.com/css2?family=Black+Han+Sans&display=block' },
@@ -1318,8 +1317,8 @@ async function posterThumb(E, ctx, j, st, frame) {
 #sh{position:absolute;inset:0;background:linear-gradient(180deg,rgba(16,14,12,.96) 0%,rgba(16,14,12,.85) 30%,rgba(16,14,12,0) 52%,rgba(16,14,12,0) 70%,rgba(16,14,12,.92) 88%)}
 #av{position:absolute;left:70px;top:1540px;width:150px;height:150px;border-radius:50%;background:url("${logo ? url(logo) : ''}") center/cover #222;box-shadow:0 0 0 6px #100E0C,0 0 0 10px #${B.cream || 'F1EBDD'}}</style></head><body>
 <div id="bg"></div><div id="sh"></div>
-<div style="position:absolute;top:200px;left:70px;right:60px"><div id="t" class="kr" style="font-size:190px;line-height:${F.lh}">${lines.map(red).join('<br>')}</div>
-<div style="width:300px;height:26px;background:#${B.tape || 'D3242E'};margin:40px 0 34px"></div><div id="b" class="kr" style="font-size:84px">${h(String(j.bot || '').replace(/\[\[|\]\]/g, ''))}</div></div>
+<div style="position:absolute;top:200px;left:70px;right:60px"><div id="t" class="kr" style="font-size:${Math.round(190 * (F.sz || 1))}px;line-height:${F.lh}">${lines.map(red).join('<br>')}</div>
+<div style="width:300px;height:26px;background:#${B.tape || 'D3242E'};margin:40px 0 34px"></div><div id="b" class="kr" style="font-size:${Math.round(84 * (F.sz || 1))}px">${h(String(j.bot || '').replace(/\[\[|\]\]/g, ''))}</div></div>
 ${logo ? '<div id="av"></div>' : ''}<div style="position:absolute;left:${logo ? 250 : 70}px;top:1560px;color:#${B.cream || 'F1EBDD'}"><div style="font-family:Anton,Impact,sans-serif;font-size:64px;line-height:1;letter-spacing:1px">${h(st.name || '')}</div>
 <div style="font-family:'JetBrains Mono',Menlo,monospace;font-size:26px;letter-spacing:3px;opacity:.8;margin-top:10px">${h(String(st.handle || '').toUpperCase())}${B.tag ? ' · ' + h(B.tag) : ''}</div></div>
 <script>document.fonts.ready.then(()=>{for(const [id,max] of [['t',950],['b',950]]){const el=document.getElementById(id);let fs=parseFloat(el.style.fontSize);while(el.scrollWidth>max&&fs>40){fs-=4;el.style.fontSize=fs+'px'}}})</script></body></html>`;
