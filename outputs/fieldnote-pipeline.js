@@ -1125,7 +1125,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
     let lines = raw.includes('/') ? raw.split('/').map(x => x.trim()).filter(Boolean).slice(0, 2) : [raw];
     if (lines.length === 1 && /\s/.test(raw) && raw.replace(/\[\[|\]\]/g, '').length > 4) { const sp = [...raw.matchAll(/\s+/g)].map(m => m.index), mid = raw.length / 2, k = sp.sort((a, b) => Math.abs(a - mid) - Math.abs(b - mid))[0]; lines = [raw.slice(0, k).trim(), raw.slice(k).trim()]; }
     const pv = box.querySelector('[data-pv]'), W = pv ? pv.clientWidth * 950 / 1080 : 0;
-    const fitEl = (el, px) => { el.style.fontSize = (px / 10.8) + 'cqw'; let f = px; while (W && el.scrollWidth > W && f > 40) { f -= 4; el.style.fontSize = (f / 10.8) + 'cqw'; } };
+    const fitEl = (el, px) => { el.style.fontSize = (px / 10.8) + 'cqw'; el.style.display = 'inline-block'; let f = px; while (W && el.scrollWidth > W + 1 && f > 40) { f -= 4; el.style.fontSize = (f / 10.8) + 'cqw'; } };
     const top = box.querySelector('[data-th="top"]'), bot = box.querySelector('[data-th="bot"]');
     if (top) { top.innerHTML = lines.map(l => escH(l).replace(/\[\[(.+?)\]\]/g, `<span style="color:${red}">$1</span>`)).join('<br>'); top.style.opacity = real ? 1 : .45; fitEl(top, 190); }
     const bt = String(T.bot || '').trim() || J.bot || '아래 한 줄 (비우면 Claude)';
