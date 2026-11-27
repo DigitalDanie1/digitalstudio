@@ -915,20 +915,14 @@
   // 자막·썸네일 입력 칸 초안 (화면이 다시 그려져도 남게): 에피소드별
   const YD = {};
   function ytSubDraft(ep) { const k = 's:' + (ep ? ep.ep : ''); if (!YD[k]) { const o = (ep && ep.subsOpt) || {}; const chLang = (ep && typeof ytChTarget === 'function' && ytChTarget(ep.channel).lang) || 'both'; YD[k] = { tech: o.tech != null ? !!o.tech : true, techLang: o.techLang || chLang, speech: o.speech != null ? !!o.speech : true, speechLang: o.speechLang || chLang, srcLang: o.srcLang || '', capStyle: o.capStyle || 'mat', top1: o.top1 || '', top2: o.top2 || '', nobottom: !!o.nobottom, mine: '' }; } return YD[k]; }
-  function ytThumbDraft(ep) { const k = 't:' + (ep ? ep.ep : ''); if (!YD[k]) { const o = (ep && ep.thumbText) || {}; YD[k] = { top: o.top || '', bot: o.bot || '', font: TF_KO[o.font] ? o.font : TF_KO[db.ytThumbFont] ? db.ytThumbFont : 'pretendard', fontEn: TF_EN[o.fontEn] ? o.fontEn : TF_EN[db.ytThumbFontEn] ? db.ytThumbFontEn : 'anton' }; } return YD[k]; }
+  function ytThumbDraft(ep) { const k = 't:' + (ep ? ep.ep : ''); if (!YD[k]) { const o = (ep && ep.thumbText) || {}; YD[k] = { top: o.top || '', bot: o.bot || '', font: TF_KO[o.font] ? o.font : TF_KO[db.ytThumbFont] ? db.ytThumbFont : 'paperlogy', fontEn: TF_EN[o.fontEn] ? o.fontEn : TF_EN[db.ytThumbFontEn] ? db.ytThumbFontEn : 'anton' }; } return YD[k]; }
   // 포스터 썸네일 글꼴 (실행기 ai.mjs THUMB_FONTS / THUMB_LATIN 와 같은 값)
   const TF_KO = {
-    gasoek: { name: '가석체 (조각처럼 두꺼움)', family: "'Gasoek One'", weight: 400, ls: -4, lh: 1.02, css: 'https://fonts.googleapis.com/css2?family=Gasoek+One&display=swap' },
-    eastsea: { name: '동해 독도 (붓 · 격투)', family: "'East Sea Dokdo'", weight: 400, ls: 0, lh: 0.95, sz: 1.32, css: 'https://fonts.googleapis.com/css2?family=East+Sea+Dokdo&display=swap' },
-    dokdo: { name: '독도 (거친 붓)', family: "'Dokdo'", weight: 400, ls: 0, lh: 1.0, sz: 1.25, css: 'https://fonts.googleapis.com/css2?family=Dokdo&display=swap' },
-    bwpicture: { name: '흑백사진 (옛 영화 포스터)', family: "'Black And White Picture'", weight: 400, ls: -2, lh: 1.0, sz: 1.08, css: 'https://fonts.googleapis.com/css2?family=Black+And+White+Picture&display=swap' },
-    songmyung: { name: '송명 (먹 명조)', family: "'Song Myung'", weight: 400, ls: -4, lh: 1.08, css: 'https://fonts.googleapis.com/css2?family=Song+Myung&display=swap' },
-    bagel: { name: '베이글 (두툼·통통)', family: "'Bagel Fat One'", weight: 400, ls: -2, lh: 1.02, css: 'https://fonts.googleapis.com/css2?family=Bagel+Fat+One&display=swap' },
-    gugi: { name: '구기 (각진 장식)', family: "'Gugi'", weight: 400, ls: -2, lh: 1.05, css: 'https://fonts.googleapis.com/css2?family=Gugi&display=swap' },
-    nanumbrush: { name: '나눔 붓글씨', family: "'Nanum Brush Script'", weight: 400, ls: 0, lh: 0.95, sz: 1.45, css: 'https://fonts.googleapis.com/css2?family=Nanum+Brush+Script&display=swap' },
-    hahmlet: { name: '함렛 (세리프)', family: "'Hahmlet'", weight: 800, ls: -6, lh: 1.06, css: 'https://fonts.googleapis.com/css2?family=Hahmlet:wght@800&display=swap' },
-    pretendard: { name: '프리텐다드 블랙 (깔끔)', family: "'Pretendard'", weight: 900, ls: -7, lh: 1.02, css: 'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css' },
-    bhs: { name: '검은고딕 (처음 것)', family: "'Black Han Sans'", weight: 400, ls: -2, lh: 0.98, css: 'https://fonts.googleapis.com/css2?family=Black+Han+Sans&display=swap' }, };
+    paperlogy: { name: '페이퍼로지 9 Black', family: "'FN Paperlogy'", weight: 900, ls: -5, lh: 1.04, file: 'https://fastly.jsdelivr.net/gh/projectnoonnu/2408-3@1.0/Paperlogy-9Black.woff2' },
+    jalnan: { name: '여기어때 잘난체', family: "'FN Jalnan'", weight: 900, ls: -5, lh: 1.04, file: 'https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_four@1.2/JalnanOTF00.woff' },
+    aggro: { name: 'SB 어그로체', family: "'FN SBAggro'", weight: 900, ls: -5, lh: 1.04, file: 'https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_2108@1.1/SBAggroB.woff' },
+    monsori: { name: '티몬 몬소리', family: "'FN Monsori'", weight: 900, ls: -5, lh: 1.04, file: 'https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_two@1.0/TmonMonsori.woff' },
+    scoredream: { name: '에스코어 드림 9', family: "'FN SCoreDream'", weight: 900, ls: -5, lh: 1.04, file: 'https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_six@1.2/S-CoreDream-9Black.woff' } };
   const TF_EN = {
     anton: { name: 'Anton', family: "'Anton'", css: 'https://fonts.googleapis.com/css2?family=Anton&display=swap' },
     bigshoulders: { name: 'Big Shoulders (경기장)', family: "'Big Shoulders Display'", css: 'https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@900&display=swap' },
@@ -940,7 +934,7 @@
     staatliches: { name: 'Staatliches', family: "'Staatliches'", css: 'https://fonts.googleapis.com/css2?family=Staatliches&display=swap' },
     bebas: { name: 'Bebas Neue', family: "'Bebas Neue'", css: 'https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap' },
     none: { name: '한글 글꼴 그대로', family: '' }, };
-  const tfLoad = css => { if (!css || document.querySelector(`link[data-tf="${css}"]`)) return; const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = css; l.dataset.tf = css; document.head.appendChild(l); };
+  const tfLoad = css => { if (!css || document.querySelector(`[data-tf="${css}"]`)) return; let l; if (/\.woff2?$/.test(css)) { const f = Object.values(TF_KO).find(x => x.file === css); l = document.createElement('style'); l.textContent = `@font-face{font-family:${f.family};src:url('${css}');font-weight:100 900;font-display:swap}`; } else { l = document.createElement('link'); l.rel = 'stylesheet'; l.href = css; } l.dataset.tf = css; document.head.appendChild(l); };
   const tfFamily = (ko, en) => `${en.family ? en.family + ',' : ''}${ko.family},'Apple SD Gothic Neo',sans-serif`;
   // 위 고정 제목 두 줄 (스타일 단계에서 내가 직접 · 비우면 Claude 가 써요)
   function ytTitleDraft(ep) { const k = 'h:' + (ep ? ep.ep : ''); if (!YD[k]) { const o = (ep && ep.titleText) || {}; YD[k] = { l1: o.l1 || '', l2: o.l2 || '' }; } return YD[k]; }
@@ -1147,7 +1141,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
       box.querySelectorAll('video[data-th-f]').forEach(v => v.addEventListener('loadedmetadata', () => { v.currentTime = (v.duration || 0) * +v.dataset.thF; }, { once: true }));
     }
     const T = ytThumbDraft(ep), escH = t => String(t || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-    const FK = TF_KO[T.font] || TF_KO.pretendard, FE = TF_EN[T.fontEn] || TF_EN.anton; tfLoad(FK.css); tfLoad(FE.css);
+    const FK = TF_KO[T.font] || TF_KO.paperlogy, FE = TF_EN[T.fontEn] || TF_EN.anton; tfLoad(FK.file || FK.css); tfLoad(FE.css);
     box.querySelectorAll('[data-th="top"],[data-th="bot"]').forEach(el => { el.style.fontFamily = tfFamily(FK, FE); el.style.fontWeight = FK.weight; el.style.letterSpacing = (FK.ls / 190).toFixed(4) + 'em'; });
     const raw = String(T.top || '').trim() || J.top || '위 제목 / 두 줄', real = !!(String(T.top || '').trim() || J.top);
     let lines = raw.includes('/') ? raw.split('/').map(x => x.trim()).filter(Boolean).slice(0, 2) : [raw];
@@ -1468,7 +1462,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
     const c6 = card(5, {
       body: () => cutDone ? `${thIdeas()}<div class="pl-ya-form"><label>상단 카피 직접 쓰기 <span class="small">(비우면 Claude 가 써요 · 큰 노랑 글씨, [[단어]] 는 빨강)</span><input class="pl-input" id="plThTop" data-pl-th="top" maxlength="30" placeholder="예: 금메달이 잡았다" value="${esc(TT.top)}"></label>
         <label>하단 카피 직접 쓰기 <span class="small">(비우면 Claude 가 써요 · 흰 글씨, 빨강/파랑 띠)</span><input class="pl-input" id="plThBot" data-pl-th="bot" maxlength="40" placeholder="예: 도발했다가 1초 만에 넘어갔다" value="${esc(TT.bot)}"></label>
-        ${ep && (ep.brandLook || {}).thumb === 'poster' ? (() => { Object.values(TF_KO).forEach(f => tfLoad(f.css)); Object.values(TF_EN).forEach(f => tfLoad(f.css)); const ok = runnerApi >= 44, chips = (k, list, sample) => `<div role="radiogroup" style="display:flex;gap:6px;flex-wrap:wrap">${Object.entries(list).map(([v, f]) => `<label class="pl-chip ${TT[k] === v ? 'on' : ''}" style="cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:6px 10px"><input type="radio" name="plTh_${k}" data-pl-th="${k}" value="${v}" ${TT[k] === v ? 'checked' : ''} ${ok ? '' : 'disabled'} style="position:absolute;opacity:0"><span style="font-family:${esc(k === 'font' ? tfFamily(f, { family: '' }) : (f.family || "'Pretendard'") + ',sans-serif')};font-weight:${k === 'font' ? f.weight : 900};font-size:20px;line-height:1.1">${sample}</span><span class="small">${esc(f.name)}</span></label>`).join('')}</div>`;
+        ${ep && (ep.brandLook || {}).thumb === 'poster' ? (() => { Object.values(TF_KO).forEach(f => tfLoad(f.file || f.css)); Object.values(TF_EN).forEach(f => tfLoad(f.css)); const ok = runnerApi >= 44, chips = (k, list, sample) => `<div role="radiogroup" style="display:flex;gap:6px;flex-wrap:wrap">${Object.entries(list).map(([v, f]) => `<label class="pl-chip ${TT[k] === v ? 'on' : ''}" style="cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:6px 10px"><input type="radio" name="plTh_${k}" data-pl-th="${k}" value="${v}" ${TT[k] === v ? 'checked' : ''} ${ok ? '' : 'disabled'} style="position:absolute;opacity:0"><span style="font-family:${esc(k === 'font' ? tfFamily(f, { family: '' }) : (f.family || "'Pretendard'") + ',sans-serif')};font-weight:${k === 'font' ? f.weight : 900};font-size:20px;line-height:1.1">${sample}</span><span class="small">${esc(f.name)}</span></label>`).join('')}</div>`;
           return `<div style="grid-column:1/-1"><b>제목 글꼴 · 한글</b> <span class="small">(고르면 바로 미리보기에. 다음 썸네일에도 기억해요)</span>${chips('font', TF_KO, '전설의 방어')}
             <p style="margin:10px 0 4px"><b>제목 글꼴 · 영어</b> <span class="small">(영문·숫자만 이 글꼴, 한글은 위 글꼴로)</span></p>${chips('fontEn', TF_EN, 'THE WALL 20')}${ok ? '' : '<p class="small">실행기를 업데이트하면 고를 수 있어요.</p>'}</div>`; })() : ''}
         <p class="small">썸네일을 한 번 만든 뒤에 카피·글꼴만 바꾸면, 장면은 그대로 두고 바로 다시 그려요 (몇 초).</p></div>${ep ? `<div data-keep-id="thpv-${esc(ep.ep)}" id="plThPrev" data-ep="${esc(ep.ep)}"></div>` : ''}` : '',

@@ -1271,21 +1271,15 @@ ${lines.filter(Boolean).map(([a, sty, txt, layer = 1]) => `Dialogue: ${layer},${
 const TW = 1080, TH = 1920, TY = 300, BB = [455, 175], VB = [680, 760];   // TY = 상단 카피 가운데 y, BB/VB = [시작 y, 높이]
 // 채널 포스터 썸네일 (MAT STORY 'B 파이트 포스터' 시안): 장면 하나 꽉 + 위 큰 크림 제목(Black Han Sans) + 빨간 막대 + 아래 프로필·채널명.
 // 글꼴이 맥에 없어서 크롬으로 그려요 (웹 글꼴). 크롬이 없거나 실패하면 null → 기본 3단 배치로 그려요
-// 포스터 제목 글꼴 (작업판에서 골라요 · 웹 글꼴, 모두 Google Fonts OFL 이라 상업 이용 가능 · 프리텐다드만 jsDelivr). 기억에 남는 것 위주. css = 불러올 주소, ls = 190px 기준 자간, lh = 줄 간격
+// 포스터 제목 한글 글꼴 (작업판에서 골라요). 사용자가 견본 12개 중 고른 5개 · 모두 무료·상업 이용 가능 (눈누 jsDelivr 웹폰트, file = 글꼴 파일 주소) css = 불러올 주소, ls = 190px 기준 자간, lh = 줄 간격
 export const THUMB_FONTS = {
-  gasoek: { name: '가석체 (조각처럼 두꺼움)', family: "'Gasoek One'", weight: 400, ls: -4, lh: 1.02, css: 'https://fonts.googleapis.com/css2?family=Gasoek+One&display=block' },
-  eastsea: { name: '동해 독도 (붓 · 격투)', family: "'East Sea Dokdo'", weight: 400, ls: 0, lh: 0.95, sz: 1.32, css: 'https://fonts.googleapis.com/css2?family=East+Sea+Dokdo&display=block' },
-  dokdo: { name: '독도 (거친 붓)', family: "'Dokdo'", weight: 400, ls: 0, lh: 1.0, sz: 1.25, css: 'https://fonts.googleapis.com/css2?family=Dokdo&display=block' },
-  bwpicture: { name: '흑백사진 (옛 영화 포스터)', family: "'Black And White Picture'", weight: 400, ls: -2, lh: 1.0, sz: 1.08, css: 'https://fonts.googleapis.com/css2?family=Black+And+White+Picture&display=block' },
-  songmyung: { name: '송명 (먹 명조)', family: "'Song Myung'", weight: 400, ls: -4, lh: 1.08, css: 'https://fonts.googleapis.com/css2?family=Song+Myung&display=block' },
-  bagel: { name: '베이글 (두툼·통통)', family: "'Bagel Fat One'", weight: 400, ls: -2, lh: 1.02, css: 'https://fonts.googleapis.com/css2?family=Bagel+Fat+One&display=block' },
-  gugi: { name: '구기 (각진 장식)', family: "'Gugi'", weight: 400, ls: -2, lh: 1.05, css: 'https://fonts.googleapis.com/css2?family=Gugi&display=block' },
-  nanumbrush: { name: '나눔 붓글씨', family: "'Nanum Brush Script'", weight: 400, ls: 0, lh: 0.95, sz: 1.45, css: 'https://fonts.googleapis.com/css2?family=Nanum+Brush+Script&display=block' },
-  hahmlet: { name: '함렛 (세리프)', family: "'Hahmlet'", weight: 800, ls: -6, lh: 1.06, css: 'https://fonts.googleapis.com/css2?family=Hahmlet:wght@800&display=block' },
-  pretendard: { name: '프리텐다드 블랙 (깔끔)', family: "'Pretendard'", weight: 900, ls: -7, lh: 1.02, css: 'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css' },
-  bhs: { name: '검은고딕 (처음 것)', family: "'Black Han Sans'", weight: 400, ls: -2, lh: 0.98, css: 'https://fonts.googleapis.com/css2?family=Black+Han+Sans&display=block' },
+  paperlogy: { name: '페이퍼로지 9 Black', family: "'FN Paperlogy'", weight: 900, ls: -5, lh: 1.04, file: 'https://fastly.jsdelivr.net/gh/projectnoonnu/2408-3@1.0/Paperlogy-9Black.woff2' },
+  jalnan: { name: '여기어때 잘난체', family: "'FN Jalnan'", weight: 900, ls: -5, lh: 1.04, file: 'https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_four@1.2/JalnanOTF00.woff' },
+  aggro: { name: 'SB 어그로체', family: "'FN SBAggro'", weight: 900, ls: -5, lh: 1.04, file: 'https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_2108@1.1/SBAggroB.woff' },
+  monsori: { name: '티몬 몬소리', family: "'FN Monsori'", weight: 900, ls: -5, lh: 1.04, file: 'https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_two@1.0/TmonMonsori.woff' },
+  scoredream: { name: '에스코어 드림 9', family: "'FN SCoreDream'", weight: 900, ls: -5, lh: 1.04, file: 'https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_six@1.2/S-CoreDream-9Black.woff' },
 };
-export const THUMB_FONT_DEFAULT = 'pretendard';
+export const THUMB_FONT_DEFAULT = 'paperlogy';
 // 영어 글꼴 (영문·숫자만 이 글꼴, 한글은 위 한글 글꼴로). 기억에 남는 스포츠·포스터 글꼴 위주 (모두 Google Fonts, 상업 이용 가능)
 export const THUMB_LATIN = {
   anton: { name: 'Anton', family: "'Anton'", css: 'https://fonts.googleapis.com/css2?family=Anton&display=block' },
@@ -1310,7 +1304,7 @@ async function posterThumb(E, ctx, j, st, frame) {
   const red = t => h(t).replace(/\[\[(.+?)\]\]/g, '<span style="color:#D3242E">$1</span>');
   const url = f => 'file://' + encodeURI(f).replace(/#/g, '%23');
   const F = THUMB_FONTS[j.font] || THUMB_FONTS[THUMB_FONT_DEFAULT], LT = THUMB_LATIN[j.fontEn] || THUMB_LATIN[THUMB_LATIN_DEFAULT], k = n => (n / 190).toFixed(4) + 'em';
-  const html = `<!doctype html><html><head><meta charset="utf-8"><link href="https://fonts.googleapis.com/css2?family=Anton&family=JetBrains+Mono:wght@500&display=block" rel="stylesheet"><link href="${F.css}" rel="stylesheet">${LT.css ? `<link href="${LT.css}" rel="stylesheet">` : ''}
+  const html = `<!doctype html><html><head><meta charset="utf-8"><link href="https://fonts.googleapis.com/css2?family=Anton&family=JetBrains+Mono:wght@500&display=block" rel="stylesheet">${F.css ? `<link href="${F.css}" rel="stylesheet">` : ''}${F.file ? `<style>@font-face{font-family:${F.family};src:url('${F.file}');font-weight:100 900;font-display:block}</style>` : ''}${LT.css ? `<link href="${LT.css}" rel="stylesheet">` : ''}
 <style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:1080px;height:1920px;overflow:hidden;background:#100E0C}
 .kr{font-family:${LT.family ? LT.family + ',' : ''}${F.family},'Apple SD Gothic Neo',sans-serif;font-weight:${F.weight};letter-spacing:${k(F.ls)};color:#${B.cream || 'F1EBDD'};white-space:nowrap}
 #bg{position:absolute;inset:0;background:url("${url(frame)}") center/cover;filter:contrast(1.08) saturate(.85)}
