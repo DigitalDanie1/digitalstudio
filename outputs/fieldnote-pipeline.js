@@ -1067,7 +1067,8 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
     const t1 = x => (Math.round((+x || 0) * 10) / 10).toFixed(1), clamp = x => Math.max(0, Math.round((+x || 0) * 10) / 10);
     box.innerHTML = `<section style="border:1px solid var(--line);border-radius:12px;padding:12px;margin:12px 0">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h3 style="margin:0;font-size:16px">자막 편집기 <span class="small" style="font-weight:400">— 내가 직접 쓰기: "모두 지우기" → 영상 멈추고 "＋ 지금 위치에 자막" → 글 쓰기 → "이 자막으로 그리기"</span></h3>
-        <div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="btn" data-se="load-ai">자동 자막 불러오기</button><button type="button" class="btn" data-se="load-src">영어 원문만 불러오기</button><button type="button" class="btn ghost" data-se="clear">모두 지우기</button></div></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="btn" data-se="load-ai">자동 자막 불러오기</button><button type="button" class="btn" data-se="load-src">영어 원문만 불러오기</button><button type="button" class="btn ghost" data-se="clear">모두 지우기</button><button type="button" class="btn primary" data-se="keep">💾 작업 저장</button></div></div>
+      <p id="plSeSaved" class="small" aria-live="polite" style="margin:6px 0 0;text-align:right"></p>
       <div style="display:grid;grid-template-columns:minmax(220px,300px) 1fr;gap:14px;margin-top:10px;align-items:start">
         <div style="position:sticky;top:8px"><div style="position:relative;aspect-ratio:9/16;background:#000;border-radius:10px;overflow:hidden;container-type:inline-size">
           <video id="plSeVid" src="${fileUrl(base.path)}&t=${base.mtime || ''}" playsinline preload="metadata" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain"></video>
@@ -1078,7 +1079,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
         <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap"><button type="button" class="btn" data-se="add-ai">＋ 지금 위치에 자막</button><button type="button" class="btn" data-se="add-my">＋ 지금 위치에 내 자막 (노랑)</button></div>
         <p class="small" style="margin-top:6px">미리보기는 자막 위치·크기를 비슷하게 보여 줘요. 정확한 건 "이 자막으로 그리기" 뒤 완성본에서 봐요.</p></div>
         <div><div id="plSeList" style="max-height:620px;overflow:auto;display:grid;gap:6px"></div>
-          <div style="display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap"><button type="button" class="btn primary" data-se="save">이 자막으로 그리기</button><span id="plSeMsg" class="small" aria-live="polite"></span></div></div>
+          <div style="display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap"><button type="button" class="btn primary" data-se="save">이 자막으로 그리기</button></div><p id="plSeMsg" class="small" aria-live="polite" style="margin:6px 0 0"></p></div>
       </div></section>`;
     const vid = box.querySelector('#plSeVid'), list = box.querySelector('#plSeList'), cap = box.querySelector('#plSeCap'), mineEl = box.querySelector('#plSeMine'), tEl = box.querySelector('#plSeT'), msg = box.querySelector('#plSeMsg');
     const KIND = { sp: '원문·번역', ai: '자막', my: '내 자막' };
@@ -1092,6 +1093,14 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
       tEl.textContent = t1(t) + '초';
       list.querySelectorAll('[data-row]').forEach(el => { const r = st.rows[+el.dataset.row]; el.style.borderColor = r && t >= r.s && t < r.e ? '#ff5a5a' : 'var(--line)'; });
     };
+    // 작업 저장: 고칠 때마다 0.8초 뒤 자동으로 (db 에 넣어서 새로고침·로그인한 다른 브라우저에서도 이어서). 💾 버튼은 바로 저장
+    const SK = () => (db.ytSubEdits = db.ytSubEdits && typeof db.ytSubEdits === 'object' ? db.ytSubEdits : {});
+    const hhmm = t => new Date(t).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const savedTxt = t => { const el = box.querySelector('#plSeSaved'); if (el) el.textContent = t; };
+    let keepT = 0, track = false;
+    const keep = now => { if (!track && !now) return; clearTimeout(keepT);
+      const go = () => { SK()[epId] = { rows: (st.rows || []).map(r => ({ s: r.s, e: r.e, kind: r.kind, ko: r.ko || '', en: r.en || '' })), at: Date.now() }; persist(); savedTxt('✓ 저장됨 ' + hhmm(SK()[epId].at) + ' · 고치면 자동 저장'); };
+      if (now) go(); else { savedTxt('저장 중…'); keepT = setTimeout(go, 800); } };
     const paint = () => {
       const rows = st.rows || [];
       list.innerHTML = rows.length ? rows.map((r, i) => `<div data-row="${i}" style="border:1px solid var(--line);border-radius:8px;padding:6px 8px;display:grid;grid-template-columns:auto 1fr auto;gap:6px;align-items:center">
@@ -1101,6 +1110,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
         <span style="display:grid;gap:3px;justify-items:end"><select class="pl-input" data-sef="kind" data-i="${i}" style="padding:2px 4px;font-size:11px">${Object.entries(KIND).map(([k, v]) => `<option value="${k}" ${r.kind === k ? 'selected' : ''}>${v}</option>`).join('')}</select><button type="button" class="btn ghost" data-se="del" data-i="${i}" aria-label="이 자막 지우기" style="padding:2px 6px;font-size:11px">지우기</button></span></div>`).join('')
         : '<p class="small">자막이 없어요. 위에서 불러오거나, 영상을 멈추고 "＋ 지금 위치에 자막"을 누르세요.</p>';
       draw();
+      keep();
     };
     const sort = () => st.rows.sort((a, b) => a.s - b.s);
     const fromJson = d => [...(d.speech || []).map(x => ({ s: x.s, e: x.e, kind: 'sp', ko: x.ko || '', en: x.en || '' })), ...(d.ai || []).map(q => ({ s: q[0], e: q[1], kind: 'ai', ko: String(q[2] || ''), en: '' })), ...(d.mine || []).map(q => ({ s: q[0], e: q[1], kind: 'my', ko: String(q[2] || ''), en: '' }))].sort((a, b) => a.s - b.s);
@@ -1116,7 +1126,8 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
       else if (a === 'now-e' && r) { r.e = Math.max(now, clamp(r.s + 0.3)); paint(); }
       else if (a === 'del' && r) { st.rows.splice(i, 1); paint(); }
       else if (a === 'add-ai' || a === 'add-my') { st.rows = st.rows || []; st.rows.push({ s: now, e: clamp(now + 2), kind: a === 'add-my' ? 'my' : 'ai', ko: '', en: '' }); sort(); paint(); const k = st.rows.findIndex(x => x.s === now && !x.ko); const inp = list.querySelector(`[data-sef="ko"][data-i="${k}"]`); if (inp) inp.focus(); }
-      else if (a === 'load-ai') loadAi();
+      else if (a === 'load-ai') { if (!st.rows || !st.rows.length || confirm('지금 고치던 자막을 자동 자막으로 바꿀까요? (저장한 작업도 바뀌어요)')) loadAi(); }
+      else if (a === 'keep') keep(true);
       else if (a === 'load-src') { if (!st.rows || !st.rows.length || confirm('지금 자막을 영어 원문으로 바꿀까요?')) loadSrc(); }
       else if (a === 'clear') { if (confirm('자막을 모두 지울까요?')) { st.rows = []; paint(); } }
       else if (a === 'save') {
@@ -1128,13 +1139,16 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
     });
     // 글·시각 고치기: 입력할 때마다 미리보기에 바로 (한글 조합 중에도 끊기지 않게 다시 그리지 않아요)
     box.addEventListener('input', e => { const f = e.target.closest('[data-sef]'); if (!f) return; const r = st.rows[+f.dataset.i]; if (!r) return;
-      const k = f.dataset.sef; if (k === 's' || k === 'e') r[k] = clamp(f.value); else if (k === 'ko') r.ko = f.value.replace(/\s*\/\s*/g, '\n'); else r[k] = f.value; draw(); });
+      const k = f.dataset.sef; if (k === 's' || k === 'e') r[k] = clamp(f.value); else if (k === 'ko') r.ko = f.value.replace(/\s*\/\s*/g, '\n'); else r[k] = f.value; draw(); keep(); });
     box.addEventListener('change', e => { const f = e.target.closest('[data-sef]'); if (!f) return; if (f.dataset.sef === 's' || f.dataset.sef === 'kind') { sort(); paint(); } });
     vid.addEventListener('timeupdate', draw); vid.addEventListener('seeked', draw);
     vid.addEventListener('play', () => { const tick = () => { draw(); if (!vid.paused) requestAnimationFrame(tick); }; tick(); box.querySelector('[data-se="play"]').textContent = '❚❚ 멈춤'; });
     vid.addEventListener('pause', () => { box.querySelector('[data-se="play"]').textContent = '▶ 재생'; });
     vid.addEventListener('click', () => { if (vid.paused) vid.play(); else vid.pause(); });
-    if (st.rows) paint(); else { st.rows = []; loadAi().then(ok => { if (!ok) paint(); }); }
+    const sv = SK()[epId];
+    if (st.rows) { paint(); track = true; if (sv) savedTxt('✓ 저장됨 ' + hhmm(sv.at) + ' · 고치면 자동 저장'); }
+    else if (sv && Array.isArray(sv.rows) && sv.rows.length) { st.rows = sv.rows.map(r => ({ ...r })); paint(); track = true; savedTxt('✓ 저장됨 ' + hhmm(sv.at) + ' · 고치면 자동 저장'); msg.textContent = `저장해 둔 작업 ${st.rows.length}줄을 이어서 열었어요. 자동 자막으로 새로 시작하려면 "자동 자막 불러오기".`; }
+    else { st.rows = []; loadAi().then(ok => { if (!ok) paint(); track = true; }); }
   }
   // 1차 컷 전/후: 컷 계획(편집/AI컷_진행.json)으로 "완성 시각 -> 원본 시각" 을 맞춰요
   function ytCutMap(ep) { const d = ytCutProg(ep, false); if (!d || !d.cuts) return null; let t = 0;
