@@ -70,17 +70,17 @@ export const AI_STYLES = {
 const MAT = AI_STYLES['yt-mat'];
 const PT = '(type ring 은 x,y = 프레임 시트에서 본 그 부위의 위치, 0=왼쪽/위 1=오른쪽/아래)';
 Object.assign(AI_STYLES, {
-  'yt-replay': { ...MAT, lay: 'full',
+  'yt-replay': { ...MAT, lay: 'full', ring: 'FFFFFF', glow: true,
     fx: `결정적 순간에 링 하나 (type ring, x, y) ${PT}. 라벨·팝업은 쓰지 않는다. 깔끔하게.`,
     caps: '- 자막은 짧은 말풍선처럼: 선수·코치·중계가 할 법한 한마디 또는 짧은 상황 설명 (예: "준비됐어?", "끝났다"). 한 줄 10자 안팎.' },
-  'yt-breakdown': { ...MAT, lay: 'full', explain: true,
+  'yt-breakdown': { ...MAT, lay: 'full', explain: true, ring: 'FFFFFF', glow: true,
     fx: `슬로우 단계마다 그 단계의 핵심 부위(손·발·허리·머리)에 링 하나 (type ring, x, y) ${PT}, 필요하면 화살표 (type arrow, x, y = 화살표 끝이 가리킬 곳). 인트로 직후 선수 라벨 하나 (type label, k=이름 (팀/국가), s=대회 · 체급).`,
     caps: '- 해설자처럼 기술을 풀어 준다. slow 컷마다 "① ...", "② ...", "③ ..." 로 그 단계에서 무엇을 보는지 정확히 짚는다.' },
   'yt-top5': { ...MAT, lay: 'rank',
     title: '위 제목: l1 = "TOP 3" 처럼 순위 개수 (ranks 개수와 같게), l2 = 주제 키워드 (예: 들어 던지기). 각 10자 이내.',
     extra: 'ranks: 인트로·아웃트로를 뺀 컷들로 순위 목록을 만든다. 큰 숫자부터 1위 순서로 나오게 [[시작, 끝, "순위 이름(12자 이내)"]], 2~5개, 시각은 그 장면이 나오는 구간.',
     extraJson: ',"ranks":[[시작,끝,"이름"]]',
-    fx: '팝업·라벨은 쓰지 않는다 (순위 목록이 대신해요). fx 는 빈 배열.',
+    fx: '팝업·라벨은 쓰지 않는다 (순위 목록이 대신해요). 기술 동그라미만 넣는다.',
     caps: '- 자막은 화면 아래에 짧게. 순위가 바뀌는 순간 "3위: ..." 처럼 순위를 말해 준다.' },
   'yt-wordpop': { ...MAT, lay: 'full', words: true,
     fx: `때리는 순간·넘기는 순간마다 화살표 (type arrow, x, y = 화살표 끝이 가리킬 곳) 또는 링 (type ring, x, y) ${PT}. 3~6개.`,
@@ -89,9 +89,11 @@ Object.assign(AI_STYLES, {
     title: '위 제목: 검은 굵은 글씨 2줄 (l1, l2 각 14자 이내). 이것이 인트로 후크다. 예: "외국인들도 충격받는 / 심권호의 레전드 기술".',
     extra: 'note: 영상 아래 카드에 채널이 남기는 한마디 (20자 이내, 시청자인 척하지 말고 채널 말투로. 예: "이 속도가 진짜 말이 안 됨").',
     extraJson: ',"note":""',
-    fx: '라벨·팝업은 쓰지 않는다. fx 는 빈 배열.',
+    fx: '라벨·팝업은 쓰지 않는다. 기술 동그라미만 넣는다.',
     caps: '- 자막은 영상 안 아래쪽에 노란 글씨로 짧게 (예: "(순식간에 뒤집힘)"). 괄호 감탄도 좋다.' },
 });
+// 기술 동그라미: 모든 레슬링(sport) 스타일 공통. 스타일·레퍼런스의 fx 규칙 뒤에 늘 붙여요 (레퍼런스가 fx 없음이어도 동그라미는 넣어요).
+export const MARK_RULE = `[기술 동그라미 · 모든 스타일 공통, 위 fx 규칙보다 우선] 기술이 들어가는 순간(미끼, 손목·팔 잡기, 발 넣기, 레벨 체인지, 허리 감기, 엘보 핀치, 마무리)마다 그 부위에 동그라미 하나 (type ring, x, y = 원본 프레임에서 그 부위 중심 0~1 (0=왼쪽/위), r = 동그라미 반지름 0.07~0.16 (화면 폭 비율, 팔·어깨 하나면 0.1 안팎, 두 사람 몸통이면 0.15), t = 그 순간 이름 2~6자 예 "미끼", "손목 컨트롤", "엘보 핀치"). slow 컷마다 1개가 기본, 전체 2~5개, 한 번에 1개만, 하나에 1.2~2.5초. 부위가 거의 안 움직이는 순간을 골라 프레임 시트에서 위치를 정확히 본다. 인트로·아웃트로에는 두지 않는다.`;
 export const AI_OUT = { aicut: ['편집/AI컷.json', '편집/AI1차컷.mp4'], aistyle: ['조사/research.md', '편집/AI완성.json', '편집/AI스타일본.mp4'], aisubs: ['편집/AI자막.json', '편집/AI완성.mp4'], aibrand: ['편집/AI인트로.mp4', '편집/AI아웃트로.mp4', '편집/AI최종.mp4'], aithumb: ['편집/AI썸네일.jpg', '편집/AI썸네일.json', '편집/AI썸네일_장면.jpg'] };
 
 // 맥의 Claude Code 스킬(~/.claude/skills). 단계마다 해당 스킬 규칙을 먼저 읽고 따르게 해요. 없으면 건너뛰어요.
@@ -213,7 +215,7 @@ const brainCaps = `[편집 뇌 · 자막 3레이어] 자막은 컷과 컷을 이
 // 레퍼런스 쇼츠 룩 (look = "ref-<영상ID>"): 스타일 입히기 때 그 쇼츠를 받아 Claude 가 보고 가장 가까운 틀 + 색·제목·이펙트·자막 규칙을 정해요 (E.s.refStyle)
 export const isRefLook = l => /^ref-[\w-]{11}$/.test(l || '');
 const REF_BASES = { 'yt-mat': '검은 바탕, 위에 큰 2줄 제목(노랑/빨강), 가운데 경기 화면, 아래 자막, 선수 라벨·점수 팝업', 'yt-replay': '꽉 찬 경기 화면, 짧은 말자막, 결정적 순간 링, 위 제목 없음', 'yt-breakdown': '꽉 찬 화면, 핵심 부위 링·화살표, ①②③ 해설 자막, SLOW 표시', 'yt-top5': '위 "TOP N" + 키워드, 흐린 배경 위 경기 화면, 아래 순위 목록', 'yt-wordpop': '꽉 찬 화면, 가운데 한 단어씩 튀어나오는 자막, 화살표·링', 'yt-post': '흰 바탕 SNS 게시물 모양, 검은 굵은 제목 2줄, 가운데 영상, 아래 채널 한마디 카드' };
-const REF_FX = { 'yt-mat': 'label, pop, badge', 'yt-top5': '(없음, 빈 배열)', 'yt-post': '(없음, 빈 배열)' };
+const REF_FX = { 'yt-mat': 'label, pop, badge, ring', 'yt-top5': 'ring', 'yt-post': 'ring' };
 const styleOf = E => { const rs = isRefLook(E.s.look) && E.s.refStyle && E.s.refStyle.look === E.s.look ? E.s.refStyle : null;
   const st = rs ? { ...AI_STYLES[rs.base], ...rs.over } : AI_STYLES[E.s.look || ''] || AI_STYLES[CH_STYLE[E.s.channel] || 'yt-mat']; const v = st.kind === 'sport' && VTYPES[E.s.vtype]; return v ? { ...st, ...v } : st; };
 
@@ -454,7 +456,7 @@ function progOf(E, id, stages) {
 // 그리는 동안: 만드는 중인 화면(편집/진행_<단계>_live.jpg)과 몇 % 인지를 진행 파일에 적어요
 const liveCtx = (ctx, E, id, label, total, prog) => { let last = 0; const rel = `편집/진행_${id}_live.jpg`;
   return { ...ctx, liveJpg: E.p(rel), onTime: t => { ctx.onTime?.(t); const now = Date.now(); if (now - last > 700) { last = now; prog({ live: { path: rel, label, pct: Math.min(100, Math.round(t / Math.max(0.1, total) * 100)) } }); } } }; };
-const fxTxt = fx => (fx || []).map(f => { const o = f[2] || {}; return `${r1(+f[0])}-${r1(+f[1])}초 ${o.type || ''} ${[o.k, o.s, o.text, o.sub].filter(Boolean).join(' ')}`.trim(); }).join(' / ');
+const fxTxt = fx => (fx || []).map(f => { const o = f[2] || {}; return `${r1(+f[0])}-${r1(+f[1])}초 ${o.type === 'ring' ? '동그라미' : o.type || ''} ${[o.k, o.s, o.text, o.sub, o.t].filter(Boolean).join(' ')}`.trim(); }).join(' / ');
 
 // ---------- 2. 하이라이트 1차 컷 ----------
 async function aicut(E, ctx) {
@@ -637,6 +639,10 @@ function checkFinal(plan, needCaps, st = {}) {
   const d = plan.duration, inT = (a, b) => a >= 0 && b > a && b <= d + 0.6, in01 = v => +v >= 0 && +v <= 1;
   return j => {
     if (!needCaps) for (const [i, f] of (j.fx || []).entries()) if (f && f[2] && ['ring', 'arrow'].includes(f[2].type) && !(in01(f[2].x) && in01(f[2].y))) return `fx ${i + 1}번 x, y 는 0~1 이어야 해요.`;
+    if (!needCaps) for (const [i, f] of (j.fx || []).entries()) if (f && f[2] && f[2].type === 'ring') {
+      if (f[2].t != null && [...String(f[2].t)].length > 8) return `fx ${i + 1}번 동그라미 이름(t)이 길어요 (6자 안팎).`;
+      if (f[2].r != null && !(+f[2].r >= 0.04 && +f[2].r <= 0.3)) return `fx ${i + 1}번 r 은 0.07~0.16 사이로 주세요.`;
+    }
     if (!needCaps && st.lay === 'rank') {
       const r = j.ranks; if (!Array.isArray(r) || r.length < 2 || r.length > 5) return 'ranks 가 2~5개 있어야 해요.';
       for (const [i, x] of r.entries()) { if (!inT(x[0], x[1])) return `ranks ${i + 1}번 시각이 0~${d}초 밖이에요.`; if (!x[2] || String(x[2]).length > 14) return `ranks ${i + 1}번 이름이 없거나 길어요 (12자 이내).`; }
@@ -700,7 +706,7 @@ export async function analyzeRef(id, channel, ctx) {
   const list = fs.readdirSync(sheets).sort().map((f, i) => `- ${path.join(sheets, f)} (${r1(i * 20 * step)}~${r1(Math.min(dur, (i * 20 + 19) * step))}초)`).join('\n');
   const talk = kind === 'talk', chKey = CH_STYLE[channel] || 'yt-mat';
   const bases = talk ? { mat: '검은 바탕, 위 2줄 제목, 가운데 영상, 아래 자막, 화자 라벨·숫자 팝업', full: '꽉 찬 화면, 자막과 라벨을 영상 위에 얹기, 위 제목 작게', post: '흰 바탕 SNS 게시물 모양, 검은 굵은 제목 2줄, 가운데 영상, 아래 채널 한마디 카드' } : REF_BASES;
-  const fxTypes = talk ? 'mat·full 은 label, pop. post 는 없음 (빈 배열)' : 'mat 은 ' + REF_FX['yt-mat'] + ', top5·post 는 없음, 나머지는 ring, arrow, label, pop';
+  const fxTypes = talk ? 'mat·full 은 label, pop. post 는 없음 (빈 배열)' : 'mat 은 ' + REF_FX['yt-mat'] + ', top5·post 는 ring 만, 나머지는 ring, arrow, label, pop';
   ctx.log('Claude 가 레퍼런스의 편집·강조·이펙트·후크를 뜯어봐요…');
   const j = await askClaude({ dir }, ctx, `너는 바이럴 쇼츠 편집 분석가다. 레퍼런스 쇼츠 "${title}" (https://www.youtube.com/shorts/${id}, ${r1(dur)}초) 를 뜯어봐서, 무엇이 사람들의 눈을 붙잡는지 편집자가 바로 따라할 수 있게 정리한다.
 프레임 시트 (Read 로 모두 본다. 5x4 타일, 왼쪽 위부터 가로로, 한 칸 = ${step}초. n번째 칸(0부터)의 시각 = 시트 시작초 + n x ${step}):
@@ -787,7 +793,7 @@ async function aistyle(E, ctx) {
   await refStyle(E, ctx);
   const st = styleOf(E), info = source(E), plan = readJson(E.p('편집/AI컷.json'));
   prog({ stage: 'research', info: [['스타일', E.s.refStyle && E.s.refStyle.look === E.s.look ? E.s.refStyle.name + ' (레퍼런스)' : (st.name || E.s.look || '기본')]] });
-  ctx.log('Claude 가 사실을 조사하고(source-check-research) 위 제목·선수 라벨·점수 팝업을 정해요…');
+  ctx.log('Claude 가 사실을 조사하고(source-check-research) 위 제목·선수 라벨·점수 팝업·기술 동그라미를 정해요…');
   fs.mkdirSync(E.p('조사'), { recursive: true });
   const j = await askClaude(E, ctx, `${skills(ctx, ['source-check-research', 'shorts-blueprint'])}${common(E, st, info, plan)}
 
@@ -797,15 +803,15 @@ async function aistyle(E, ctx) {
 이번 할 일: 스타일 요소만 정한다 (자막은 다음 단계).
 - ${st.title || '위 고정 제목 l1, l2: 각 14자 이내. 이것이 인트로 후크다. 설명·인사 금지.'}
 - [편집 뇌] 위 제목은 이 쇼츠의 서사 질문을 프레임으로 건다. l1 = 상황(누가·무엇을, 예 "정지현의 레슬링을 본" / "격투기 선수를 던져"), l2 = 질문·반전 키워드 (예 "외국 파이터들의 반응" / "버리는 레슬링 레전드"). 결의 답(누가 이겼는지, 정체)을 다 말하지 않는다. 숫자가 서사의 핵심이면 넣는다.
-- fx: ${st.fx} 남발 금지. 아웃트로에는 fx 를 두지 않는다.${st.extra ? '\n- ' + st.extra : ''}
+- fx: ${st.fx} 남발 금지. 아웃트로에는 fx 를 두지 않는다.${st.kind === 'sport' ? '\n- ' + MARK_RULE : ''}${st.extra ? '\n- ' + st.extra : ''}
 - credits: [[0, ${plan.duration}, "원본 채널명"]]
-JSON 하나만 답해라: {"frame":{"l1":"","l2":""},"fx":[[시작,끝,{"type":"label","k":"","s":""}],[시작,끝,{"type":"pop","text":"","sub":"","y":660}]${st.lay && st.lay !== 'mat' ? ',[시작,끝,{"type":"ring","x":0.5,"y":0.5}],[시작,끝,{"type":"arrow","x":0.5,"y":0.5}]' : ''}]${st.extraJson || ''},"credits":[[0,${plan.duration},"${info.channel || ''}"]],"facts":["쓴 사실과 근거 한 줄씩"]}`, checkFinal(plan, false, st));
+JSON 하나만 답해라: {"frame":{"l1":"","l2":""},"fx":[[시작,끝,{"type":"label","k":"","s":""}],[시작,끝,{"type":"pop","text":"","sub":"","y":660}]${st.kind === 'sport' ? ',[시작,끝,{"type":"ring","x":0.5,"y":0.5,"r":0.1,"t":"미끼"}]' : ''}${st.lay && st.lay !== 'mat' ? ',[시작,끝,{"type":"arrow","x":0.5,"y":0.5}]' : ''}]${st.extraJson || ''},"credits":[[0,${plan.duration},"${info.channel || ''}"]],"facts":["쓴 사실과 근거 한 줄씩"]}`, checkFinal(plan, false, st));
   j.captions = []; j.frame = myTitle(E, j.frame);   // 내가 적은 제목이 있으면 그걸로
   writeJson(E.p('편집/AI완성.json'), j); writeJson(E.p('편집/AI스타일.json'), j);   // 자막 단계는 늘 이 원본에서 시작
   fs.rmSync(E.p('편집/AI완성.mp4'), { force: true });
   for (const id of ['aisubs', 'aibrand']) if (E.s.steps[id]) E.s.steps[id] = { status: 'todo' };
   let rs = ''; try { rs = fs.readFileSync(E.p('조사/research.md'), 'utf8').replace(/\s+/g, ' ').slice(0, 240); } catch {}
-  prog({ stage: 'render', info: [['위 제목', [j.frame && j.frame.l1, j.frame && j.frame.l2].filter(Boolean).join(' / ')], ['라벨·팝업', fxTxt(j.fx) || '없음'], ...(rs ? [['조사 메모', rs + '…']] : [])] });
+  prog({ stage: 'render', info: [['위 제목', [j.frame && j.frame.l1, j.frame && j.frame.l2].filter(Boolean).join(' / ')], ['라벨·팝업·동그라미', fxTxt(j.fx) || '없음'], ...(rs ? [['조사 메모', rs + '…']] : [])] });
   await render(E, liveCtx(ctx, E, 'aistyle', '스타일 입히는 중', plan.duration, prog), st, plan, j, '편집/AI스타일본.mp4');
   prog({ live: null });
   for (const [k, t] of [[1, 0.8], [2, plan.duration * 0.45], [3, plan.duration * 0.8]]) await prog.snap(ctx, '편집/AI스타일본.mp4', t, `${r1(t)}초`);
@@ -994,6 +1000,40 @@ const ts = x => { x = Math.max(0, x); const h = Math.floor(x / 3600), m = Math.f
 const capSty = (S, cs) => { const t = cs.l1 || { c: 'FFFFFF' }, t2 = cs.l2 || { c: 'FFFFFF' }, c = cs.cap, oc = c.box ? bgr(c.box) : c.outline ? bgr(c.outline) : '&H00000000&';
   return [S('Title', 84, bgr(t.c), 0), S('Title2', 84, bgr(t2.c), 0), S('T1', 80, bgr(t.c), 14, 3, bgr(t.box || '000000')), S('T2', 80, bgr(t2.c), 14, 3, bgr(t2.box || '000000')),
     c.box ? S('Cap', c.size, bgr(c.c), 14, 3, oc) : S('Cap', c.size, bgr(c.c), 7).replace(/,&H00000000&,&H00000000&,-1/, `,${oc},&H00000000&,-1`)]; };
+// ---------- 기술 동그라미 (모든 틀 공통) ----------
+// 원본 프레임 x,y(0~1) → 틀의 영상 칸 좌표. 1차 컷은 영상 칸을 꽉 채우게 키우고 가운데를 잘라요 (scale increase + crop)
+const vxy = (src, L) => { const sh = src.h * (1 - (src.cb || 0)), sc = Math.max(W / src.w, L.vh / sh), ox = (src.w * sc - W) / 2, oy = (sh * sc - L.vh) / 2;
+  return (x, y, padY = 40) => [Math.round(Math.min(W - 60, Math.max(60, x * src.w * sc - ox))), Math.round(Math.min(L.vy + L.vh - padY, Math.max(L.vy + padY, y * src.h * sc - oy + L.vy)))]; };
+// 손으로 그린 듯한 타원: 한 바퀴 조금 넘게 돌고(끝이 살짝 겹침) 반지름이 조금씩 흔들려요
+const handEllipse = (rx, ry) => { const pts = [], a0 = -2.2, n = 44;
+  for (let k = 0; k <= n; k++) { const t = a0 + (2 * Math.PI + 0.45) * k / n, w = 1 + 0.035 * Math.sin(3 * t + 0.6) + 0.02 * k / n;
+    pts.push(`${Math.round(rx + rx * w * Math.cos(t))} ${Math.round(ry + ry * w * Math.sin(t))}`); }
+  return `m ${pts[0]} l ${pts.slice(1).join(' ')}`; };
+// 동그라미 + (이름이 있으면) 화살표 + 이름표. 왼쪽부터 쓱 그려지고, 이름표는 조금 뒤에 나와요.
+// col = 선 색(ASS &H..&), glow = 흰 빛 번짐 (리플레이·분석 룩)
+function markDraw(add, a, b, f, X, Yp, L, col, glow) {
+  const rx = Math.round(Math.min(260, Math.max(70, (+f.r || 0.11) * W))), ry = Math.round(rx * 0.8);
+  const cy = Math.min(L.vy + L.vh - ry - 10, Math.max(L.vy + ry + 10, Yp)), x0 = X - rx, y0 = cy - ry, shape = handEllipse(rx, ry);
+  const wipe = `\\clip(${x0 - 30},${y0 - 30},${x0 - 30},${y0 + 2 * ry + 30})\\t(0,280,\\clip(${x0 - 30},${y0 - 30},${x0 + 2 * rx + 40},${y0 + 2 * ry + 30}))`;
+  add(a, b, 8, 'Draw', `{\\an7\\pos(${x0},${y0})\\1a&HFF&\\3c&H000000&\\3a&H90&\\bord${glow ? 18 : 13}\\blur${glow ? 12 : 5}${glow ? `\\3c${col}\\3a&H70&` : ''}${wipe}\\fad(0,160)\\p1}${shape}`);
+  add(a, b, 9, 'Draw', `{\\an7\\pos(${x0},${y0})\\1a&HFF&\\3c${col}\\bord7\\blur0.8${wipe}\\fad(0,160)\\p1}${shape}`);
+  const t = String(f.t || '').replace(/[{}\\]/g, '').trim(); if (!t) return;
+  const fs = 66, tw = Math.round(textW(t) * fs), AL = 96, ay = cy - Math.round(ry * 0.35), late = '\\alpha&HFF&\\t(240,360,\\alpha&H00&)';
+  const right = X + rx + 18 + AL + 14 + tw <= W - 24, left = X - rx - 18 - AL - 14 - tw >= 24;
+  const side = right && (X <= W / 2 || !left) ? 1 : left ? -1 : 0;
+  if (side) {   // 옆: ← 이름  /  이름 →  (화살표 끝이 동그라미 테두리를 가리켜요)
+    const tip = X + side * (rx + 18), tail = tip + side * AL;
+    const arrow = `m 0 0 l ${30 * side} -17 l ${30 * side} -5 l ${AL * side} -5 l ${AL * side} 5 l ${30 * side} 5 l ${30 * side} 17`;
+    add(a, b, 9, 'Draw', `{\\an7\\pos(${tip},${ay})\\1c${col}\\3c&H000000&\\bord3\\shad0${late}\\p1}${arrow}`);
+    add(a, b, 9, 'MarkT', `{\\an${side > 0 ? 4 : 6}\\pos(${tail + side * 14},${ay})\\c${col}${late}}${t}`);
+  } else {      // 양옆이 좁으면 위에: 이름 ↓
+    const tip = cy - ry - 14;
+    add(a, b, 9, 'Draw', `{\\an7\\pos(${X},${tip})\\1c${col}\\3c&H000000&\\bord3\\shad0${late}\\p1}m 0 0 l -17 -30 l -5 -30 l -5 -${AL - 20} l 5 -${AL - 20} l 5 -30 l 17 -30`);
+    add(a, b, 9, 'MarkT', `{\\an2\\pos(${X},${tip - AL + 14})\\c${col}${late}}${t}`);
+  }
+}
+const markStyle = (S, size = 66) => S('MarkT', size, '&H00FFFFFF&', 6);
+
 export function buildAss(fin, plan, st, src) {
   if (st.lay && st.lay !== 'mat') {   // 다른 틀: 아래 자막 색·박스·따옴표만 고른 모양으로
     const c2 = CAP_STYLES[fin.capStyle] && fin.capStyle !== 'mat' ? CAP_STYLES[fin.capStyle] : null;
@@ -1004,7 +1044,7 @@ export function buildAss(fin, plan, st, src) {
   }
   const cs = CAP_STYLES[fin.capStyle] && fin.capStyle !== 'mat' ? CAP_STYLES[fin.capStyle] : null;
   const Y = bgr(st.yellow), R = bgr(st.red), capC = cs ? bgr(cs.cap.c) : '&H00FFFFFF&', hi = (s, base = capC, acc = Y) => esc(s).replace(/\[\[(.+?)\]\]/g, `{\\c${acc}}$1{\\c${base}}`);
-  const end = plan.duration, ev = [];
+  const end = plan.duration, ev = [], mxy = vxy(src || { w: 1920, h: 1080, cb: 0 }, LAY.mat);
   const add = (a, b, layer, style, text) => ev.push(`Dialogue: ${layer},${ts(a)},${ts(b)},${style},,0,0,0,,${text}`);
   if (!cs) {
     add(0, end, 5, 'Title', `{\\an5\\pos(540,262)\\c${Y}}${hi(fin.frame?.l1, Y, '&H00FFFFFF&')}`);
@@ -1024,6 +1064,7 @@ export function buildAss(fin, plan, st, src) {
       add(a, b, 7, 'Pop', `{\\an8\\pos(540,${y})\\frz6\\fscx130\\fscy130\\t(0,160,\\fscx100\\fscy100)\\c${Y}}${esc(f.text)}`);
       if (f.sub) add(a, b, 7, 'PopSub', `{\\an8\\pos(540,${y + 215})\\frz6}${esc(f.sub)}`);
     } else if (f.type === 'badge') add(a, b, 6, 'Badge', `{\\an9\\pos(1040,500)}${esc(f.text)}`);
+    else if (f.type === 'ring') { const [X, Yp] = mxy(+f.x, +f.y); markDraw(add, a, b, f, X, Yp, LAY.mat, st.ring ? bgr(st.ring) : Y, !!st.glow); }
   }
   if (!(fin.fx || []).some(([, , f]) => f.type === 'badge'))   // 슬로우 컷에는 SLOW 배지 자동
     for (const c of plan.cuts) if ((+c.speed || 1) < 1) add(c.out[0], c.out[1], 6, 'Badge', `{\\an9\\pos(1040,500)}SLOW ${+(+c.speed).toFixed(2)}x`);
@@ -1031,7 +1072,7 @@ export function buildAss(fin, plan, st, src) {
   return `[Script Info]\nScriptType: v4.00+\nPlayResX: ${W}\nPlayResY: ${H}\nWrapStyle: 2\nScaledBorderAndShadow: yes\n\n[V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 ${[...(cs ? capSty(S, cs) : [S('Title', 84, '&H00FFFFFF&', 0), S('Cap', 74, '&H00FFFFFF&', 7)]), S('Label', 50, '&H00FFFFFF&', 14, 3, R), S('Sub', 36, '&H00FFFFFF&', 12, 3, '&H80303030&'),
-    S('Pop', 230, '&H00FFFFFF&', 12), S('PopSub', 62, '&H00FFFFFF&', 7), S('Badge', 44, '&H00000000&', 10, 3, Y), S('Mark', 46, '&H00FFFFFF&', 3), S('Credit', 34, '&H00FFFFFF&', 0)].join('\n')}
+    S('Pop', 230, '&H00FFFFFF&', 12), S('PopSub', 62, '&H00FFFFFF&', 7), S('Badge', 44, '&H00000000&', 10, 3, Y), S('Mark', 46, '&H00FFFFFF&', 3), S('Credit', 34, '&H00FFFFFF&', 0), S('Draw', 10, '&H00FFFFFF&', 0), markStyle(S)].join('\n')}
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -1044,21 +1085,17 @@ function buildAssLay(fin, plan, st, src) {
   const L = layOf(st), Y = bgr(st.yellow), R = bgr(st.red), end = plan.duration, ev = [], white = st.lay === 'post';
   const hi = (s, c = Y, back = '&HFFFFFF&') => esc(s).replace(/\[\[(.+?)\]\]/g, `{\\c${c}}$1{\\c${back}}`);
   const add = (a, b, layer, style, text) => ev.push(`Dialogue: ${layer},${ts(a)},${ts(b)},${style},,0,0,0,,${text}`);
-  const sh = src.h * (1 - (src.cb || 0)), sc = Math.max(W / src.w, L.vh / sh), ox = (src.w * sc - W) / 2, oy = (sh * sc - L.vh) / 2;
-  const xy = (x, y) => [Math.round(Math.min(W - 60, Math.max(60, x * src.w * sc - ox))), Math.round(Math.min(L.vy + L.vh - 40, Math.max(L.vy + 40, y * src.h * sc - oy + L.vy)))];
+  const xy = vxy(src, L);
   const intro = plan.cuts[0]?.out || [0, 2];
-  // 링: 원 테두리 (속은 비움), 톡 커지며 나타나요
-  const ring = (a, b, f, col, glow) => { const [X, Yp] = xy(+f.x, +f.y), r = 95, k = Math.round(r * 0.552), d = 2 * r;
-    const shape = `m ${r} 0 b ${r + k} 0 ${d} ${r - k} ${d} ${r} b ${d} ${r + k} ${r + k} ${d} ${r} ${d} b ${r - k} ${d} 0 ${r + k} 0 ${r} b 0 ${r - k} ${r - k} 0 ${r} 0`;
-    if (glow) add(a, b, 8, 'Draw', `{\\an7\\pos(${X - r},${Yp - r})\\org(${X},${Yp})\\1a&HFF&\\3c${col}\\bord16\\blur10\\3a&H60&\\fscx60\\fscy60\\t(0,180,\\fscx100\\fscy100)\\p1}${shape}`);
-    add(a, b, 9, 'Draw', `{\\an7\\pos(${X - r},${Yp - r})\\org(${X},${Yp})\\1a&HFF&\\3c${col}\\bord7\\blur1\\fscx60\\fscy60\\t(0,180,\\fscx100\\fscy100)\\p1}${shape}`); };
+  // 링 = 기술 동그라미 (markDraw: 손그림 타원 + 화살표 + 이름표)
+  const ring = (a, b, f, col, glow) => { const [X, Yp] = xy(+f.x, +f.y); markDraw(add, a, b, f, X, Yp, L, col, glow); };
   // 화살표: 끝이 (x,y) 를 가리켜요. 오른쪽 위에서 왼쪽 아래로.
   const arrow = (a, b, f, col) => { const [X, Yp] = xy(+f.x, +f.y);
     add(a, b, 9, 'Draw', `{\\an7\\pos(${X - 60},${Yp - 180})\\org(${X},${Yp})\\frz-35\\1c${col}\\3c&H000000&\\bord3\\fscx70\\fscy70\\t(0,160,\\fscx100\\fscy100)\\p1}m 60 180 l 0 105 l 38 105 l 38 0 l 82 0 l 82 105 l 120 105 l 60 180`); };
   const fxs = fin.fx || [];
   for (const [a, b, f] of fxs) {
     if (!f) continue;
-    if (f.type === 'ring') ring(a, b, f, st.lay === 'full' && !st.words ? '&HFFFFFF&' : Y, st.lay === 'full' && !st.words);
+    if (f.type === 'ring') ring(a, b, f, st.ring ? bgr(st.ring) : Y, !!st.glow);
     else if (f.type === 'arrow') arrow(a, b, f, st.words ? '&H2B2BFF&' : '&HFFFFFF&');
     else if (f.type === 'label') { add(a, b, 6, 'Label', `{\\an7\\pos(44,${L.vy + 60})}${esc(f.k)}`); if (f.s) add(a, b, 6, 'Sub', `{\\an7\\pos(44,${L.vy + 152})}${esc(f.s)}`); }
     else if (f.type === 'pop') { const y = L.vy + Math.round(L.vh * 0.3); add(a, b, 7, 'Pop', `{\\an8\\pos(540,${y})\\frz6\\fscx130\\fscy130\\t(0,160,\\fscx100\\fscy100)\\c${Y}}${esc(f.text)}`); if (f.sub) add(a, b, 7, 'PopSub', `{\\an8\\pos(540,${y + 215})\\frz6}${esc(f.sub)}`); }
@@ -1103,12 +1140,12 @@ function buildAssLay(fin, plan, st, src) {
   const K = '&H00000000&', Wh = '&H00FFFFFF&';
   mineEv(fin, add, L.vy + 40);
   const styles = st.lay === 'post'
-    ? [S('Title', 86, K, 0), S('Name', 46, K, 0), S('Cap', 62, Y, 5), S('NoteName', 36, '&H00AAAAAA&', 0), S('Note', 50, '&H00222222&', 0, K, 1, K, 0), S('Credit', 30, '&H00888888&', 0), S('Draw', 10, Wh, 0)]
+    ? [S('Title', 86, K, 0), S('Name', 46, K, 0), S('Cap', 62, Y, 5), S('NoteName', 36, '&H00AAAAAA&', 0), S('Note', 50, '&H00222222&', 0, K, 1, K, 0), S('Credit', 30, '&H00888888&', 0), S('Draw', 10, Wh, 0), markStyle(S)]
     : st.lay === 'rank'
-      ? [S('Title', 110, Wh, 6), S('Rank', 62, Wh, 5), S('Cap', 60, Wh, 5), S('Credit', 30, Wh, 2), S('Draw', 10, Wh, 0)]
+      ? [S('Title', 110, Wh, 6), S('Rank', 62, Wh, 5), S('Cap', 60, Wh, 5), S('Credit', 30, Wh, 2), S('Draw', 10, Wh, 0), markStyle(S)]
       : [S('Title', 84, Wh, 7), S('Cap', st.explain ? 70 : 60, st.explain ? Wh : Y, 6), S('Word', 104, Wh, 9, '&H00FF6B1E&'),
         S('Label', 50, Wh, 14, R, 3, R), S('Sub', 36, Wh, 12, '&H80303030&', 3, '&H80303030&'), S('Pop', 230, Wh, 12), S('PopSub', 62, Wh, 7),
-        S('Badge', 44, K, 10, Y, 3, Y), S('Mark', 34, '&H40FFFFFF&', 2, '&H80000000&'), S('Credit', 28, '&H40FFFFFF&', 2), S('Draw', 10, Wh, 0)];
+        S('Badge', 44, K, 10, Y, 3, Y), S('Mark', 34, '&H40FFFFFF&', 2, '&H80000000&'), S('Credit', 28, '&H40FFFFFF&', 2), S('Draw', 10, Wh, 0), markStyle(S)];
   return `[Script Info]\nScriptType: v4.00+\nPlayResX: ${W}\nPlayResY: ${H}\nWrapStyle: 2\nScaledBorderAndShadow: yes\n\n[V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 ${styles.join('\n')}
