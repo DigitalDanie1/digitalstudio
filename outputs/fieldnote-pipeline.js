@@ -1215,6 +1215,121 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
   }
   // ===== 자막 편집기 (CapCut 처럼): 영상 위에 자막이 바로 보이고, 줄마다 시각·글을 고쳐요 =====
   const SED = {};
+  // ===== 동그라미 편집기 (스타일 입히기 칸, 실행기 api 48): 그 시각의 깨끗한 화면 위에서 동그라미를 끌어 옮기고, 이름표 글·크기·쪽·시간을 고쳐요 → Claude 없이 다시 그리기 =====
+  // 좌표는 완성 화면 1080x1920. 모양·이름표 자리 계산은 실행기 ai.mjs markDraw 와 같아요.
+  const MK = {};
+  const MK_SIDES = [['auto', '자동'], ['left', '왼쪽'], ['right', '오른쪽'], ['top', '위']];
+  const mkKey = ep => { const s = (ep.steps || []).find(x => x.id === 'aistyle'); return ((s && s.outputs) || []).map(o => o.path + ':' + (o.mtime || 0)).join(','); };
+  const mkR = r => Math.round(Math.min(260, Math.max(70, (+r || 0.11) * 1080)));
+  const mkTW = t => [...String(t)].reduce((a, c) => a + (c === ' ' ? 0.25 : /[A-Z0-9]/.test(c) ? 0.47 : /[a-z]/.test(c) ? 0.38 : /[ -~]/.test(c) ? 0.4 : 0.72), 0);
+  function mkShape(cx, cy, rx, ry) { const pts = [], n = 44, a0 = -2.2;
+    for (let k = 0; k <= n; k++) { const t = a0 + (2 * Math.PI + 0.45) * k / n, w = 1 + 0.035 * Math.sin(3 * t + 0.6) + 0.02 * k / n; pts.push(`${Math.round(cx + rx * w * Math.cos(t))} ${Math.round(cy + ry * w * Math.sin(t))}`); }
+    return 'M' + pts.join('L'); }
+  function mkSvg(D, m) {
+    const rx = mkR(m.r), ry = Math.round(rx * 0.8), X = Math.round(m.px), cy = Math.min(D.vy + D.vh - ry - 10, Math.max(D.vy + ry + 10, Math.round(m.py))), col = esc(D.col);
+    let lab = ''; const t = String(m.t || '').trim();
+    if (t) { const tw = mkTW(t) * 66, AL = 96, ay = cy - Math.round(ry * 0.35);
+      const right = X + rx + 18 + AL + 14 + tw <= 1056, left = X - rx - 18 - AL - 14 - tw >= 24;
+      const sd = m.side === 'right' ? 1 : m.side === 'left' ? -1 : m.side === 'top' ? 0 : right && (X <= 540 || !left) ? 1 : left ? -1 : 0;
+      if (sd) { const tip = X + sd * (rx + 18), q = (dx, dy) => `${tip + dx * sd},${ay + dy}`;
+        lab = `<polygon points="${[q(0, 0), q(30, -17), q(30, -5), q(AL, -5), q(AL, 5), q(30, 5), q(30, 17)].join(' ')}" fill="${col}" stroke="#000" stroke-width="3"/><text x="${tip + sd * (AL + 14)}" y="${ay}" text-anchor="${sd > 0 ? 'start' : 'end'}" dominant-baseline="central" fill="${col}">${esc(t)}</text>`;
+      } else { const tip = cy - ry - 14, q = (dx, dy) => `${X + dx},${tip + dy}`;
+        lab = `<polygon points="${[q(0, 0), q(-17, -30), q(-5, -30), q(-5, -76), q(5, -76), q(5, -30), q(17, -30)].join(' ')}" fill="${col}" stroke="#000" stroke-width="3"/><text x="${X}" y="${tip - 82}" text-anchor="middle" fill="${col}">${esc(t)}</text>`; } }
+    return `<path d="${mkShape(X, cy, rx, ry)}" fill="none" stroke="#000" stroke-opacity=".45" stroke-width="16" stroke-linejoin="round"/><path d="${mkShape(X, cy, rx, ry)}" fill="none" stroke="${col}" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"${D.glow ? ' style="filter:drop-shadow(0 0 10px #fff)"' : ''}/>${lab}`;
+  }
+  // 고른 쪽에 이름표가 안 들어가면 (화면 밖으로 잘림) 알려 줘요
+  const mkCut = m => { const t = String(m.t || '').trim(); if (!t || m.del) return false; const rx = mkR(m.r), w = rx + 18 + 96 + 14 + mkTW(t) * 66;
+    return m.side === 'right' ? m.px + w > 1056 : m.side === 'left' ? m.px - w < 24 : m.side === 'top' ? mkTW(t) * 33 > Math.min(m.px, 1080 - m.px) : false; };
+  const mkTime = m => Math.round(Math.min(m.b - 0.05, m.a + 0.6) * 10) / 10;
+  const mkFileUrl = (epId, p) => `${RUNNER}/file?ep=${encodeURIComponent(epId)}&path=${encodeURIComponent(p)}`;
+  function mkFrame(epId, M, m) {
+    const t = mkTime(m), k = String(t); if (M.frames[k] !== undefined) return M.frames[k];
+    M.frames[k] = 0;
+    runnerFetch(`/markframe?ep=${encodeURIComponent(epId)}&t=${t}`).then(r => { M.frames[k] = r.path; mkStage(epId); }).catch(() => { M.frames[k] = ''; mkStage(epId); });
+    return 0;
+  }
+  const mkDirty = M => !!M.list && JSON.stringify(M.list) !== M.orig;
+  // 화면(사진 + 동그라미)과 목록 글자만 다시: 입력 중인 칸은 그대로 둬요
+  function mkStage(epId) {
+    const el = document.getElementById('plMk'), M = MK[epId]; if (!el || el.dataset.ep !== epId || !M || !M.d) return;
+    const m = M.list[M.sel], st = el.querySelector('#plMkStage'); if (!st) return;
+    const D = M.d, f = m ? mkFrame(epId, M, m) : '';
+    st.querySelector('img').style.visibility = f ? 'visible' : 'hidden'; if (f) st.querySelector('img').src = mkFileUrl(epId, f);
+    st.querySelector('.mk-ld').textContent = m && f === 0 ? '화면 불러오는 중…' : m && f === '' ? '화면을 못 불러왔어요' : '';
+    st.querySelector('svg').innerHTML = `<rect x="2" y="${D.vy}" width="1076" height="${D.vh}" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="4" stroke-dasharray="18 14"/>${m && !m.del ? mkSvg(D, m) : ''}`;
+    el.querySelectorAll('[data-mk-sel]').forEach(b => { const x = M.list[+b.dataset.mkSel]; b.textContent = `${x.a.toFixed(1)}~${x.b.toFixed(1)}초 · ${x.t || '(글 없음)'}`; b.classList.toggle('del', !!x.del); });
+    const dirty = mkDirty(M), ep = ytItem().ep, run = !!(ep && ep.running);
+    const sv = el.querySelector('[data-mk-act="save"]'), rs = el.querySelector('[data-mk-act="reset"]'), ms = el.querySelector('.mk-msg');
+    if (sv) sv.disabled = !dirty || M.busy || run; if (rs) rs.disabled = !dirty || M.busy;
+    if (ms) ms.textContent = m && mkCut(m) ? '⚠ 이름표가 화면 밖으로 잘려요. 동그라미를 옮기거나 이름표 쪽을 바꾸세요.' : M.busy ? '다시 그리는 중…' : run ? '다른 단계가 도는 중이에요. 끝나면 다시 그릴 수 있어요.' : dirty ? '고친 게 있어요. 다시 그려야 영상에 들어가요.' : '영상과 같아요.';
+    const dl = el.querySelector('[data-mk-act="del"]'); if (dl && m) dl.textContent = m.del ? '되살리기' : '이 동그라미 빼기';
+  }
+  function mkPaint(epId) {
+    const el = document.getElementById('plMk'), M = MK[epId]; if (!el || !M) return;
+    el.dataset.ep = epId;
+    if (M.err) { el.innerHTML = `<section class="mk-box"><p class="pl-error">${esc(M.err)}</p></section>`; return; }
+    if (!M.d) { el.innerHTML = '<section class="mk-box"><p class="small">동그라미 불러오는 중…</p></section>'; return; }
+    const m = M.list[M.sel], D = M.d, n = v => (Math.round(v * 10) / 10).toFixed(1);
+    const fields = m ? `<div class="mk-f">
+        <label class="wide">화살표 이름표 글 <span class="small">(비우면 동그라미만)</span><input class="pl-input" data-mk-f="t" maxlength="12" value="${esc(m.t)}" placeholder="예: 미끼, 손목 컨트롤"></label>
+        <label>동그라미 크기<input type="range" data-mk-f="r" min="0.065" max="0.24" step="0.005" value="${m.r}"></label>
+        <label>이름표 쪽<select class="pl-input" data-mk-f="side">${MK_SIDES.map(([v, l]) => `<option value="${v}"${m.side === v ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
+        <label>나오는 시각 (초)<input class="pl-input" type="number" data-mk-f="a" min="0" max="${D.dur}" step="0.1" value="${n(m.a)}"></label>
+        <label>사라지는 시각 (초)<input class="pl-input" type="number" data-mk-f="b" min="0" max="${D.dur}" step="0.1" value="${n(m.b)}"></label>
+        <p class="wide"><button type="button" class="btn" data-mk-act="del">${m.del ? '되살리기' : '이 동그라미 빼기'}</button></p></div>` : '<p class="small">동그라미가 없어요. "＋ 동그라미 추가"로 넣으세요.</p>';
+    el.innerHTML = `<section class="mk-box"><div class="mk-h"><b>동그라미 고치기</b><span class="small">화면을 누르거나 끌면 동그라미가 그 자리로 가요 (화살표 키로 조금씩). 이름표 글·크기·쪽·시간을 고친 뒤 "다시 그리기"를 누르면 Claude 없이 바로 그려요. 점선 = 영상 칸.</span></div>
+      <div class="mk-row"><div class="mk-stage" id="plMkStage" tabindex="0" role="application" aria-label="동그라미 자리: 끌거나 화살표 키로 옮기기"><img alt=""><span class="mk-ld small"></span><svg viewBox="0 0 1080 1920" aria-hidden="true"></svg></div>
+      <div class="mk-side"><div class="mk-list">${M.list.map((x, i) => `<button type="button" class="mk-chip${i === M.sel ? ' on' : ''}" data-mk-sel="${i}" aria-pressed="${i === M.sel}"></button>`).join('')}<button type="button" class="mk-chip add" data-mk-act="add">＋ 동그라미 추가</button></div>
+      ${fields}
+      <div class="mk-go"><button type="button" class="btn primary" data-mk-act="save">고친 동그라미로 다시 그리기</button><button type="button" class="btn" data-mk-act="reset">되돌리기</button><span class="small mk-msg" role="status"></span></div>
+      <p class="small">자막·인트로까지 만들었으면 그것도 같이 다시 붙여요 (글은 그대로).</p></div></div></section>`;
+    mkStage(epId);
+  }
+  function mkLoad(epId) {
+    const M = MK[epId], key = M.key;
+    runnerFetch(`/marks?ep=${encodeURIComponent(epId)}`).then(d => {
+      if (M.key !== key) return;
+      M.d = d; M.list = d.marks.map(x => ({ k: x.k, a: +x.a, b: +x.b, t: x.t || '', r: +x.r || 0.11, side: x.side || 'auto', px: +x.px, py: +x.py, del: false }));
+      M.orig = JSON.stringify(M.list); M.sel = Math.min(M.sel || 0, Math.max(0, M.list.length - 1)); mkPaint(epId);
+    }).catch(e => { if (M.key !== key) return; M.err = '동그라미를 못 불러왔어요: ' + (e.message || e); mkPaint(epId); });
+  }
+  function mkBind(el) {
+    const cur = () => { const id = el.dataset.ep, M = MK[id]; return M && M.list ? { id, M, m: M.list[M.sel] } : null; };
+    const moveTo = (e, st) => { const c = cur(); if (!c || !c.m || el.classList.contains('off')) return; const R = st.getBoundingClientRect();
+      c.m.px = Math.round(Math.min(1080, Math.max(0, (e.clientX - R.left) / R.width * 1080))); c.m.py = Math.round(Math.min(1920, Math.max(0, (e.clientY - R.top) / R.height * 1920))); c.m.del = false; mkStage(c.id); };
+    el.addEventListener('pointerdown', e => { const st = e.target.closest('#plMkStage'); if (!st) return; e.preventDefault(); st.focus(); st.setPointerCapture(e.pointerId); moveTo(e, st);
+      const mv = ev => moveTo(ev, st), up = () => { st.removeEventListener('pointermove', mv); st.removeEventListener('pointerup', up); st.removeEventListener('pointercancel', up); };
+      st.addEventListener('pointermove', mv); st.addEventListener('pointerup', up); st.addEventListener('pointercancel', up); });
+    el.addEventListener('keydown', e => { if (!e.target.closest('#plMkStage')) return; const c = cur(); if (!c || !c.m) return;
+      const d = e.shiftKey ? 40 : 10, dx = { ArrowLeft: -d, ArrowRight: d }[e.key] || 0, dy = { ArrowUp: -d, ArrowDown: d }[e.key] || 0; if (!dx && !dy) return;
+      e.preventDefault(); c.m.px = Math.min(1080, Math.max(0, c.m.px + dx)); c.m.py = Math.min(1920, Math.max(0, c.m.py + dy)); mkStage(c.id); });
+    el.addEventListener('input', e => { const f = e.target.dataset && e.target.dataset.mkF, c = cur(); if (!f || !c || !c.m) return;
+      const v = e.target.value; if (f === 't') c.m.t = v.replace(/[{}\\]/g, '').slice(0, 12); else if (f === 'r') c.m.r = +v; else if (f === 'side') c.m.side = v;
+      else if (f === 'a' || f === 'b') { const x = Math.max(0, Math.min(c.M.d.dur, +v || 0)); c.m[f] = x; if (c.m.b < c.m.a + 0.3) { if (f === 'a') c.m.b = Math.min(c.M.d.dur, c.m.a + 0.3); else c.m.a = Math.max(0, c.m.b - 0.3); } }
+      mkStage(c.id); });
+    el.addEventListener('click', e => { const c = cur(); if (!c) return;
+      const sb = e.target.closest('[data-mk-sel]'); if (sb) { c.M.sel = +sb.dataset.mkSel; mkPaint(c.id); return; }
+      const act = e.target.closest('[data-mk-act]') && e.target.closest('[data-mk-act]').dataset.mkAct; if (!act) return;
+      if (act === 'add') { const D = c.M.d, base = c.m || { a: Math.max(0, D.dur / 2 - 1), b: D.dur / 2 + 1 }, a = Math.round(Math.min(D.dur - 2.1, base.b + 0.5) * 10) / 10;
+        c.M.list.push({ k: -1, a: Math.max(0, a), b: Math.min(D.dur, Math.max(0, a) + 2), t: '', r: 0.11, side: 'auto', px: 540, py: D.vy + Math.round(D.vh / 2), del: false }); c.M.sel = c.M.list.length - 1; mkPaint(c.id); return; }
+      if (act === 'del' && c.m) { if (c.m.k < 0 && !c.m.del) { c.M.list.splice(c.M.sel, 1); c.M.sel = Math.max(0, c.M.sel - 1); } else c.m.del = !c.m.del; mkPaint(c.id); return; }
+      if (act === 'reset') { c.M.list = JSON.parse(c.M.orig); c.M.sel = Math.min(c.M.sel, Math.max(0, c.M.list.length - 1)); mkPaint(c.id); return; }
+      if (act === 'save') { const edits = c.M.list.map(x => ({ k: x.k, px: x.px, py: x.py, r: x.r, t: x.t, side: x.side, a: x.a, b: x.b, del: x.del }));
+        c.M.busy = true; mkStage(c.id);
+        runnerFetch('/run', { ep: c.id, steps: ['aistyle'], marks: { edits } }).then(() => { toast('고친 동그라미로 다시 그려요 (Claude 없이, 1분 안팎).'); runnerRefresh(); })
+          .catch(err => { c.M.busy = false; mkStage(c.id); toast(err.message); }); }
+    });
+  }
+  function ytMkMount() {
+    const el = document.getElementById('plMk'); if (!el || !(runnerApi >= 48)) return;
+    const ep = ytItem().ep; if (!ep) return;
+    const M = MK[ep.ep] || (MK[ep.ep] = { sel: 0, frames: {} }), key = mkKey(ep), run = !!ep.running;
+    if (!el.dataset.bound) { mkBind(el); el.dataset.bound = '1'; }
+    el.classList.toggle('off', run);
+    if (M.key !== key) { M.key = key; M.d = null; M.list = null; M.err = ''; M.busy = false; M.frames = {}; mkLoad(ep.ep); mkPaint(ep.ep); return; }
+    if (el.dataset.ep !== ep.ep || !el.childElementCount) mkPaint(ep.ep); else mkStage(ep.ep);
+  }
+
   function ytSubEdMount() {
     const box = document.getElementById('plSubEd'); if (!box || box.childElementCount) return;
     const epId = box.dataset.ep, ep = (runnerData && runnerData.episodes || []).find(e => e.ep === epId); if (!ep) return;
@@ -1395,7 +1510,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
       attrs: stopOr(ST, 'data-ya-steps="aistyle"'), cls: runIn(ST) ? 'danger' : '',
       disabled: () => off || !lookOk || !cutDone || busyElse(ST),
       isDone: () => styDone, statusLine: runLine(ST),
-      result: () => ep ? errOf(ST) + (runnerApi >= 19 && (runIn(ST) || styDone) ? ytStepLive(ep, ST[0], runIn(ST)) : '') + (styDone ? ba('aicut', '편집/AI1차컷.mp4', 'aistyle', '편집/AI스타일본.mp4', '1차 컷', '스타일 입힌 뒤 (자막 전)') + getf('aistyle', [['편집/AI스타일본.mp4', '스타일본 영상']]) + (out('aistyle', '조사/research.md') ? `<p class="small">${ytFileLink(ep.ep, { path: '조사/research.md' })} · 제목·라벨에 쓴 사실의 근거</p>` : '') : '') + logs(ST) : '',
+      result: () => ep ? errOf(ST) + (runnerApi >= 19 && (runIn(ST) || styDone) ? ytStepLive(ep, ST[0], runIn(ST)) : '') + (styDone ? ba('aicut', '편집/AI1차컷.mp4', 'aistyle', '편집/AI스타일본.mp4', '1차 컷', '스타일 입힌 뒤 (자막 전)') + getf('aistyle', [['편집/AI스타일본.mp4', '스타일본 영상']]) + (out('aistyle', '조사/research.md') ? `<p class="small">${ytFileLink(ep.ep, { path: '조사/research.md' })} · 제목·라벨에 쓴 사실의 근거</p>` : '') + (sport ? (runnerApi >= 48 ? '<div class="mk" id="plMk" data-keep-id="mk"></div>' : '<p class="small">맥 실행기를 업데이트하면 동그라미를 직접 옮기고 이름표 글을 고칠 수 있어요.</p>') : '') : '') + logs(ST) : '',
     });
     const SU = ['aisubs'], subDone = ok('aisubs');
     // 자막: 원문(영어)·번역(한국어)·해설/후크(AI)·내 자막을 나눠 켜고, 만든 뒤 줄별로 확인
@@ -1916,7 +2031,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
   window.ytGoScript = function () { const { steps } = evalSteps('youtube'), k = steps.findIndex(x => x.id === 'g-voice'); if (k >= 0) { T.view.youtube = k; repaint('youtube', true); } };
   window.ytRepaint = function () { repaint('youtube'); };
   function afterPaint(c) {
-    if (c === 'youtube') { setTimeout(ytPrevSync, 0); setTimeout(ytUpTextHydrate, 0); setTimeout(ytSubEdMount, 0); setTimeout(ytThPrevMount, 0); setTimeout(ytBrPrevMount, 0); }
+    if (c === 'youtube') { setTimeout(ytPrevSync, 0); setTimeout(ytUpTextHydrate, 0); setTimeout(ytSubEdMount, 0); setTimeout(ytThPrevMount, 0); setTimeout(ytBrPrevMount, 0); setTimeout(ytMkMount, 0); }
     if (window.CodexImg) setTimeout(() => CodexImg.hydrate(), 0);
     if (c === 'insta') setTimeout(() => window.InstaToon && window.InstaToon.hydrateArt(), 0);
     if (c === 'youtube' && T.logOpen) { const el = document.getElementById('plLog'), ep = ytItem().ep; if (el && ep) runnerFetch(`/log?ep=${encodeURIComponent(ep.ep)}&step=${T.logOpen}&tail=6000`).then(t => { el.textContent = t || '(로그 없음)'; el.scrollTop = el.scrollHeight; }).catch(e => { el.textContent = '로그를 못 읽었어요: ' + e.message; }); }
@@ -2228,6 +2343,24 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
 @keyframes lm-mk-draw{0%{stroke-dashoffset:1;opacity:1}20%{stroke-dashoffset:0}86%{stroke-dashoffset:0;opacity:1}100%{stroke-dashoffset:0;opacity:0}}
 @keyframes lm-mk-lab{0%,22%{opacity:0}30%,86%{opacity:1}100%{opacity:0}}
 @media (prefers-reduced-motion:reduce){.lm-mk .mk-o{animation:none;stroke-dashoffset:0}.lm-mk .mk-l{animation:none;opacity:1}}
+.mk-box{border:1px solid var(--line);border-radius:12px;padding:14px;margin:12px 0;background:var(--panel2)}
+.mk-h{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}.mk-h b{font-size:16px}
+.mk-row{display:flex;gap:16px;align-items:flex-start}
+.mk-stage{position:relative;flex:none;width:270px;aspect-ratio:9/16;border-radius:10px;overflow:hidden;background:#000;cursor:crosshair;touch-action:none;user-select:none}
+.mk-stage:focus-visible{outline:3px solid var(--pc);outline-offset:2px}
+.mk-stage img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none}
+.mk-stage svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.mk-stage text{font:900 66px 'Apple SD Gothic Neo','Noto Sans KR',sans-serif;paint-order:stroke;stroke:#000;stroke-width:12px;stroke-linejoin:round}
+.mk-ld{position:absolute;left:0;right:0;top:46%;text-align:center;color:#ccc}
+.mk-side{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px}
+.mk-list{display:flex;flex-wrap:wrap;gap:6px}
+.mk-chip{min-height:40px;padding:6px 12px;border-radius:99px;border:2px solid var(--line);background:none;color:var(--text);font-size:14px;cursor:pointer}
+.mk-chip.on{border-color:var(--pc);background:color-mix(in srgb,var(--pc) 14%,transparent)}.mk-chip.del{text-decoration:line-through;opacity:.6}.mk-chip.add{border-style:dashed;color:var(--muted)}
+.mk-f{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.mk-f label{display:grid;gap:6px;font-size:14px;color:#c3c8cf}.mk-f .wide{grid-column:1/-1;margin:0}
+.mk-f input[type=range]{width:100%;min-height:40px;accent-color:var(--pc)}
+.mk-go{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.mk-go .mk-msg{color:var(--muted)}
+.mk.off .mk-stage{cursor:not-allowed;opacity:.75}
+@media (max-width:640px){.mk-row{flex-direction:column;align-items:center}.mk-side{width:100%}.mk-f{grid-template-columns:1fr}}
 .ya-mkpv{display:flex;gap:16px;align-items:flex-start;margin:4px 0 12px;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--panel2)}
 .ya-mkpv-s{flex:none;width:168px;height:300px;border-radius:12px;overflow:hidden;background:#000}
 .ya-mkpv-s .lm{transform:scale(2);transform-origin:0 0;border:0;border-radius:0}

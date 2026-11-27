@@ -770,9 +770,64 @@ async function refStyle(E, ctx) {
   E.s.refStyle = { look: E.s.look, id, at: a.at, title: a.title, base: a.style.base, lay: a.style.lay, name: a.name, desc: a.desc, over: a.style.over };
 }
 
+// ---------- 동그라미 편집기 (작업판에서 끌어서 옮기기 · 크기 · 이름표 글 · 쪽) ----------
+const QUIET = { log() {}, aborted: () => false, setChild() {} };
+async function srcOf(E, plan) { const info = source(E), pr = await probe(info.file, QUIET), ar = srcArea(plan);
+  return ar ? { w: pr.width || 1920, h: Math.round((pr.height || 1080) * (ar[1] - ar[0])), cb: 0 } : { w: pr.width || 1920, h: pr.height || 1080, cb: Math.min(0.25, Math.max(0, +plan.crop_bottom || 0)) }; }
+const markBase = (E, st) => { const b = layOf(st) === LAY.mat ? '편집/AI1차컷.mp4' : `편집/AI1차컷_${st.lay}.mp4`; return exists(E.p(b)) ? b : '편집/AI스타일본.mp4'; };
+// 지금 그려지는 동그라미들을 완성 화면(1080x1920) 좌표로: k = AI스타일.json fx 의 번호
+export async function marksOf(E) {
+  if (!exists(E.p('편집/AI스타일.json'))) throw new StepError('스타일 입히기를 먼저 해 주세요.');
+  const plan = readJson(E.p('편집/AI컷.json')), j = readJson(E.p('편집/AI스타일.json')), st = styleOf(E), L = layOf(st), conv = vxy(await srcOf(E, plan), L);
+  const marks = [];
+  (j.fx || []).forEach((x, k) => { const f = x && x[2]; if (!f || f.type !== 'ring') return;
+    const [X, Yp] = ringAt(f, conv), rx = ringR(f), ry = Math.round(rx * 0.8), cy = Math.min(L.vy + L.vh - ry - 10, Math.max(L.vy + ry + 10, Yp));
+    marks.push({ k, a: r1(+x[0]), b: r1(+x[1]), t: String(f.t || ''), r: +(+f.r || 0.11).toFixed(3), side: f.side || 'auto', px: X, py: cy, moved: hasPx(f) }); });
+  return { w: W, h: H, vy: L.vy, vh: L.vh, dur: plan.duration, col: '#' + (st.ring || st.yellow || 'FFD600'), glow: !!st.glow, marks, at: fs.statSync(E.p('편집/AI스타일.json')).mtimeMs };
+}
+// 그 시각의 깨끗한 화면 (제목·자막·동그라미 없이, 틀만) → 편집/동그라미/f_<0.1초>.jpg
+export async function markFrame(E, t) {
+  const st = styleOf(E), base = markBase(E, st); if (!exists(E.p(base))) throw new StepError('1차 컷 영상이 없어요.');
+  const out = `편집/동그라미/f_${Math.max(0, Math.round(+t * 10))}.jpg`, mt = f => { try { return fs.statSync(E.p(f)).mtimeMs; } catch { return 0; } };
+  if (mt(out) < mt(base)) { fs.mkdirSync(E.p('편집/동그라미'), { recursive: true }); await ff(['-y', '-ss', String(Math.max(0, +t)), '-i', E.p(base), '-frames:v', '1', '-vf', 'scale=540:-2', '-q:v', '4', E.p(out)], QUIET); }
+  return out;
+}
+// 고친 내용 적용: edits = [{k, px, py, r, t, side, a, b, del}] (k 가 없거나 -1 이면 새 동그라미)
+export function applyMarks(fx, edits, d) {
+  const tm = (a, b) => { a = Math.max(0, Math.min(d - 0.3, +a || 0)); b = Math.max(a + 0.3, Math.min(d, +b || a + 2)); return [r1(a), r1(b)]; };
+  const merge = (x, e) => { const f = { ...(x[2] || {}), type: 'ring' };
+    if (hasPx(e)) { f.px = Math.round(+e.px); f.py = Math.round(+e.py); }
+    if (e.r != null) f.r = +e.r; if (e.t != null) f.t = String(e.t); if (e.side) { if (e.side === 'auto') delete f.side; else f.side = e.side; }
+    if (!hasPx(f) && !(f.x >= 0)) { f.x = 0.5; f.y = 0.5; }
+    return [...tm(e.a != null ? e.a : x[0], e.b != null ? e.b : x[1]), f]; };
+  const out = [];
+  (fx || []).forEach((x, k) => { const e = edits.find(e => e.k === k); if (!x || !x[2] || x[2].type !== 'ring' || !e) { out.push(x); return; } if (!e.del) out.push(merge(x, e)); });
+  for (const e of edits) if ((e.k == null || e.k < 0) && !e.del) out.push(merge([e.a, e.b, { type: 'ring' }], e));
+  return out.sort((p, q) => (+p[0]) - (+q[0]));
+}
+
 // 내가 스타일 단계에서 적은 위 제목 두 줄 (빈 줄은 Claude 것 그대로)
 const myTitle = (E, frame) => { const t = E.s.titleText || {}; return { ...(frame || {}), ...(t.l1 ? { l1: t.l1 } : {}), ...(t.l2 ? { l2: t.l2 } : {}) }; };
 async function aistyle(E, ctx) {
+  if (E.s.marksOnly) {   // 동그라미만 고쳐 다시 그리기: 조사·제목·라벨·자막은 그대로, Claude 없이. 자막까지 만든 본편(AI완성.mp4)도 같이 다시 그려요
+    E.s.marksOnly = false;
+    const prog = progOf(E, 'aistyle', [['render', '고친 동그라미로 다시 그리기'], ['done', '끝']]);
+    const st = styleOf(E), plan = readJson(E.p('편집/AI컷.json')), j = readJson(E.p('편집/AI스타일.json'));
+    j.fx = applyMarks(j.fx, E.s.marksEdit || [], plan.duration); E.s.marksEdit = null;
+    writeJson(E.p('편집/AI스타일.json'), j);
+    const hadMain = exists(E.p('편집/AI완성.mp4'));
+    let fin = j; try { fin = { ...readJson(E.p('편집/AI완성.json')), fx: j.fx }; } catch {}
+    writeJson(E.p('편집/AI완성.json'), fin);
+    const n = j.fx.filter(x => x && x[2] && x[2].type === 'ring').length;
+    ctx.log(`동그라미 ${n}개로 다시 그려요 (Claude 없이)${hadMain ? ' · 자막 넣은 본편도 같이' : ''}`);
+    prog({ stage: 'render', info: [['동그라미', fxTxt(j.fx.filter(x => x && x[2] && x[2].type === 'ring')) || '없음']] });
+    await render(E, liveCtx(ctx, E, 'aistyle', '동그라미 다시 그리는 중', plan.duration, prog), st, plan, { ...j, captions: [] }, '편집/AI스타일본.mp4');
+    if (hadMain) await render(E, liveCtx(ctx, E, 'aistyle', '자막 넣은 본편 다시 그리는 중', plan.duration, prog), st, plan, fin, '편집/AI완성.mp4');
+    prog({ live: null });
+    const r0 = j.fx.find(x => x && x[2] && x[2].type === 'ring'); if (r0) await prog.snap(ctx, '편집/AI스타일본.mp4', Math.min(plan.duration - 0.1, +r0[0] + 0.6), `${r1(+r0[0] + 0.6)}초 동그라미`);
+    prog({ stage: 'done' });
+    return;
+  }
   if (E.s.titleOnly) {   // 제목만 바꿔 다시 그리기: 조사·라벨·팝업은 그대로, Claude 없이
     E.s.titleOnly = false;
     const prog = progOf(E, 'aistyle', [['render', '바꾼 제목으로 다시 그리기'], ['done', '끝']]);
@@ -1012,7 +1067,7 @@ const handEllipse = (rx, ry) => { const pts = [], a0 = -2.2, n = 44;
 // 동그라미 + (이름이 있으면) 화살표 + 이름표. 왼쪽부터 쓱 그려지고, 이름표는 조금 뒤에 나와요.
 // col = 선 색(ASS &H..&), glow = 흰 빛 번짐 (리플레이·분석 룩)
 function markDraw(add, a, b, f, X, Yp, L, col, glow) {
-  const rx = Math.round(Math.min(260, Math.max(70, (+f.r || 0.11) * W))), ry = Math.round(rx * 0.8);
+  const rx = ringR(f), ry = Math.round(rx * 0.8);
   const cy = Math.min(L.vy + L.vh - ry - 10, Math.max(L.vy + ry + 10, Yp)), x0 = X - rx, y0 = cy - ry, shape = handEllipse(rx, ry);
   const wipe = `\\clip(${x0 - 30},${y0 - 30},${x0 - 30},${y0 + 2 * ry + 30})\\t(0,280,\\clip(${x0 - 30},${y0 - 30},${x0 + 2 * rx + 40},${y0 + 2 * ry + 30}))`;
   add(a, b, 8, 'Draw', `{\\an7\\pos(${x0},${y0})\\1a&HFF&\\3c&H000000&\\3a&H90&\\bord${glow ? 18 : 13}\\blur${glow ? 12 : 5}${glow ? `\\3c${col}\\3a&H70&` : ''}${wipe}\\fad(0,160)\\p1}${shape}`);
@@ -1020,7 +1075,7 @@ function markDraw(add, a, b, f, X, Yp, L, col, glow) {
   const t = String(f.t || '').replace(/[{}\\]/g, '').trim(); if (!t) return;
   const fs = 66, tw = Math.round(textW(t) * fs), AL = 96, ay = cy - Math.round(ry * 0.35), late = '\\alpha&HFF&\\t(240,360,\\alpha&H00&)';
   const right = X + rx + 18 + AL + 14 + tw <= W - 24, left = X - rx - 18 - AL - 14 - tw >= 24;
-  const side = right && (X <= W / 2 || !left) ? 1 : left ? -1 : 0;
+  const side = f.side === 'right' ? 1 : f.side === 'left' ? -1 : f.side === 'top' ? 0 : right && (X <= W / 2 || !left) ? 1 : left ? -1 : 0;
   if (side) {   // 옆: ← 이름  /  이름 →  (화살표 끝이 동그라미 테두리를 가리켜요)
     const tip = X + side * (rx + 18), tail = tip + side * AL;
     const arrow = `m 0 0 l ${30 * side} -17 l ${30 * side} -5 l ${AL * side} -5 l ${AL * side} 5 l ${30 * side} 5 l ${30 * side} 17`;
@@ -1033,6 +1088,10 @@ function markDraw(add, a, b, f, X, Yp, L, col, glow) {
   }
 }
 const markStyle = (S, size = 66) => S('MarkT', size, '&H00FFFFFF&', 6);
+// 동그라미 자리: 작업판에서 내가 옮겼으면(px, py = 완성 화면 좌표) 그 자리, 아니면 Claude 가 본 원본 프레임 x,y 를 틀 좌표로
+const hasPx = f => f.px != null && f.px !== '' && Number.isFinite(+f.px) && Number.isFinite(+f.py);
+const ringAt = (f, conv) => hasPx(f) ? [Math.round(Math.min(W, Math.max(0, +f.px))), Math.round(Math.min(H, Math.max(0, +f.py)))] : conv(+f.x, +f.y);
+const ringR = f => Math.round(Math.min(260, Math.max(70, (+f.r || 0.11) * W)));
 
 export function buildAss(fin, plan, st, src) {
   if (st.lay && st.lay !== 'mat') {   // 다른 틀: 아래 자막 색·박스·따옴표만 고른 모양으로
@@ -1064,7 +1123,7 @@ export function buildAss(fin, plan, st, src) {
       add(a, b, 7, 'Pop', `{\\an8\\pos(540,${y})\\frz6\\fscx130\\fscy130\\t(0,160,\\fscx100\\fscy100)\\c${Y}}${esc(f.text)}`);
       if (f.sub) add(a, b, 7, 'PopSub', `{\\an8\\pos(540,${y + 215})\\frz6}${esc(f.sub)}`);
     } else if (f.type === 'badge') add(a, b, 6, 'Badge', `{\\an9\\pos(1040,500)}${esc(f.text)}`);
-    else if (f.type === 'ring') { const [X, Yp] = mxy(+f.x, +f.y); markDraw(add, a, b, f, X, Yp, LAY.mat, st.ring ? bgr(st.ring) : Y, !!st.glow); }
+    else if (f.type === 'ring') { const [X, Yp] = ringAt(f, mxy); markDraw(add, a, b, f, X, Yp, LAY.mat, st.ring ? bgr(st.ring) : Y, !!st.glow); }
   }
   if (!(fin.fx || []).some(([, , f]) => f.type === 'badge'))   // 슬로우 컷에는 SLOW 배지 자동
     for (const c of plan.cuts) if ((+c.speed || 1) < 1) add(c.out[0], c.out[1], 6, 'Badge', `{\\an9\\pos(1040,500)}SLOW ${+(+c.speed).toFixed(2)}x`);
@@ -1088,7 +1147,7 @@ function buildAssLay(fin, plan, st, src) {
   const xy = vxy(src, L);
   const intro = plan.cuts[0]?.out || [0, 2];
   // 링 = 기술 동그라미 (markDraw: 손그림 타원 + 화살표 + 이름표)
-  const ring = (a, b, f, col, glow) => { const [X, Yp] = xy(+f.x, +f.y); markDraw(add, a, b, f, X, Yp, L, col, glow); };
+  const ring = (a, b, f, col, glow) => { const [X, Yp] = ringAt(f, xy); markDraw(add, a, b, f, X, Yp, L, col, glow); };
   // 화살표: 끝이 (x,y) 를 가리켜요. 오른쪽 위에서 왼쪽 아래로.
   const arrow = (a, b, f, col) => { const [X, Yp] = xy(+f.x, +f.y);
     add(a, b, 9, 'Draw', `{\\an7\\pos(${X - 60},${Yp - 180})\\org(${X},${Yp})\\frz-35\\1c${col}\\3c&H000000&\\bord3\\fscx70\\fscy70\\t(0,160,\\fscx100\\fscy100)\\p1}m 60 180 l 0 105 l 38 105 l 38 0 l 82 0 l 82 105 l 120 105 l 60 180`); };
@@ -1222,7 +1281,8 @@ async function aibrand(E, ctx) {
   const mergeMy = x => { for (const [k, o] of [['intro', myI], ['outro', myO]]) { x[k] = x[k] || {}; for (const f of ['l1', 'l2', 'cta']) if (String(o[f] || '').trim()) x[k][f] = String(o[f]).trim(); } return x; };
   const allMine = ['l1', 'l2'].every(f => String(myI[f] || '').trim()) && ['l1', 'l2', 'cta'].every(f => String(myO[f] || '').trim());
   let j;
-  if (myAny && (allMine || (prevB && prevB.intro && prevB.outro))) {
+  const reuse = !!E.s.brandReuse; E.s.brandReuse = false;
+  if ((myAny || reuse) && (allMine || (prevB && prevB.intro && prevB.outro))) {
     j = mergeMy(allMine ? { intro: {}, outro: {} } : JSON.parse(JSON.stringify(prevB)));
     ctx.log(allMine ? '인트로·아웃트로 글을 내가 쓴 그대로 써요 (Claude 없이).' : '내가 쓴 칸만 바꾸고 나머지는 전에 만든 글 그대로 (Claude 없이).');
   } else {
