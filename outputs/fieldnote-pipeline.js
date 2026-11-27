@@ -1072,7 +1072,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
       box.dataset.k = key;
       const frame = (o, f, css) => o ? `<video muted playsinline preload="auto" data-br-f="${f}" src="${esc(fileUrl(o.path, o.mtime))}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;${css}"></video>` : '';
       const phone = (id, lab, bg) => `<figure style="margin:0;width:min(240px,44%)"><div data-br="${id}" style="position:relative;aspect-ratio:9/16;background:#000;border-radius:10px;overflow:hidden;container-type:inline-size;border:1px solid var(--line)">${bg}<div data-br-layer style="position:absolute;inset:0"></div></div><figcaption class="small" style="text-align:center;margin-top:4px">${lab}</figcaption></figure>`;
-      box.innerHTML = `<p class="small" style="margin:14px 0 6px"><b style="color:var(--text)">미리보기</b> — 쓰는 대로 바로 바뀌어요. 배경은 실제로 쓰는 장면이고, 로고 자리는 표시만 해요.</p>
+      box.innerHTML = `<p class="small" style="margin:14px 0 6px"><b style="color:var(--text)">미리보기</b> — 쓰는 대로 바로 바뀌어요. 배경 장면·로고는 실제로 쓰는 그대로예요 (움직임만 빠져 있어요).</p>
         <div style="display:flex;gap:14px;flex-wrap:wrap">${phone('in', '인트로 (2.2초, 영상 맨 앞)', frame(cut, 0.02, 'transform:scale(1.98);filter:brightness(.87) saturate(1.25)'))}${phone('out', '아웃트로 (3.2초, 영상 맨 끝)', frame(main, 0.995, 'transform:scale(1.15);filter:blur(2.2cqw) brightness(.68)'))}</div>`;
       box.querySelectorAll('video[data-br-f]').forEach(v => v.addEventListener('loadedmetadata', () => { v.currentTime = Math.max(0, (v.duration || 0) * +v.dataset.brF); }, { once: true }));
     }
