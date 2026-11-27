@@ -1263,8 +1263,10 @@ ${lines.filter(Boolean).map(([a, sty, txt, layer = 1]) => `Dialogue: ${layer},${
   prog({ stage: 'done', live: null, info: [['길이', `인트로 ${IN_D}초 + 본편 ${plan.duration}초 + 아웃트로 ${OUT_D}초`]] });
 }
 
-// ---------- 7. 썸네일: 예쁘게 말고 3단 원색 대비 (상단 노랑 카피 / 중앙 액션|리액션 2분할 / 하단 빨강·파랑 반전 카피) ----------
-const TW = 1280, TH = 720, TOP = 140, BOT = 120;
+// ---------- 7. 썸네일: 예쁘게 말고 3단 원색 대비 (상단 노랑 카피 / 액션·리액션 위아래 2분할 / 하단 빨강·파랑 반전 카피) ----------
+// 쇼츠 크기 1080x1920, 쇼츠 목록에서 잘 보이는 배치 (레퍼런스: 검은 바탕 위에 화면 폭을 꽉 채우는 큰 카피 → 그 아래 장면).
+// 목록 카드는 위아래를 조금 잘라서 (약 9:14) 글자는 y 160 아래에 둬요. 장면 띠는 본편 경기 화면과 같은 높이 (y 680~1440)
+const TW = 1080, TH = 1920, TY = 300, BB = [455, 175], VB = [680, 760];   // TY = 상단 카피 가운데 y, BB/VB = [시작 y, 높이]
 async function aithumb(E, ctx) {
   const info = source(E), plan = readJson(E.p('편집/AI컷.json')), dur = (await probe(info.file, ctx)).duration;
   let fin = {}; try { fin = readJson(E.p('편집/AI완성.json')); } catch {}
@@ -1283,7 +1285,7 @@ async function aithumb(E, ctx) {
   ctx.log('Claude 가 썸네일 카피와 액션·리액션 장면을 골라요…');
   j = await askClaude(E, ctx, `${skills(ctx, ['thumbnail-3tier'])}너는 ${st.genre} 쇼츠 썸네일 작가다. 규칙: 예쁘게 말고 3단 원색 대비.
 - 상단 카피(노랑, 검정 띠): 결정적 순간 1개만. 공백 빼고 12자 이하.
-- 중앙 2분할: 왼쪽 = ${st.thumbL}, 오른쪽 = ${st.thumbR}.
+- 카피 아래 장면 2분할: 왼쪽 = ${st.thumbL}, 오른쪽 = ${st.thumbR}.
 - 하단 카피(흰 글씨, 빨강 또는 파랑 띠): 반전/궁금증. 공백 빼고 16자 이하.
 - 내용 설명형 문장 금지 (그리고/그래서/했는데/하면서 금지). 파스텔·분홍 금지.
 - 띄어쓰기는 맞춤법대로 한다 (글자 수는 공백을 빼고 센다).
@@ -1296,34 +1298,35 @@ ${plan.story ? `[편집 뇌] 이 쇼츠의 질문: "${plan.story.question}" (${p
 ${st.voice ? '카피 화자: ' + st.voice + '\n' : ''}프레임 시트를 Read 로 보고 장면을 골라라:
 ${coarse.length ? `- 전체 영상 2초 간격 6x5 타일: 시트 k(1부터) 타일 i 의 시각 = ((k-1)*30 + i)*2 초\n${coarse.map(f => '  ' + f).join('\n')}\n` : ''}- 고른 구간 0.2초 간격 5x5 타일:
 ${plan.sheets || `원본 ${r1(plan.window[0])}초부터: 시트 k 타일 i 의 시각 = ${r1(plan.window[0])} + ((k-1)*25 + i)*0.2 초\n${fine.map(f => '  ' + f).join('\n')}`}
-x 는 그 프레임에서 인물이 있는 가로 위치(0=왼쪽 끝, 0.5=가운데, 1=오른쪽 끝). 썸네일 칸은 세로로 길어서 x 기준으로 잘라낸다.
+x 는 그 프레임에서 인물이 있는 가로 위치(0=왼쪽 끝, 0.5=가운데, 1=오른쪽 끝). 썸네일은 쇼츠 세로 화면이라 장면 칸이 세로로 길어서(각 540x760) x 기준으로 잘라낸다.
 ${myTop ? `상단 카피는 내가 정했다. 그대로 쓴다: "${myTop}"\n` : ''}${myBot ? `하단 카피는 내가 정했다. 그대로 쓴다: "${myBot}"\n` : ''}JSON 하나만 답해라: {"top":"","bot":"","color":"red|blue","left":{"t":원본초,"x":0.5,"why":""},"right":{"t":원본초,"x":0.5,"why":""}}`,
     x => { if (myTop) x.top = myTop; if (myBot) x.bot = myBot; return !x.top || !x.bot ? 'top, bot 이 있어야 해요.' : !myTop && nos(x.top) > 12 ? `상단 카피가 ${nos(x.top)}자예요 (12자 이하).` : !myBot && nos(x.bot) > 16 ? `하단 카피가 ${nos(x.bot)}자예요 (16자 이하).`
       : /(그리고|그래서|했는데|하면서)/.test((myTop ? '' : x.top) + (myBot ? '' : x.bot)) ? '내용 설명형 단어가 있어요.' : [myTop ? '' : x.top, myBot ? '' : x.bot].some(t => nos(t) >= 7 && !/\s/.test(t)) ? '띄어쓰기가 없어요. 맞춤법대로 띄어 써라.' : !['red', 'blue'].includes(x.color) ? 'color 는 red 또는 blue.'
       : ![x.left, x.right].every(f => f && f.t >= 0 && f.t <= dur && f.x >= 0 && f.x <= 1) ? `left/right 의 t 는 0~${Math.round(dur)}, x 는 0~1.` : Math.abs(x.left.t - x.right.t) < 0.5 ? '왼쪽과 오른쪽은 다른 장면이어야 해요.' : ''; });
   j.mine = { top: !!myTop, bot: !!myBot };
   }
+  j.w = TW; j.h = TH;
   writeJson(E.p('편집/AI썸네일.json'), j);
   prog({ stage: 'render', info: [['상단', j.top], ['하단', j.bot], ['색', j.color === 'blue' ? '파랑' : '빨강'], ['왼쪽 장면', `${r1(j.left.t)}초 ${j.left.why || ''}`], ['오른쪽 장면', `${r1(j.right.t)}초 ${j.right.why || ''}`]] });
   const fitT = (t, base, w) => { const n = [...String(t)].reduce((a, c) => a + (c === ' ' ? 0.35 : /[ -~]/.test(c) ? 0.6 : 1), 0); return Math.min(base, Math.floor(w / Math.max(1, n))); };
   const assF = E.p('편집/AI썸네일.ass');
   fs.writeFileSync(assF, `[Script Info]\nScriptType: v4.00+\nPlayResX: ${TW}\nPlayResY: ${TH}\nScaledBorderAndShadow: yes\n\n[V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: T,${FONT},96,&H0000E6FF&,&H000000FF&,&H00000000&,&H00000000&,-1,0,0,0,100,100,-2,0,1,4,3,5,0,0,0,1
+Style: T,${FONT},96,&H0000E6FF&,&H000000FF&,&H00000000&,&H00000000&,-1,0,0,0,100,100,-2,0,1,6,0,5,0,0,0,1
 Style: B,${FONT},84,&H00FFFFFF&,&H000000FF&,&H00000000&,&H00000000&,-1,0,0,0,100,100,-2,0,1,5,3,5,0,0,0,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-Dialogue: 1,0:00:00.00,0:00:05.00,T,,0,0,0,,{\\an5\\pos(${TW / 2},${TOP / 2 + 2})\\fs${fitT(j.top, 104, 1220)}}${esc(j.top)}
-Dialogue: 1,0:00:00.00,0:00:05.00,B,,0,0,0,,{\\an5\\pos(${TW / 2},${TH - BOT / 2 + 2})\\fs${fitT(j.bot, 88, 1220)}}${esc(j.bot)}
+Dialogue: 1,0:00:00.00,0:00:05.00,T,,0,0,0,,{\\an5\\pos(${TW / 2},${TY})\\fs${Math.min(250, Math.floor(1020 / Math.max(1, textW(String(j.top).replace(/\[\[|\]\]/g, '')))))}}${esc(j.top).replace(/\[\[(.+?)\]\]/g, '{\\c&H3A30FF&}$1{\\c&H0000E6FF&}')}
+Dialogue: 1,0:00:00.00,0:00:05.00,B,,0,0,0,,{\\an5\\pos(${TW / 2},${BB[0] + BB[1] / 2 + 2})\\fs${Math.min(130, Math.floor(960 / Math.max(1, textW(j.bot))))}}${esc(j.bot)}
 `);
-  const q = p => p.replace(/\\/g, '/').replace(/:/g, '\\:').replace(/'/g, "\\'"), MH = TH - TOP - BOT, half = TW / 2;
+  const q = p => p.replace(/\\/g, '/').replace(/:/g, '\\:').replace(/'/g, "\\'"), CW = TW / 2, CH = VB[1];
   const cb = srcArea(plan) ? 0 : Math.min(0.25, Math.max(0, +plan.crop_bottom || 0)), spr = await probe(info.file, ctx);
-  const cell = (i, x) => `${srcPre(plan, spr, `[${i}:v]`, 't' + i)}trim=end_frame=1,setpts=PTS-STARTPTS,${cb ? `crop=iw:trunc(ih*${(1 - cb).toFixed(3)}/2)*2:0:0,` : ''}scale=w=${half}:h=${MH}:force_original_aspect_ratio=increase,crop=${half}:${MH}:x='(iw-${half})*${(+x).toFixed(3)}':y='(ih-${MH})/2',setsar=1[c${i}]`;
+  const cell = (i, x) => `${srcPre(plan, spr, `[${i}:v]`, 't' + i)}trim=end_frame=1,setpts=PTS-STARTPTS,${cb ? `crop=iw:trunc(ih*${(1 - cb).toFixed(3)}/2)*2:0:0,` : ''}scale=w=${CW}:h=${CH}:force_original_aspect_ratio=increase,crop=${CW}:${CH}:x='(iw-${CW})*${(+x).toFixed(3)}':y='(ih-${CH})/2',setsar=1[c${i}]`;
   ctx.log('썸네일 그리는 중…');
   await ff(['-ss', String(j.left.t), '-i', info.file, '-ss', String(j.right.t), '-i', info.file, '-filter_complex',
-    `${cell(0, j.left.x)};${cell(1, j.right.x)};color=c=black:s=${TW}x${TH}:d=1[bg];[bg][c0]overlay=0:${TOP}:shortest=1[a];[a][c1]overlay=${half}:${TOP}[b];` +
-    `[b]drawbox=x=${half - 3}:y=${TOP}:w=6:h=${MH}:color=0xFFE600:t=fill,drawbox=x=0:y=${TH - BOT}:w=${TW}:h=${BOT}:color=${j.color === 'blue' ? '0x0047FF' : '0xE60012'}:t=fill,` +
+    `${cell(0, j.left.x)};${cell(1, j.right.x)};color=c=black:s=${TW}x${TH}:d=1[bg];[bg][c0]overlay=0:${VB[0]}:shortest=1[a];[a][c1]overlay=${CW}:${VB[0]}[b];` +
+    `[b]drawbox=x=${CW - 4}:y=${VB[0]}:w=8:h=${VB[1]}:color=0xFFE600:t=fill,drawbox=x=0:y=${BB[0]}:w=${TW}:h=${BB[1]}:color=${j.color === 'blue' ? '0x0047FF' : '0xE60012'}:t=fill,` +
     `subtitles=filename='${q(assF)}':fontsdir='${q(process.env.FIELDNOTE_AI_FONT_DIR || FONT_DIR)}'[v]`,
     '-map', '[v]', '-frames:v', '1', '-q:v', '2', E.p('편집/AI썸네일.jpg')], ctx);
   ctx.log(`완성: 편집/AI썸네일.jpg · 상단 "${j.top}" · 하단 "${j.bot}"`);
