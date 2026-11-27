@@ -1456,7 +1456,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
     const TT = ytThumbDraft(ep);
     // 썸네일 카피 추천 (Claude 가 이 영상을 보고 위/아래 카피 후보 여러 개 · 눌러서 칸에 넣기)
     const thIdeas = () => { if (!ep || runnerApi < 45) return ''; const I = ep.thumbIdeas, busy = TCI.busy[ep.ep], err = TCI.err[ep.ep], lang = (typeof ytChTarget === 'function' && ytChTarget(ep.channel).lang) || 'both';
-      const red = t => esc(t).replace(/\[\[(.+?)\]\]/g, '<span style="color:#ff5a5a">$1</span>').replace(/\s*\/\s*/g, ' / ');
+      const red = t => esc(t).replace(/\s*\/\s*/g, ' / ').replace(/\[\[(.+?)\]\]/g, '<span style="color:#ff5a5a">$1</span>');
       const card = (x, i) => `<div style="border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:4px">
           <div class="small" style="opacity:.75">${esc(x.angle || '후보 ' + (i + 1))}</div><div style="font-weight:800;font-size:17px;line-height:1.3">${red(x.top)}</div><div style="font-size:14px">${esc(x.bot)}</div>
           ${x.en_top ? `<div class="small" style="margin-top:2px">EN · <b>${red(x.en_top)}</b> — ${esc(x.en_bot)}</div>` : ''}${x.why ? `<div class="small" style="opacity:.7">${esc(x.why)}</div>` : ''}
