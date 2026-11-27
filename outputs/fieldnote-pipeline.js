@@ -1098,12 +1098,50 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
   }
   // ===== 썸네일 미리보기: 실행기 aithumb 과 같은 쇼츠 세로 1080x1920 배치 (위 큰 카피 y300 · 빨강/파랑 띠 455~630 · 장면 2분할 680~1440) =====
   const THJ = {};
+  // 채널 포스터 썸네일 미리보기 (MAT STORY 'B 파이트 포스터'): 실행기 posterThumb 와 같은 배치·글꼴
+  function ytThPoster(box, ep, step, has, fileUrl, J) {
+    if (!document.getElementById('fnPosterFonts')) { const l = document.createElement('link'); l.id = 'fnPosterFonts'; l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=Anton&family=Black+Han+Sans&family=JetBrains+Mono:wght@500&display=swap'; document.head.appendChild(l); }
+    const L = ep.brandLook || {}, cream = '#' + (L.cream || 'F1EBDD'), red = '#' + (L.tape || 'D3242E'), epId = ep.ep;
+    const scene = has('aithumb', '편집/AI썸네일_장면.jpg'), src = (step('download').outputs || []).find(o => o.exists && /\.(mp4|mov|m4v|webm|mkv)$/i.test(o.path));
+    const key = 'p' + ((scene && scene.mtime) || '') + ((src && src.mtime) || '');
+    if (box.dataset.k !== key) {
+      box.dataset.k = key;
+      const bg = scene ? `<img src="${esc(fileUrl(scene))}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:contrast(1.08) saturate(.85)">`
+        : src ? `<video muted playsinline preload="auto" data-th-f="0.35" src="${esc(fileUrl(src))}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:contrast(1.08) saturate(.85)"></video>` : '';
+      const cq = px => (px / 10.8).toFixed(3) + 'cqw', crop = y => `<div style="position:absolute;left:0;right:0;top:${(y / 19.2).toFixed(3)}%;border-top:1px dashed rgba(255,255,255,.5)"></div>`;
+      box.innerHTML = `<p class="small" style="margin:14px 0 6px"><b style="color:var(--text)">미리보기</b> — MAT STORY 채널 포스터 (세로 1080x1920). 쓰는 대로 바로 바뀌어요. 점선 밖은 쇼츠 목록에서 잘려요. ${scene ? '장면은 지금 썸네일 장면.' : '장면은 예시 (실제 장면은 Claude 가 골라요).'}</p>
+        <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap"><div data-pv style="position:relative;width:min(270px,60%);aspect-ratio:9/16;background:#100E0C;container-type:inline-size;overflow:hidden;border-radius:10px;border:1px solid var(--line)">${bg}
+          <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(16,14,12,.96) 0%,rgba(16,14,12,.85) 30%,rgba(16,14,12,0) 52%,rgba(16,14,12,0) 70%,rgba(16,14,12,.92) 88%)"></div>
+          <div style="position:absolute;top:${cq(200)};left:${cq(70)};right:${cq(60)}"><div data-th="top" style="font-family:'Black Han Sans','Apple SD Gothic Neo',sans-serif;letter-spacing:${cq(-2)};line-height:.98;color:${cream};white-space:nowrap"></div>
+            <div style="width:${cq(300)};height:${cq(26)};background:${red};margin:${cq(40)} 0 ${cq(34)}"></div><div data-th="bot" style="font-family:'Black Han Sans','Apple SD Gothic Neo',sans-serif;letter-spacing:${cq(-2)};color:${cream};white-space:nowrap"></div></div>
+          ${L.logo ? `<img alt="" src="${RUNNER}/brand?ep=${encodeURIComponent(epId)}&k=logo" style="position:absolute;left:${cq(70)};top:${cq(1540)};width:${cq(150)};height:${cq(150)};border-radius:50%;object-fit:cover;box-shadow:0 0 0 ${cq(6)} #100E0C,0 0 0 ${cq(10)} ${cream}">` : ''}
+          <div style="position:absolute;left:${cq(L.logo ? 250 : 70)};top:${cq(1560)};color:${cream}"><div style="font-family:Anton,Impact,sans-serif;font-size:${cq(64)};line-height:1;letter-spacing:${cq(1)}">${esc(L.name || '')}</div>
+            <div style="font-family:'JetBrains Mono',Menlo,monospace;font-size:${cq(26)};letter-spacing:${cq(3)};opacity:.8;margin-top:${cq(10)}">${esc(String(L.handle || '').toUpperCase())}${L.tag ? ' · ' + esc(L.tag) : ''}</div></div>${crop(120)}${crop(1800)}</div>
+        <p class="small" data-th-note style="margin:0;max-width:260px"></p></div>`;
+      box.querySelectorAll('video[data-th-f]').forEach(v => v.addEventListener('loadedmetadata', () => { v.currentTime = (v.duration || 0) * +v.dataset.thF; }, { once: true }));
+    }
+    const T = ytThumbDraft(ep), escH = t => String(t || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const raw = String(T.top || '').trim() || J.top || '위 제목 / 두 줄', real = !!(String(T.top || '').trim() || J.top);
+    let lines = raw.includes('/') ? raw.split('/').map(x => x.trim()).filter(Boolean).slice(0, 2) : [raw];
+    if (lines.length === 1 && /\s/.test(raw) && raw.replace(/\[\[|\]\]/g, '').length > 4) { const sp = [...raw.matchAll(/\s+/g)].map(m => m.index), mid = raw.length / 2, k = sp.sort((a, b) => Math.abs(a - mid) - Math.abs(b - mid))[0]; lines = [raw.slice(0, k).trim(), raw.slice(k).trim()]; }
+    const pv = box.querySelector('[data-pv]'), W = pv ? pv.clientWidth * 950 / 1080 : 0;
+    const fitEl = (el, px) => { el.style.fontSize = (px / 10.8) + 'cqw'; let f = px; while (W && el.scrollWidth > W && f > 40) { f -= 4; el.style.fontSize = (f / 10.8) + 'cqw'; } };
+    const top = box.querySelector('[data-th="top"]'), bot = box.querySelector('[data-th="bot"]');
+    if (top) { top.innerHTML = lines.map(l => escH(l).replace(/\[\[(.+?)\]\]/g, `<span style="color:${red}">$1</span>`)).join('<br>'); top.style.opacity = real ? 1 : .45; fitEl(top, 190); }
+    const bt = String(T.bot || '').trim() || J.bot || '아래 한 줄 (비우면 Claude)';
+    if (bot) { bot.textContent = bt.replace(/\[\[|\]\]/g, ''); bot.style.opacity = (String(T.bot || '').trim() || J.bot) ? 1 : .45; fitEl(bot, 84); }
+    if (document.fonts && !box.dataset.fw) { box.dataset.fw = 1; document.fonts.ready.then(() => ytThPrevMount()); }
+    const note = box.querySelector('[data-th-note]');
+    if (note) note.innerHTML = ['위 제목은 띄어쓰기에서 두 줄로 나뉘어요. 직접 나누려면 <b>/</b> (예: 전설의 / 방어).', '<b>[[단어]]</b> 는 빨강.', step('aithumb').status === 'done' && J.layout !== 'poster' ? '지금 썸네일은 예전 모양이에요. "다시 만들기"를 누르면 이 모양으로 다시 그려요.' : ''].filter(Boolean).join('<br>');
+  }
   function ytThPrevMount() {
     const box = document.getElementById('plThPrev'); if (!box) return;
     const epId = box.dataset.ep, ep = (runnerData && runnerData.episodes || []).find(e => e.ep === epId); if (!ep) return;
     const step = id => (ep.steps || []).find(x => x.id === id) || {}, has = (id, r) => (step(id).outputs || []).find(o => o.path === r && o.exists);
     const fileUrl = (o) => `${RUNNER}/file?ep=${encodeURIComponent(epId)}&path=${encodeURIComponent(o.path)}&t=${o.mtime || ''}`;
     const js = has('aithumb', '편집/AI썸네일.json'), J = (THJ[epId] && THJ[epId].j) || {};
+    if (js && (!THJ[epId] || THJ[epId].m !== js.mtime)) { THJ[epId] = { m: js.mtime, j: null }; fetch(fileUrl(js)).then(r => r.json()).then(j => { THJ[epId].j = j; ytThPrevMount(); }).catch(() => {}); }
+    if ((ep.brandLook || {}).thumb === 'poster') return ytThPoster(box, ep, step, has, fileUrl, J);
     const img = step('aithumb').status === 'done' && J.w === 1080 && has('aithumb', '편집/AI썸네일.jpg'), cut = (step('download').outputs || []).find(o => o.exists && /\.(mp4|mov|m4v|webm|mkv)$/i.test(o.path)) || has('aicut', '편집/AI1차컷.mp4');
     if (js && (!THJ[epId] || THJ[epId].m !== js.mtime)) { THJ[epId] = { m: js.mtime, j: null }; fetch(fileUrl(js)).then(r => r.json()).then(j => { THJ[epId].j = j; ytThPrevMount(); }).catch(() => {}); }
     const key = img ? 'i' + (img.mtime || '') : 'c' + ((cut && cut.mtime) || '');

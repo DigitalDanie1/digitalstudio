@@ -2,6 +2,8 @@
 // 단계: aicut(편집/AI컷.json, AI1차컷.mp4) -> aistyle(편집/AI완성.json 제목·라벨·팝업, AI스타일본.mp4) -> aisubs(자막 추가, AI완성.mp4)
 // 인트로·아웃트로는 모든 단계에서 후크로 다뤄요: 컷(첫 컷 intro, 마지막 컷 outro) / 스타일(위 제목) / 자막(0초 후크, 마지막 줄 후크).
 import fs from 'node:fs';
+import os from 'node:os';
+import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
@@ -49,7 +51,7 @@ const TALK_RULES = ['자막과 문장은 모두 한국어로만. 영어 문장�
 export const AI_STYLES = {
   'yt-mat': { ...SPORT, genre: '레슬링', name: 'MAT STORY', handle: '@matstoryhq', logo: '브랜드/matstory_avatar.png', logoAlt: '브랜드/matstory_logo.png', watermark: ['MAT', 'STORY'],
     // 채널 애셋(프로필 구두·레슬링화 + 배너 MAT/STORY·빨간 막대): ~/Desktop/유투브/브랜드 의 투명 PNG, 없으면 예전처럼 글자·옛 로고로
-    brand: { mark: '브랜드/matstory_mark.png', lockup: '브랜드/matstory_lockup.png', handle: '브랜드/matstory_handle.png', tape: 'D3242E', cream: 'F1EBDD' }, yellow: 'FFD600', red: 'FF3B30', tone: '반말, 짧고 세게. 레슬링을 모르는 사람도 알아듣게. 위 제목 2줄 끝에 "ㄷㄷ" 가능.',
+    brand: { mark: '브랜드/matstory_mark.png', lockup: '브랜드/matstory_lockup.png', handle: '브랜드/matstory_handle.png', tape: 'D3242E', cream: 'F1EBDD', thumb: 'poster', tag: '퇴근 후 분석' }, yellow: 'FFD600', red: 'FF3B30', tone: '반말, 짧고 세게. 레슬링을 모르는 사람도 알아듣게. 위 제목 2줄 끝에 "ㄷㄷ" 가능.',
     // 화자: 채널이 아니라 퇴근하고 매트에 가는 30대 직장인 생활체육 레슬러 (MAT STORY | Wrestling Breakdowns After Work)
     voice: `이 채널은 방송·해설 채널이 아니라, 퇴근하고 매트에 가는 30대 직장인 생활체육 레슬러 한 사람이 운영한다 (20대 후반에 레슬링을 시작한 일반인, 주 5회 운동).
 - 말투는 운동 끝나고 친구한테 영상 보여 주며 하는 말. 프로 해설자·뉴스 말투, "여러분", "오늘은 ~를 알아보겠습니다" 금지.
@@ -90,7 +92,7 @@ Object.assign(AI_STYLES, {
     fx: '라벨·팝업은 쓰지 않는다. fx 는 빈 배열.',
     caps: '- 자막은 영상 안 아래쪽에 노란 글씨로 짧게 (예: "(순식간에 뒤집힘)"). 괄호 감탄도 좋다.' },
 });
-export const AI_OUT = { aicut: ['편집/AI컷.json', '편집/AI1차컷.mp4'], aistyle: ['조사/research.md', '편집/AI완성.json', '편집/AI스타일본.mp4'], aisubs: ['편집/AI자막.json', '편집/AI완성.mp4'], aibrand: ['편집/AI인트로.mp4', '편집/AI아웃트로.mp4', '편집/AI최종.mp4'], aithumb: ['편집/AI썸네일.jpg', '편집/AI썸네일.json'] };
+export const AI_OUT = { aicut: ['편집/AI컷.json', '편집/AI1차컷.mp4'], aistyle: ['조사/research.md', '편집/AI완성.json', '편집/AI스타일본.mp4'], aisubs: ['편집/AI자막.json', '편집/AI완성.mp4'], aibrand: ['편집/AI인트로.mp4', '편집/AI아웃트로.mp4', '편집/AI최종.mp4'], aithumb: ['편집/AI썸네일.jpg', '편집/AI썸네일.json', '편집/AI썸네일_장면.jpg'] };
 
 // 맥의 Claude Code 스킬(~/.claude/skills). 단계마다 해당 스킬 규칙을 먼저 읽고 따르게 해요. 없으면 건너뛰어요.
 const SKILL_DIR = path.join(HOME, '.claude/skills');
@@ -1155,7 +1157,7 @@ const IN_D = 2.2, OUT_D = 3.2;
 export function brandAssetOf(E, k) { const st = styleOf(E), B = st.brand || {}, root = E.homeRoot || path.join(HOME, 'Desktop/유투브');
   return k === 'logo' ? brandFile(root, st.logo, st.logoAlt) : k === 'lockup' ? brandFile(root, B.lockup) : k === 'handle' ? brandFile(root, B.handle) : null; }
 export function brandLookOf(E) { try { const st = styleOf(E), B = st.brand || {}, a = k => { try { return !!brandAssetOf(E, k); } catch { return false; } };
-  return { tape: B.tape || '', cream: B.cream || '', yellow: st.yellow || 'FFD600', red: st.red || 'FF3B30', cta: st.cta || '', name: st.name || '', handle: st.handle || '', logo: a('logo'), lockup: a('lockup'), handleImg: a('handle') }; } catch { return null; } }
+  return { tape: B.tape || '', cream: B.cream || '', yellow: st.yellow || 'FFD600', red: st.red || 'FF3B30', cta: st.cta || '', name: st.name || '', handle: st.handle || '', thumb: B.thumb || '', tag: B.tag || '', logo: a('logo'), lockup: a('lockup'), handleImg: a('handle') }; } catch { return null; } }
 async function aibrand(E, ctx) {
   const st = styleOf(E), info = source(E), plan = readJson(E.p('편집/AI컷.json'));
   // 본편: 자막 단계를 했으면 AI완성.mp4, 안 했으면 스타일본 (자막 단계는 작업판에서 뺐어요)
@@ -1267,6 +1269,40 @@ ${lines.filter(Boolean).map(([a, sty, txt, layer = 1]) => `Dialogue: ${layer},${
 // 쇼츠 크기 1080x1920, 쇼츠 목록에서 잘 보이는 배치 (레퍼런스: 검은 바탕 위에 화면 폭을 꽉 채우는 큰 카피 → 그 아래 장면).
 // 목록 카드는 위아래를 조금 잘라서 (약 9:14) 글자는 y 160 아래에 둬요. 장면 띠는 본편 경기 화면과 같은 높이 (y 680~1440)
 const TW = 1080, TH = 1920, TY = 300, BB = [455, 175], VB = [680, 760];   // TY = 상단 카피 가운데 y, BB/VB = [시작 y, 높이]
+// 채널 포스터 썸네일 (MAT STORY 'B 파이트 포스터' 시안): 장면 하나 꽉 + 위 큰 크림 제목(Black Han Sans) + 빨간 막대 + 아래 프로필·채널명.
+// 글꼴이 맥에 없어서 크롬으로 그려요 (웹 글꼴). 크롬이 없거나 실패하면 null → 기본 3단 배치로 그려요
+const CHROME = process.env.FIELDNOTE_CHROME || ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', path.join(HOME, 'Applications/Google Chrome.app/Contents/MacOS/Google Chrome')].find(exists) || '';
+async function posterThumb(E, ctx, j, st, frame) {
+  if (!CHROME) { ctx.log('  크롬이 없어서 기본 썸네일 모양으로 그려요.'); return null; }
+  const B = st.brand || {}, logo = brandAssetOf(E, 'logo'), h = t => String(t || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  // 위 제목 두 줄: "/" 로 직접 나누거나, 아니면 가운데에 가까운 띄어쓰기에서 나눠요
+  const raw = String(j.top || '').trim(); let lines = raw.includes('/') ? raw.split('/').map(x => x.trim()).filter(Boolean).slice(0, 2) : [raw];
+  if (lines.length === 1 && /\s/.test(raw) && raw.replace(/\[\[|\]\]/g, '').length > 4) { const sp = [...raw.matchAll(/\s+/g)].map(m => m.index), mid = raw.length / 2, k = sp.sort((a, b) => Math.abs(a - mid) - Math.abs(b - mid))[0]; lines = [raw.slice(0, k).trim(), raw.slice(k).trim()]; }
+  const red = t => h(t).replace(/\[\[(.+?)\]\]/g, '<span style="color:#D3242E">$1</span>');
+  const url = f => 'file://' + encodeURI(f).replace(/#/g, '%23');
+  const html = `<!doctype html><html><head><meta charset="utf-8"><link href="https://fonts.googleapis.com/css2?family=Anton&family=Black+Han+Sans&family=JetBrains+Mono:wght@500&display=block" rel="stylesheet">
+<style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:1080px;height:1920px;overflow:hidden;background:#100E0C}
+.kr{font-family:'Black Han Sans','Apple SD Gothic Neo',sans-serif;letter-spacing:-2px;color:#${B.cream || 'F1EBDD'};white-space:nowrap}
+#bg{position:absolute;inset:0;background:url("${url(frame)}") center/cover;filter:contrast(1.08) saturate(.85)}
+#sh{position:absolute;inset:0;background:linear-gradient(180deg,rgba(16,14,12,.96) 0%,rgba(16,14,12,.85) 30%,rgba(16,14,12,0) 52%,rgba(16,14,12,0) 70%,rgba(16,14,12,.92) 88%)}
+#av{position:absolute;left:70px;top:1540px;width:150px;height:150px;border-radius:50%;background:url("${logo ? url(logo) : ''}") center/cover #222;box-shadow:0 0 0 6px #100E0C,0 0 0 10px #${B.cream || 'F1EBDD'}}</style></head><body>
+<div id="bg"></div><div id="sh"></div>
+<div style="position:absolute;top:200px;left:70px;right:60px"><div id="t" class="kr" style="font-size:190px;line-height:.98">${lines.map(red).join('<br>')}</div>
+<div style="width:300px;height:26px;background:#${B.tape || 'D3242E'};margin:40px 0 34px"></div><div id="b" class="kr" style="font-size:84px">${h(String(j.bot || '').replace(/\[\[|\]\]/g, ''))}</div></div>
+${logo ? '<div id="av"></div>' : ''}<div style="position:absolute;left:${logo ? 250 : 70}px;top:1560px;color:#${B.cream || 'F1EBDD'}"><div style="font-family:Anton,Impact,sans-serif;font-size:64px;line-height:1;letter-spacing:1px">${h(st.name || '')}</div>
+<div style="font-family:'JetBrains Mono',Menlo,monospace;font-size:26px;letter-spacing:3px;opacity:.8;margin-top:10px">${h(String(st.handle || '').toUpperCase())}${B.tag ? ' · ' + h(B.tag) : ''}</div></div>
+<script>document.fonts.ready.then(()=>{for(const [id,max] of [['t',950],['b',950]]){const el=document.getElementById(id);let fs=parseFloat(el.style.fontSize);while(el.scrollWidth>max&&fs>40){fs-=4;el.style.fontSize=fs+'px'}}})</script></body></html>`;
+  const hf = E.p('편집/AI썸네일.html'), png = E.p('편집/AI썸네일.png');
+  fs.writeFileSync(hf, html); try { fs.unlinkSync(png); } catch {}
+  try {
+    await new Promise((res, rej) => { const c = spawn(CHROME, ['--headless=new', '--disable-gpu', '--hide-scrollbars', '--no-first-run', '--allow-file-access-from-files', `--user-data-dir=${path.join(os.tmpdir(), 'fieldnote-chrome')}`, '--virtual-time-budget=8000', '--window-size=1080,1920', `--screenshot=${png}`, url(hf)], { stdio: 'ignore' });
+      const t = setTimeout(() => { c.kill('SIGKILL'); rej(new Error('크롬이 90초 안에 끝나지 않았어요')); }, 90000); c.on('error', e => { clearTimeout(t); rej(e); }); c.on('exit', () => { clearTimeout(t); res(); }); });
+  } catch (e) { ctx.log('  크롬으로 그리기 실패 — 기본 모양으로 그려요: ' + String(e.message || e).slice(0, 120)); return null; }
+  if (!exists(png)) return null;
+  await ff(['-y', '-i', png, '-q:v', '2', E.p('편집/AI썸네일.jpg')], ctx);
+  try { fs.unlinkSync(png); } catch {}
+  return true;
+}
 async function aithumb(E, ctx) {
   const info = source(E), plan = readJson(E.p('편집/AI컷.json')), dur = (await probe(info.file, ctx)).duration;
   let fin = {}; try { fin = readJson(E.p('편집/AI완성.json')); } catch {}
@@ -1299,7 +1335,7 @@ ${st.voice ? '카피 화자: ' + st.voice + '\n' : ''}프레임 시트를 Read �
 ${coarse.length ? `- 전체 영상 2초 간격 6x5 타일: 시트 k(1부터) 타일 i 의 시각 = ((k-1)*30 + i)*2 초\n${coarse.map(f => '  ' + f).join('\n')}\n` : ''}- 고른 구간 0.2초 간격 5x5 타일:
 ${plan.sheets || `원본 ${r1(plan.window[0])}초부터: 시트 k 타일 i 의 시각 = ${r1(plan.window[0])} + ((k-1)*25 + i)*0.2 초\n${fine.map(f => '  ' + f).join('\n')}`}
 x 는 그 프레임에서 인물이 있는 가로 위치(0=왼쪽 끝, 0.5=가운데, 1=오른쪽 끝). 썸네일은 쇼츠 세로 화면이라 장면 칸이 세로로 길어서(각 540x760) x 기준으로 잘라낸다.
-${myTop ? `상단 카피는 내가 정했다. 그대로 쓴다: "${myTop}"\n` : ''}${myBot ? `하단 카피는 내가 정했다. 그대로 쓴다: "${myBot}"\n` : ''}JSON 하나만 답해라: {"top":"","bot":"","color":"red|blue","left":{"t":원본초,"x":0.5,"why":""},"right":{"t":원본초,"x":0.5,"why":""}}`,
+${(st.brand || {}).thumb === 'poster' ? '이 채널 썸네일은 왼쪽(left) 장면 하나만 화면 가득 크게 쓴다. left 는 인물이 크게 잡히고 동작이 가장 폭발적인 프레임으로 골라라. 상단 카피는 두 줄로 크게 들어간다 (띄어쓰기로 나뉨).\n' : ''}${myTop ? `상단 카피는 내가 정했다. 그대로 쓴다: "${myTop}"\n` : ''}${myBot ? `하단 카피는 내가 정했다. 그대로 쓴다: "${myBot}"\n` : ''}JSON 하나만 답해라: {"top":"","bot":"","color":"red|blue","left":{"t":원본초,"x":0.5,"why":""},"right":{"t":원본초,"x":0.5,"why":""}}`,
     x => { if (myTop) x.top = myTop; if (myBot) x.bot = myBot; return !x.top || !x.bot ? 'top, bot 이 있어야 해요.' : !myTop && nos(x.top) > 12 ? `상단 카피가 ${nos(x.top)}자예요 (12자 이하).` : !myBot && nos(x.bot) > 16 ? `하단 카피가 ${nos(x.bot)}자예요 (16자 이하).`
       : /(그리고|그래서|했는데|하면서)/.test((myTop ? '' : x.top) + (myBot ? '' : x.bot)) ? '내용 설명형 단어가 있어요.' : [myTop ? '' : x.top, myBot ? '' : x.bot].some(t => nos(t) >= 7 && !/\s/.test(t)) ? '띄어쓰기가 없어요. 맞춤법대로 띄어 써라.' : !['red', 'blue'].includes(x.color) ? 'color 는 red 또는 blue.'
       : ![x.left, x.right].every(f => f && f.t >= 0 && f.t <= dur && f.x >= 0 && f.x <= 1) ? `left/right 의 t 는 0~${Math.round(dur)}, x 는 0~1.` : Math.abs(x.left.t - x.right.t) < 0.5 ? '왼쪽과 오른쪽은 다른 장면이어야 해요.' : ''; });
@@ -1324,6 +1360,11 @@ Dialogue: 1,0:00:00.00,0:00:05.00,B,,0,0,0,,{\\an5\\pos(${TW / 2},${BB[0] + BB[1
   const cb = srcArea(plan) ? 0 : Math.min(0.25, Math.max(0, +plan.crop_bottom || 0)), spr = await probe(info.file, ctx);
   const cell = (i, x) => `${srcPre(plan, spr, `[${i}:v]`, 't' + i)}trim=end_frame=1,setpts=PTS-STARTPTS,${cb ? `crop=iw:trunc(ih*${(1 - cb).toFixed(3)}/2)*2:0:0,` : ''}scale=w=${CW}:h=${CH}:force_original_aspect_ratio=increase,crop=${CW}:${CH}:x='(iw-${CW})*${(+x).toFixed(3)}':y='(ih-${CH})/2',setsar=1[c${i}]`;
   ctx.log('썸네일 그리는 중…');
+  if ((st.brand || {}).thumb === 'poster') {   // 채널 포스터: 왼쪽(액션) 장면 하나를 1080x1920 으로 꽉 채워 뽑고 크롬으로 그려요
+    const fr = E.p('편집/AI썸네일_장면.jpg');
+    await ff(['-y', '-ss', String(j.left.t), '-i', info.file, '-filter_complex', `${srcPre(plan, spr, '[0:v]', 'p0')}trim=end_frame=1,setpts=PTS-STARTPTS,${cb ? `crop=iw:trunc(ih*${(1 - cb).toFixed(3)}/2)*2:0:0,` : ''}scale=w=${TW}:h=${TH}:force_original_aspect_ratio=increase,crop=${TW}:${TH}:x='(iw-${TW})*${(+j.left.x).toFixed(3)}':y='(ih-${TH})/2',setsar=1[v]`, '-map', '[v]', '-frames:v', '1', '-q:v', '2', fr], ctx);
+    if (await posterThumb(E, ctx, j, st, fr)) { j.layout = 'poster'; writeJson(E.p('편집/AI썸네일.json'), j); ctx.log(`완성: 편집/AI썸네일.jpg (채널 포스터) · 상단 "${j.top}" · 하단 "${j.bot}"`); prog({ stage: 'done', image: { path: '편집/AI썸네일.jpg', cap: '썸네일' } }); return; }
+  }
   await ff(['-ss', String(j.left.t), '-i', info.file, '-ss', String(j.right.t), '-i', info.file, '-filter_complex',
     `${cell(0, j.left.x)};${cell(1, j.right.x)};color=c=black:s=${TW}x${TH}:d=1[bg];[bg][c0]overlay=0:${VB[0]}:shortest=1[a];[a][c1]overlay=${CW}:${VB[0]}[b];` +
     `[b]drawbox=x=${CW - 4}:y=${VB[0]}:w=8:h=${VB[1]}:color=0xFFE600:t=fill,drawbox=x=0:y=${BB[0]}:w=${TW}:h=${BB[1]}:color=${j.color === 'blue' ? '0x0047FF' : '0xE60012'}:t=fill,` +
