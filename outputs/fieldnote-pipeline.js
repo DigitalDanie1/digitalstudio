@@ -918,7 +918,9 @@
   function ytThumbDraft(ep) { const k = 't:' + (ep ? ep.ep : ''); if (!YD[k]) { const o = (ep && ep.thumbText) || {}; YD[k] = { top: o.top || '', bot: o.bot || '' }; } return YD[k]; }
   // 위 고정 제목 두 줄 (스타일 단계에서 내가 직접 · 비우면 Claude 가 써요)
   function ytTitleDraft(ep) { const k = 'h:' + (ep ? ep.ep : ''); if (!YD[k]) { const o = (ep && ep.titleText) || {}; YD[k] = { l1: o.l1 || '', l2: o.l2 || '' }; } return YD[k]; }
-  window.ytAiExtra = (ep, ids) => { const x = {}; if (ids.includes('aistyle')) x.title = { ...ytTitleDraft(ep) }; if (ids.includes('aisubs')) x.subs = { ...ytSubDraft(ep) }; if (ids.includes('aithumb')) x.thumb = { ...ytThumbDraft(ep) }; return x; };
+  // 인트로·아웃트로 글 (내가 직접 · 비우면 전에 만든 글, 없으면 Claude)
+  function ytBrandDraft(ep) { const k = 'b:' + (ep ? ep.ep : ''); if (!YD[k]) { const o = (ep && ep.brandText) || {}, i = o.intro || {}, u = o.outro || {}; YD[k] = { i1: i.l1 || '', i2: i.l2 || '', o1: u.l1 || '', o2: u.l2 || '', cta: u.cta || '' }; } return YD[k]; }
+  window.ytAiExtra = (ep, ids) => { const x = {}; if (ids.includes('aibrand')) { const b = ytBrandDraft(ep); x.brand = { intro: { l1: b.i1, l2: b.i2 }, outro: { l1: b.o1, l2: b.o2, cta: b.cta } }; } if (ids.includes('aistyle')) x.title = { ...ytTitleDraft(ep) }; if (ids.includes('aisubs')) x.subs = { ...ytSubDraft(ep) }; if (ids.includes('aithumb')) x.thumb = { ...ytThumbDraft(ep) }; return x; };
   // 만든 자막 목록 (편집/AI자막.json) 은 실행기에서 받아 와서 기억해요
   const SJ = {};
   function ytSubJson(ep, o) { const k = ep.ep + ':' + (o.mtime || ''); if (SJ[k] !== undefined) return SJ[k]; SJ[k] = null;
@@ -1054,6 +1056,46 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
       ${tail ? `<pre class="small" style="white-space:pre-wrap;margin:8px 0 0;opacity:.85">${tail}</pre>` : ''}</details>`;
   }
   window.ytRefA = { RA, RK, poll: refPoll, panel: refPanel, start: refStart, img: refImg };
+  // ===== 인트로·아웃트로 미리보기: 실행기 aibrand 와 같은 자리·크기·색 (1080x1920 기준, 채널 테이프 스타일이면 강조어 뒤 빨간 테이프) =====
+  const BRJ = {};
+  function ytBrPrevMount() {
+    const box = document.getElementById('plBrPrev'); if (!box) return;
+    const epId = box.dataset.ep, ep = (runnerData && runnerData.episodes || []).find(e => e.ep === epId); if (!ep) return;
+    const step = id => (ep.steps || []).find(x => x.id === id) || {}, has = (id, r) => (step(id).outputs || []).find(o => o.path === r && o.exists);
+    const fileUrl = (r, m) => `${RUNNER}/file?ep=${encodeURIComponent(epId)}&path=${encodeURIComponent(r)}&t=${m || ''}`;
+    const cut = has('aicut', '편집/AI1차컷.mp4'), main = has('aisubs', '편집/AI완성.mp4') || has('aistyle', '편집/AI스타일본.mp4'), done = step('aibrand').status === 'done';
+    const fin = has('aibrand', '편집/AI최종.mp4'), fm = fin && fin.mtime;
+    if (done && (!BRJ[epId] || BRJ[epId].m !== fm)) { BRJ[epId] = { m: fm, j: null }; fetch(fileUrl('편집/AI인트로아웃트로.json', Date.now())).then(r => r.ok ? r.json() : null).then(j => { BRJ[epId].j = j; ytBrPrevMount(); }).catch(() => {}); }
+    const L = ep.brandLook || {}, tape = L.tape ? '#' + L.tape : '', cream = L.cream ? '#' + L.cream : '#fff', Y = '#' + (L.yellow || 'FFD600'), R = '#' + (L.red || 'FF3B30');
+    const key = (cut && cut.mtime) + '|' + (main && main.mtime);
+    if (box.dataset.k !== key) {
+      box.dataset.k = key;
+      const frame = (o, f, css) => o ? `<video muted playsinline preload="auto" data-br-f="${f}" src="${esc(fileUrl(o.path, o.mtime))}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;${css}"></video>` : '';
+      const phone = (id, lab, bg) => `<figure style="margin:0;width:min(240px,44%)"><div data-br="${id}" style="position:relative;aspect-ratio:9/16;background:#000;border-radius:10px;overflow:hidden;container-type:inline-size;border:1px solid var(--line)">${bg}<div data-br-layer style="position:absolute;inset:0"></div></div><figcaption class="small" style="text-align:center;margin-top:4px">${lab}</figcaption></figure>`;
+      box.innerHTML = `<p class="small" style="margin:14px 0 6px"><b style="color:var(--text)">미리보기</b> — 쓰는 대로 바로 바뀌어요. 배경은 실제로 쓰는 장면이고, 로고 자리는 표시만 해요.</p>
+        <div style="display:flex;gap:14px;flex-wrap:wrap">${phone('in', '인트로 (2.2초, 영상 맨 앞)', frame(cut, 0.02, 'transform:scale(1.98);filter:brightness(.87) saturate(1.25)'))}${phone('out', '아웃트로 (3.2초, 영상 맨 끝)', frame(main, 0.995, 'transform:scale(1.15);filter:blur(2.2cqw) brightness(.68)'))}</div>`;
+      box.querySelectorAll('video[data-br-f]').forEach(v => v.addEventListener('loadedmetadata', () => { v.currentTime = Math.max(0, (v.duration || 0) * +v.dataset.brF); }, { once: true }));
+    }
+    const B = ytBrandDraft(ep), J = (BRJ[epId] && BRJ[epId].j) || {}, JI = J.intro || {}, JO = J.outro || {};
+    const pick = (mine, prev, ph) => { const m = String(mine || '').trim(); return m ? [m, 1] : prev ? [prev, 1] : [ph, 0]; };
+    const fit = (t, base) => { const n = [...String(t).replace(/\[\[|\]\]/g, '')].reduce((a, c) => a + (c === ' ' ? 0.35 : /[ -~]/.test(c) ? 0.6 : 1), 0); return Math.min(base, Math.floor(960 / Math.max(1, n))); };
+    const cq = px => (px / 10.8).toFixed(2) + 'cqw', escH = t => String(t || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    // y: 1920 기준 가운데 높이, base: 글자 크기, bord: 외곽선 굵기, body: 글자색, hi: 강조어 (tape=테이프 / 색)
+    const line = (t, real, y, base, bord, body, hi, extra = '') => `<div style="position:absolute;left:0;right:0;top:${(y / 19.2).toFixed(2)}%;transform:translateY(-50%);text-align:center;white-space:nowrap;font-family:'Apple SD Gothic Neo','Noto Sans KR',sans-serif;font-weight:800;line-height:1.15;font-size:${cq(fit(t, base))};color:${body};-webkit-text-stroke:${cq(bord * 2)} #000;paint-order:stroke fill;opacity:${real ? 1 : .45};${extra}">${escH(t).replace(/\[\[(.+?)\]\]/g, (_, w) => hi === 'tape' ? `<span style="background:${tape};color:${cream};-webkit-text-stroke:0;padding:0 ${cq(14)}">${w}</span>` : `<span style="color:${hi}">${w}</span>`)}</div>`;
+    const bImg = (k, y, w) => `<img alt="" src="${RUNNER}/brand?ep=${encodeURIComponent(epId)}&k=${k}" style="position:absolute;left:50%;top:${(y / 19.2).toFixed(2)}%;transform:translate(-50%,-50%);width:${cq(w)}">`;
+    const logo = (y, w) => L.logo ? bImg('logo', y, w) : `<div style="position:absolute;left:50%;top:${(y / 19.2).toFixed(2)}%;transform:translate(-50%,-50%);width:${cq(w)};aspect-ratio:1;border:2px dashed rgba(255,255,255,.55);border-radius:50%;display:grid;place-items:center;color:#fff;font-size:${cq(44)};font-weight:700;text-align:center;line-height:1.2">${escH(L.name || '로고')}<br>로고</div>`;
+    const [i1, r1] = pick(B.i1, JI.l1, '인트로 첫 줄'), [i2, r2] = pick(B.i2, JI.l2, '인트로 [[둘째]] 줄'), [o1, r3] = pick(B.o1, JO.l1, '아웃트로 첫 줄'), [o2, r4] = pick(B.o2, JO.l2, '아웃트로 둘째 줄'), [ct, r5] = pick(B.cta, JO.cta, '구독하고 다음 기술 보기');
+    const handle = (y) => tape && L.handleImg ? bImg('handle', y, 520) : L.handle ? `<div style="position:absolute;left:0;right:0;top:${(y / 19.2).toFixed(2)}%;transform:translateY(-50%);text-align:center;color:#fff;font-weight:700;font-size:${cq(56)};-webkit-text-stroke:${cq(8)} #000;paint-order:stroke fill">${escH(L.handle)}</div>` : '';
+    const inL = tape ? line(i1, r1, 460, 100, 9, cream, 'tape') + line(i2, r2, 640, 156, 11, cream, 'tape') + logo(1300, 330) + handle(1500)
+      : line(i1, r1, 460, 100, 9, '#fff', Y) + line(i2, r2, 640, 156, 11, Y, Y) + logo(1290, 470) + handle(1570);
+    const ctaBox = tape ? line(ct, r5, 1460, 76, 0, cream, 'tape', `-webkit-text-stroke:0;`).replace('<div style="', `<div style="transform:translateY(-50%) rotate(-1.5deg);`).replace(/>([^<]*)<\/div>$/, (m, t) => `><span style="background:${tape};padding:${cq(16)} ${cq(28)}">${t}</span></div>`)
+      : line(ct, r5, 1420, 100, 0, '#fff', Y, `-webkit-text-stroke:${cq(20)} ${L.cta ? '#' + L.cta : R};`);
+    const outL = tape ? line(o1, r3, 300, 92, 9, cream, R) + line(o2, r4, 420, 92, 9, cream, R) + logo(810, 420) + (L.lockup ? bImg('lockup', 1190, 820) : '') + ctaBox + handle(1590)
+      : line(o1, r3, 360, 100, 9, '#fff', Y) + line(o2, r4, 470, 100, 9, Y, Y) + logo(930, 520) + ctaBox + handle(1540);
+    const li = box.querySelector('[data-br="in"] [data-br-layer]'), lo = box.querySelector('[data-br="out"] [data-br-layer]');
+    if (li) li.innerHTML = inL; if (lo) lo.innerHTML = outL;
+    document.querySelectorAll('[data-pl-br]').forEach(el => { const ph = { i1: JI.l1, i2: JI.l2, o1: JO.l1, o2: JO.l2, cta: JO.cta }[el.dataset.plBr]; if (ph) el.placeholder = ph; });
+  }
   // ===== 썸네일 미리보기: 실행기 aithumb 과 같은 비율·색·글꼴 (1280x720, 위 띠 140 · 아래 띠 120, 노랑 FFE600 · 빨강 E60012 / 파랑 0047FF) =====
   const THJ = {};
   function ytThPrevMount() {
@@ -1324,8 +1366,13 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
       isDone: () => subDone || subSkip || ok('aibrand'), statusLine: runLine(SU),
       result: () => ep ? errOf(SU) + (runnerApi >= 19 && (runIn(SU) || subDone) ? ytStepLive(ep, SU[0], runIn(SU)) : '') + (subDone ? ba('aistyle', '편집/AI스타일본.mp4', 'aisubs', '편집/AI완성.mp4', '스타일본 (자막 전)', '자막 넣은 뒤') + getf('aisubs', [['편집/AI완성.mp4', '자막 넣은 영상']]) + subTable() : '') + logs(SU) : '',
     });
-    const BR = ['aibrand'], brDone = ok('aibrand');
+    const BR = ['aibrand'], brDone = ok('aibrand'), BT = ytBrandDraft(ep), brOk = runnerApi >= 41;
+    const brIn = (k, lab, ph) => `<label>${lab}<input class="pl-input" data-pl-br="${k}" maxlength="30" placeholder="${esc(ph)}" value="${esc(BT[k])}" ${brOk ? '' : 'disabled'}></label>`;
     const c5 = card(4, {
+      body: () => styDone ? `<div class="pl-ya-form">${brIn('i1', '인트로 첫 줄 <span class="small">(짧은 도발 · 10자 안팎)</span>', '예: 이 아저씨 누군데')}${brIn('i2', '인트로 둘째 줄 <span class="small">(크게 · [[단어]] 는 강조)</span>', '예: 아무도 [[못 버텨]]')}
+        ${brIn('o1', '아웃트로 첫 줄 <span class="small">(여운·반전·질문)</span>', '예: 다음은 누가 버틸까?')}${brIn('o2', '아웃트로 둘째 줄 <span class="small">(다음 편 떡밥)</span>', '예: 2탄 바로 간다')}${brIn('cta', '구독 유도 한 줄 <span class="small">(14자 안팎)</span>', '예: 구독하고 다음 기술 보기')}</div>
+        <p class="small">${brOk ? '비운 칸은 전에 만든 글 그대로, 처음이면 Claude 가 써요. 이미 만든 뒤 글만 바꾸면 Claude 없이 바로 다시 그려요.' : '실행기를 업데이트하면 직접 쓸 수 있어요.'}</p>
+        ${ep ? `<div data-keep-id="brpv-${esc(ep.ep)}" id="plBrPrev" data-ep="${esc(ep.ep)}"></div>` : ''}` : '',
       desc: !styDone ? '스타일을 입히면 열려요.' : `채널 로고가 들어간 인트로·아웃트로를 따로 만들어 본편 앞뒤에 붙여요 (로고 파일이 없으면 글자만). 인트로는 스크롤을 멈추게 하는 한 방, 아웃트로는 다시 보게·구독하게 만드는 한 방.`,
       btn: () => runIn(BR) ? '실행 멈춤' : brDone ? '다시 만들기' : '인트로·아웃트로 만들기',
       attrs: stopOr(BR, 'data-ya-steps="aibrand"'), cls: runIn(BR) ? 'danger' : '',
@@ -1771,7 +1818,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
   window.ytGoScript = function () { const { steps } = evalSteps('youtube'), k = steps.findIndex(x => x.id === 'g-voice'); if (k >= 0) { T.view.youtube = k; repaint('youtube', true); } };
   window.ytRepaint = function () { repaint('youtube'); };
   function afterPaint(c) {
-    if (c === 'youtube') { setTimeout(ytPrevSync, 0); setTimeout(ytUpTextHydrate, 0); setTimeout(ytSubEdMount, 0); setTimeout(ytThPrevMount, 0); }
+    if (c === 'youtube') { setTimeout(ytPrevSync, 0); setTimeout(ytUpTextHydrate, 0); setTimeout(ytSubEdMount, 0); setTimeout(ytThPrevMount, 0); setTimeout(ytBrPrevMount, 0); }
     if (window.CodexImg) setTimeout(() => CodexImg.hydrate(), 0);
     if (c === 'insta') setTimeout(() => window.InstaToon && window.InstaToon.hydrateArt(), 0);
     if (c === 'youtube' && T.logOpen) { const el = document.getElementById('plLog'), ep = ytItem().ep; if (el && ep) runnerFetch(`/log?ep=${encodeURIComponent(ep.ep)}&step=${T.logOpen}&tail=6000`).then(t => { el.textContent = t || '(로그 없음)'; el.scrollTop = el.scrollHeight; }).catch(e => { el.textContent = '로그를 못 읽었어요: ' + e.message; }); }
@@ -1944,6 +1991,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
     else if (t.id === 'plYlFile') ylUpload(t.files && t.files[0]);
     else if (t.dataset.plSub) { const { it } = evalSteps('youtube'), d = ytSubDraft(it.ep); d[t.dataset.plSub] = t.type === 'checkbox' ? t.checked : t.value; if (t.dataset.plSub === 'nobottom') { persist(); repaint('youtube', true); return; } if (t.type === 'radio') t.closest('[role=radiogroup]')?.querySelectorAll('label').forEach(l => { l.classList.toggle('on', l.contains(t)); if (l.hasAttribute('data-cap-card')) l.style.borderColor = l.contains(t) ? 'var(--accent,#3b82f6)' : 'var(--line)'; }); }
     else if (t.dataset.plTh) { const { it } = evalSteps('youtube'); ytThumbDraft(it.ep)[t.dataset.plTh] = t.value; ytThPrevMount(); }
+    else if (t.dataset.plBr) { const { it } = evalSteps('youtube'); ytBrandDraft(it.ep)[t.dataset.plBr] = t.value; ytBrPrevMount(); }
     else if (t.dataset.plTi) { const { it } = evalSteps('youtube'); ytTitleDraft(it.ep)[t.dataset.plTi] = t.value; }
     else if (t.dataset.yl) { if (t.dataset.yl === 'url') ylSetUrl(t.value); else if (t.dataset.yl === 'title') { YL.title = t.value; YL.edited = true; } else YL.view = t.value; }
     else if (t.dataset.yaNew === 'fxtimes') { const { it } = evalSteps('youtube'); ytPipe.fxTimes = t.value; ytPipe.fxIdea = it.idea ? it.idea.id : ''; if (!ytPipe.fxPack) ytPipe.fxPack = ytFxPick(it, it.ep); document.querySelector('#plRoot [data-ya-act="fxpack"]')?.removeAttribute('disabled'); ytOutRefresh(); ytPrevSync(); }

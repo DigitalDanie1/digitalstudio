@@ -1151,6 +1151,11 @@ async function render(E, ctx, st, plan, fin, outRel) {
 
 // ---------- 6. 인트로·아웃트로: 채널 로고가 들어간 후크 클립을 만들고 본편 앞뒤에 붙여요 ----------
 const IN_D = 2.2, OUT_D = 3.2;
+// 작업판 미리보기용: 인트로·아웃트로 글 색·테이프 (aibrand 와 같은 값)
+export function brandAssetOf(E, k) { const st = styleOf(E), B = st.brand || {}, root = E.homeRoot || path.join(HOME, 'Desktop/유투브');
+  return k === 'logo' ? brandFile(root, st.logo, st.logoAlt) : k === 'lockup' ? brandFile(root, B.lockup) : k === 'handle' ? brandFile(root, B.handle) : null; }
+export function brandLookOf(E) { try { const st = styleOf(E), B = st.brand || {}, a = k => { try { return !!brandAssetOf(E, k); } catch { return false; } };
+  return { tape: B.tape || '', cream: B.cream || '', yellow: st.yellow || 'FFD600', red: st.red || 'FF3B30', cta: st.cta || '', name: st.name || '', handle: st.handle || '', logo: a('logo'), lockup: a('lockup'), handleImg: a('handle') }; } catch { return null; } }
 async function aibrand(E, ctx) {
   const st = styleOf(E), info = source(E), plan = readJson(E.p('편집/AI컷.json'));
   // 본편: 자막 단계를 했으면 AI완성.mp4, 안 했으면 스타일본 (자막 단계는 작업판에서 뺐어요)
@@ -1167,9 +1172,21 @@ async function aibrand(E, ctx) {
   const fin = readJson(E.p('편집/AI완성.json'));
   const prog = progOf(E, 'aibrand', [['hook', '후크 문장 쓰기'], ['intro', '인트로 그리기'], ['outro', '아웃트로 그리기'], ['join', '붙이기'], ['done', '끝']]);
   prog({ info: [['로고', hasLogo ? '있음' : '없음 (글자로)']] });
-  ctx.log('Claude 가 인트로·아웃트로 후크 문장을 써요…');
   const short = (t, n) => String(t || '').replace(/\[\[|\]\]/g, '').length <= n;
-  const j = await askClaude(E, ctx, `${skills(ctx, ['shorts-blueprint'])}너는 한국어 ${st.genre} 쇼츠 채널${st.name ? ` "${st.name}"` : ''}${st.handle ? ` (${st.handle})` : ''}의 편집 작가다.
+  // 내가 직접 쓴 인트로·아웃트로 글 (비운 칸만 Claude). 전에 만든 글이 있으면 빈 칸은 그걸 써서 Claude 없이 바로 다시 그려요
+  const MY = E.s.brandText || {}, myI = MY.intro || {}, myO = MY.outro || {};
+  const myAny = [myI.l1, myI.l2, myO.l1, myO.l2, myO.cta].some(t => String(t || '').trim());
+  let prevB = null; try { prevB = readJson(E.p('편집/AI인트로아웃트로.json')); } catch {}
+  const mergeMy = x => { for (const [k, o] of [['intro', myI], ['outro', myO]]) { x[k] = x[k] || {}; for (const f of ['l1', 'l2', 'cta']) if (String(o[f] || '').trim()) x[k][f] = String(o[f]).trim(); } return x; };
+  const allMine = ['l1', 'l2'].every(f => String(myI[f] || '').trim()) && ['l1', 'l2', 'cta'].every(f => String(myO[f] || '').trim());
+  let j;
+  if (myAny && (allMine || (prevB && prevB.intro && prevB.outro))) {
+    j = mergeMy(allMine ? { intro: {}, outro: {} } : JSON.parse(JSON.stringify(prevB)));
+    ctx.log(allMine ? '인트로·아웃트로 글을 내가 쓴 그대로 써요 (Claude 없이).' : '내가 쓴 칸만 바꾸고 나머지는 전에 만든 글 그대로 (Claude 없이).');
+  } else {
+  ctx.log('Claude 가 인트로·아웃트로 후크 문장을 써요…');
+  const fixed = myAny ? `\n아래 칸은 내가 정했다. 그대로 쓴다: ${JSON.stringify({ intro: myI, outro: myO })} (빈 칸만 네가 쓴다)` : '';
+  j = await askClaude(E, ctx, `${skills(ctx, ['shorts-blueprint'])}너는 한국어 ${st.genre} 쇼츠 채널${st.name ? ` "${st.name}"` : ''}${st.handle ? ` (${st.handle})` : ''}의 편집 작가다.
 본편 쇼츠 앞에 붙일 인트로(${IN_D}초)와 뒤에 붙일 아웃트로(${OUT_D}초) 문장을 쓴다. 둘 다 무조건 후크다.
 본편: 위 제목 ${JSON.stringify(fin.frame)}, 자막 ${JSON.stringify(fin.captions)}
 1차 컷 정보: ${JSON.stringify({ moments: plan.moments, who: plan.who })}
@@ -1179,8 +1196,11 @@ ${storyTxt(plan)}
 말투: ${st.tone}
 ${st.voice ? '화자: ' + st.voice + '\n' : ''}- 인트로: 0.1초 만에 스크롤을 멈추게 하는 한 방. 결과·숫자·반전·질문 중 하나. 인사·채널 소개·"오늘은" 금지. l1 은 짧은 도발(10자 이내), l2 는 핵심 한 방(12자 이내). 강조 단어 하나만 [[단어]].
 - 아웃트로: 끝까지 본 사람이 다시 보거나 구독하게 만드는 한 방. l1 은 여운/반전/질문(12자 이내), l2 는 다음 편 예고나 떡밥(12자 이내), cta 는 구독 유도 한 줄(14자 이내, 예: "구독하고 다음 기술 보기").
-JSON 하나만 답해라: {"intro":{"l1":"","l2":""},"outro":{"l1":"","l2":"","cta":""}}`,
-    x => !x.intro || !x.outro ? 'intro, outro 가 있어야 해요.' : !short(x.intro.l1, 12) || !short(x.intro.l2, 14) ? '인트로 문장이 너무 길어요.' : !short(x.outro.l1, 14) || !short(x.outro.l2, 14) || !short(x.outro.cta, 16) ? '아웃트로 문장이 너무 길어요.' : '');
+JSON 하나만 답해라: {"intro":{"l1":"","l2":""},"outro":{"l1":"","l2":"","cta":""}}${fixed}`,
+    x => { if (!x.intro || !x.outro) return 'intro, outro 가 있어야 해요.'; mergeMy(x); const okL = (k, f, n) => String((k === 'intro' ? myI : myO)[f] || '').trim() || short(x[k][f], n);
+      return !okL('intro', 'l1', 12) || !okL('intro', 'l2', 14) ? '인트로 문장이 너무 길어요.' : !okL('outro', 'l1', 14) || !okL('outro', 'l2', 14) || !okL('outro', 'cta', 16) ? '아웃트로 문장이 너무 길어요.' : ''; });
+  mergeMy(j);
+  }
   writeJson(E.p('편집/AI인트로아웃트로.json'), j);
   prog({ stage: 'intro', info: [['인트로 후크', [j.intro.l1, j.intro.l2].join(' / ')], ['아웃트로 후크', [j.outro.l1, j.outro.l2, j.outro.cta].filter(Boolean).join(' / ')]] });
   const Y = bgr(st.yellow), R = bgr(st.red), hi = t => esc(t).replace(/\[\[(.+?)\]\]/g, `{\\c${Y}}$1{\\c&HFFFFFF&}`);
