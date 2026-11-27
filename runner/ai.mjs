@@ -543,8 +543,11 @@ JSON 하나만 답해라:
     j => {
       const c = j.cuts;
       if (!Array.isArray(c) || c.length < 3) return 'cuts 가 3개 이상 있어야 해요.';
-      if (c[0].role !== 'intro') return '첫 컷 role 이 intro 가 아니에요.';
-      if (c[c.length - 1].role !== 'outro') return '마지막 컷 role 이 outro 가 아니에요.';
+      // 첫·마지막 컷의 이름표(role·beat)는 자리만 뜻해요. 틀리면 다시 묻지 않고(5~10분) 여기서 바로 고쳐요.
+      if (c[0].role !== 'intro') { ctx.log(`  첫 컷 role "${c[0].role}" → intro 로 고쳤어요.`); c[0].role = 'intro'; }
+      if (c[c.length - 1].role !== 'outro') { ctx.log(`  마지막 컷 role "${c[c.length - 1].role}" → outro 로 고쳤어요.`); c[c.length - 1].role = 'outro'; }
+      if (c[0].beat !== 'hook') c[0].beat = 'hook';
+      if (c[c.length - 1].beat !== '결') c[c.length - 1].beat = '결';
       const sy = j.story || {}, eks = Object.keys(engOf(st));
       if (!eks.includes(sy.engine) || !String(sy.question || '').trim()) return `story 에 engine(${eks.join(', ')} 중 하나)과 question 이 있어야 해요.`;
       if (c.some(x => !BEATS.includes(x.beat))) return 'cuts 마다 beat(hook, 기, 승, 전, 결)가 있어야 해요.';
