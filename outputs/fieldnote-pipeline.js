@@ -1054,6 +1054,39 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
       ${tail ? `<pre class="small" style="white-space:pre-wrap;margin:8px 0 0;opacity:.85">${tail}</pre>` : ''}</details>`;
   }
   window.ytRefA = { RA, RK, poll: refPoll, panel: refPanel, start: refStart, img: refImg };
+  // ===== 썸네일 미리보기: 실행기 aithumb 과 같은 비율·색·글꼴 (1280x720, 위 띠 140 · 아래 띠 120, 노랑 FFE600 · 빨강 E60012 / 파랑 0047FF) =====
+  const THJ = {};
+  function ytThPrevMount() {
+    const box = document.getElementById('plThPrev'); if (!box) return;
+    const epId = box.dataset.ep, ep = (runnerData && runnerData.episodes || []).find(e => e.ep === epId); if (!ep) return;
+    const step = id => (ep.steps || []).find(x => x.id === id) || {}, has = (id, r) => (step(id).outputs || []).find(o => o.path === r && o.exists);
+    const fileUrl = (o) => `${RUNNER}/file?ep=${encodeURIComponent(epId)}&path=${encodeURIComponent(o.path)}&t=${o.mtime || ''}`;
+    const img = step('aithumb').status === 'done' && has('aithumb', '편집/AI썸네일.jpg'), js = has('aithumb', '편집/AI썸네일.json'), cut = has('aicut', '편집/AI1차컷.mp4');
+    const key = img ? 'i' + (img.mtime || '') : 'c' + ((cut && cut.mtime) || '');
+    if (js && (!THJ[epId] || THJ[epId].m !== js.mtime)) { THJ[epId] = { m: js.mtime, j: null }; fetch(fileUrl(js)).then(r => r.json()).then(j => { THJ[epId].j = j; ytThPrevMount(); }).catch(() => {}); }
+    if (box.dataset.k !== key) {
+      box.dataset.k = key;
+      const cell = (f, left) => `<video muted playsinline preload="auto" data-th-f="${f}" src="${esc(fileUrl(cut))}" style="position:absolute;top:19.444%;height:63.889%;left:${left};width:50%;object-fit:cover"></video>`;
+      const mid = img ? `<img src="${esc(fileUrl(img))}" alt="지금 썸네일" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">`
+        : cut ? cell(0.35, '0') + cell(0.75, '50%') + '<div style="position:absolute;top:19.444%;height:63.889%;left:calc(50% - .235cqw);width:.47cqw;background:#FFE600"></div>'
+        : '<div style="position:absolute;top:19.444%;height:63.889%;inset-inline:0;display:grid;place-items:center;color:#777;font-size:3cqw">장면 (1차 컷 뒤에 보여요)</div>';
+      box.innerHTML = `<p class="small" style="margin:14px 0 6px"><b style="color:var(--text)">미리보기</b> — 쓰는 대로 바로 바뀌어요. ${img ? '가운데 장면은 지금 썸네일 그대로예요.' : '가운데 장면은 예시예요 (실제 액션·리액션 장면은 Claude 가 골라요).'}</p>
+        <div style="position:relative;width:100%;max-width:720px;aspect-ratio:16/9;background:#000;container-type:inline-size;overflow:hidden;border-radius:8px;border:1px solid var(--line)">${mid}
+          <div data-th="top" style="position:absolute;inset:0 0 auto 0;height:19.444%;background:#000;display:flex;align-items:center;justify-content:center;white-space:nowrap;color:#FFE600"></div>
+          <div data-th="bot" style="position:absolute;inset:auto 0 0 0;height:16.667%;display:flex;align-items:center;justify-content:center;white-space:nowrap;color:#fff"></div></div>
+        <p class="small" data-th-note style="margin:6px 0 0"></p>`;
+      box.querySelectorAll('video[data-th-f]').forEach(v => v.addEventListener('loadedmetadata', () => { v.currentTime = (v.duration || 0) * +v.dataset.thF; }, { once: true }));
+    }
+    const T = ytThumbDraft(ep), J = (THJ[epId] && THJ[epId].j) || {}, nos = t => String(t || '').replace(/\s/g, '').length;
+    const fitT = (t, base) => { const n = [...String(t)].reduce((a, c) => a + (c === ' ' ? 0.35 : /[ -~]/.test(c) ? 0.6 : 1), 0); return Math.min(base, Math.floor(1220 / Math.max(1, n))); };
+    const put = (k, mine, prev, ph, base, stroke) => { const el = box.querySelector(`[data-th="${k}"]`); if (!el) return; const t = String(mine || '').trim() || prev || ph, real = !!(String(mine || '').trim() || prev);
+      el.textContent = t; el.style.cssText += `;font-family:'Apple SD Gothic Neo','Noto Sans KR',sans-serif;font-weight:800;letter-spacing:-.156cqw;font-size:${(fitT(t, base) / 12.8).toFixed(2)}cqw;-webkit-text-stroke:${stroke}cqw #000;paint-order:stroke fill;text-shadow:.23cqw .23cqw 0 #000;opacity:${real ? 1 : .45}`; };
+    put('top', T.top, J.top, '상단 카피 (비우면 Claude)', 104, 0.62);
+    put('bot', T.bot, J.bot, '하단 카피 (비우면 Claude)', 88, 0.78);
+    const bot = box.querySelector('[data-th="bot"]'); if (bot) bot.style.background = J.color === 'blue' ? '#0047FF' : '#E60012';
+    const note = box.querySelector('[data-th-note]'), tn = nos(T.top), bn = nos(T.bot);
+    if (note) note.textContent = [tn > 12 ? `상단 ${tn}자 — 12자 이하가 잘 읽혀요` : '', bn > 16 ? `하단 ${bn}자 — 16자 이하가 잘 읽혀요` : '', J.color ? '' : '아래 띠 색(빨강/파랑)은 Claude 가 골라요'].filter(Boolean).join(' · ');
+  }
   // ===== 자막 편집기 (CapCut 처럼): 영상 위에 자막이 바로 보이고, 줄마다 시각·글을 고쳐요 =====
   const SED = {};
   function ytSubEdMount() {
@@ -1305,7 +1338,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
     const c6 = card(5, {
       body: () => cutDone ? `<div class="pl-ya-form"><label>상단 카피 직접 쓰기 <span class="small">(비우면 Claude 가 써요 · 노랑 글씨)</span><input class="pl-input" id="plThTop" data-pl-th="top" maxlength="30" placeholder="예: 금메달이 잡았다" value="${esc(TT.top)}"></label>
         <label>하단 카피 직접 쓰기 <span class="small">(비우면 Claude 가 써요 · 흰 글씨, 빨강/파랑 띠)</span><input class="pl-input" id="plThBot" data-pl-th="bot" maxlength="40" placeholder="예: 도발했다가 1초 만에 넘어갔다" value="${esc(TT.bot)}"></label>
-        <p class="small">썸네일을 한 번 만든 뒤에 카피만 바꾸면, 장면은 그대로 두고 바로 다시 그려요 (몇 초).</p></div>` : '',
+        <p class="small">썸네일을 한 번 만든 뒤에 카피만 바꾸면, 장면은 그대로 두고 바로 다시 그려요 (몇 초).</p></div>${ep ? `<div data-keep-id="thpv-${esc(ep.ep)}" id="plThPrev" data-ep="${esc(ep.ep)}"></div>` : ''}` : '',
       desc: !cutDone ? '1차 컷이 끝나면 열려요.' : '예쁘게 말고 3단 원색 대비: 위 노랑 후킹 카피(12자 이하) + 가운데 2분할(액션 | 리액션 표정) + 아래 빨강/파랑 반전 카피(16자 이하). Claude 가 카피와 두 장면을 골라 1280x720 으로 만들어요.',
       btn: () => runIn(TH) ? '실행 멈춤' : thDone ? '다시 만들기' : '썸네일 만들기',
       attrs: stopOr(TH, 'data-ya-steps="aithumb"'), cls: runIn(TH) ? 'danger' : '',
@@ -1738,7 +1771,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
   window.ytGoScript = function () { const { steps } = evalSteps('youtube'), k = steps.findIndex(x => x.id === 'g-voice'); if (k >= 0) { T.view.youtube = k; repaint('youtube', true); } };
   window.ytRepaint = function () { repaint('youtube'); };
   function afterPaint(c) {
-    if (c === 'youtube') { setTimeout(ytPrevSync, 0); setTimeout(ytUpTextHydrate, 0); setTimeout(ytSubEdMount, 0); }
+    if (c === 'youtube') { setTimeout(ytPrevSync, 0); setTimeout(ytUpTextHydrate, 0); setTimeout(ytSubEdMount, 0); setTimeout(ytThPrevMount, 0); }
     if (window.CodexImg) setTimeout(() => CodexImg.hydrate(), 0);
     if (c === 'insta') setTimeout(() => window.InstaToon && window.InstaToon.hydrateArt(), 0);
     if (c === 'youtube' && T.logOpen) { const el = document.getElementById('plLog'), ep = ytItem().ep; if (el && ep) runnerFetch(`/log?ep=${encodeURIComponent(ep.ep)}&step=${T.logOpen}&tail=6000`).then(t => { el.textContent = t || '(로그 없음)'; el.scrollTop = el.scrollHeight; }).catch(e => { el.textContent = '로그를 못 읽었어요: ' + e.message; }); }
@@ -1910,7 +1943,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
     else if (t.hasAttribute('data-pl-caption')) { const p = c === 'insta' && window.InstaToon.current(); if (p) { p.caption = t.value; persist(); } }
     else if (t.id === 'plYlFile') ylUpload(t.files && t.files[0]);
     else if (t.dataset.plSub) { const { it } = evalSteps('youtube'), d = ytSubDraft(it.ep); d[t.dataset.plSub] = t.type === 'checkbox' ? t.checked : t.value; if (t.dataset.plSub === 'nobottom') { persist(); repaint('youtube', true); return; } if (t.type === 'radio') t.closest('[role=radiogroup]')?.querySelectorAll('label').forEach(l => { l.classList.toggle('on', l.contains(t)); if (l.hasAttribute('data-cap-card')) l.style.borderColor = l.contains(t) ? 'var(--accent,#3b82f6)' : 'var(--line)'; }); }
-    else if (t.dataset.plTh) { const { it } = evalSteps('youtube'); ytThumbDraft(it.ep)[t.dataset.plTh] = t.value; }
+    else if (t.dataset.plTh) { const { it } = evalSteps('youtube'); ytThumbDraft(it.ep)[t.dataset.plTh] = t.value; ytThPrevMount(); }
     else if (t.dataset.plTi) { const { it } = evalSteps('youtube'); ytTitleDraft(it.ep)[t.dataset.plTi] = t.value; }
     else if (t.dataset.yl) { if (t.dataset.yl === 'url') ylSetUrl(t.value); else if (t.dataset.yl === 'title') { YL.title = t.value; YL.edited = true; } else YL.view = t.value; }
     else if (t.dataset.yaNew === 'fxtimes') { const { it } = evalSteps('youtube'); ytPipe.fxTimes = t.value; ytPipe.fxIdea = it.idea ? it.idea.id : ''; if (!ytPipe.fxPack) ytPipe.fxPack = ytFxPick(it, it.ep); document.querySelector('#plRoot [data-ya-act="fxpack"]')?.removeAttribute('disabled'); ytOutRefresh(); ytPrevSync(); }
