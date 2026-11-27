@@ -915,7 +915,25 @@
   // 자막·썸네일 입력 칸 초안 (화면이 다시 그려져도 남게): 에피소드별
   const YD = {};
   function ytSubDraft(ep) { const k = 's:' + (ep ? ep.ep : ''); if (!YD[k]) { const o = (ep && ep.subsOpt) || {}; const chLang = (ep && typeof ytChTarget === 'function' && ytChTarget(ep.channel).lang) || 'both'; YD[k] = { tech: o.tech != null ? !!o.tech : true, techLang: o.techLang || chLang, speech: o.speech != null ? !!o.speech : true, speechLang: o.speechLang || chLang, srcLang: o.srcLang || '', capStyle: o.capStyle || 'mat', top1: o.top1 || '', top2: o.top2 || '', nobottom: !!o.nobottom, mine: '' }; } return YD[k]; }
-  function ytThumbDraft(ep) { const k = 't:' + (ep ? ep.ep : ''); if (!YD[k]) { const o = (ep && ep.thumbText) || {}; YD[k] = { top: o.top || '', bot: o.bot || '' }; } return YD[k]; }
+  function ytThumbDraft(ep) { const k = 't:' + (ep ? ep.ep : ''); if (!YD[k]) { const o = (ep && ep.thumbText) || {}; YD[k] = { top: o.top || '', bot: o.bot || '', font: TF_KO[o.font] ? o.font : TF_KO[db.ytThumbFont] ? db.ytThumbFont : 'pretendard', fontEn: TF_EN[o.fontEn] ? o.fontEn : TF_EN[db.ytThumbFontEn] ? db.ytThumbFontEn : 'anton' }; } return YD[k]; }
+  // 포스터 썸네일 글꼴 (실행기 ai.mjs THUMB_FONTS / THUMB_LATIN 와 같은 값)
+  const TF_KO = {
+    pretendard: { name: '프리텐다드 블랙', family: "'Pretendard'", weight: 900, ls: -7, lh: 1.02, css: 'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css' },
+    notosans: { name: '본고딕 블랙', family: "'Noto Sans KR'", weight: 900, ls: -8, lh: 1.04, css: 'https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@900&display=swap' },
+    gothica1: { name: '고딕 A1 블랙', family: "'Gothic A1'", weight: 900, ls: -6, lh: 1.04, css: 'https://fonts.googleapis.com/css2?family=Gothic+A1:wght@900&display=swap' },
+    hahmlet: { name: '함렛 (세리프)', family: "'Hahmlet'", weight: 800, ls: -6, lh: 1.06, css: 'https://fonts.googleapis.com/css2?family=Hahmlet:wght@800&display=swap' },
+    notoserif: { name: '본명조 블랙 (세리프)', family: "'Noto Serif KR'", weight: 900, ls: -6, lh: 1.08, css: 'https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@900&display=swap' },
+    bhs: { name: '검은고딕 (처음 것)', family: "'Black Han Sans'", weight: 400, ls: -2, lh: .98, css: 'https://fonts.googleapis.com/css2?family=Black+Han+Sans&display=swap' } };
+  const TF_EN = {
+    anton: { name: 'Anton', family: "'Anton'", css: 'https://fonts.googleapis.com/css2?family=Anton&display=swap' },
+    bebas: { name: 'Bebas Neue', family: "'Bebas Neue'", css: 'https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap' },
+    archivo: { name: 'Archivo Black', family: "'Archivo'", css: 'https://fonts.googleapis.com/css2?family=Archivo:wght@900&display=swap' },
+    montserrat: { name: 'Montserrat Black', family: "'Montserrat'", css: 'https://fonts.googleapis.com/css2?family=Montserrat:wght@900&display=swap' },
+    unbounded: { name: 'Unbounded', family: "'Unbounded'", css: 'https://fonts.googleapis.com/css2?family=Unbounded:wght@800&display=swap' },
+    instrument: { name: 'Instrument Serif', family: "'Instrument Serif'", css: 'https://fonts.googleapis.com/css2?family=Instrument+Serif&display=swap' },
+    none: { name: '한글 글꼴 그대로', family: '' } };
+  const tfLoad = css => { if (!css || document.querySelector(`link[data-tf="${css}"]`)) return; const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = css; l.dataset.tf = css; document.head.appendChild(l); };
+  const tfFamily = (ko, en) => `${en.family ? en.family + ',' : ''}${ko.family},'Apple SD Gothic Neo',sans-serif`;
   // 위 고정 제목 두 줄 (스타일 단계에서 내가 직접 · 비우면 Claude 가 써요)
   function ytTitleDraft(ep) { const k = 'h:' + (ep ? ep.ep : ''); if (!YD[k]) { const o = (ep && ep.titleText) || {}; YD[k] = { l1: o.l1 || '', l2: o.l2 || '' }; } return YD[k]; }
   // 인트로·아웃트로 글 (내가 직접 · 비우면 전에 만든 글, 없으면 Claude)
@@ -1121,16 +1139,18 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
       box.querySelectorAll('video[data-th-f]').forEach(v => v.addEventListener('loadedmetadata', () => { v.currentTime = (v.duration || 0) * +v.dataset.thF; }, { once: true }));
     }
     const T = ytThumbDraft(ep), escH = t => String(t || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const FK = TF_KO[T.font] || TF_KO.pretendard, FE = TF_EN[T.fontEn] || TF_EN.anton; tfLoad(FK.css); tfLoad(FE.css);
+    box.querySelectorAll('[data-th="top"],[data-th="bot"]').forEach(el => { el.style.fontFamily = tfFamily(FK, FE); el.style.fontWeight = FK.weight; el.style.letterSpacing = (FK.ls / 190).toFixed(4) + 'em'; });
     const raw = String(T.top || '').trim() || J.top || '위 제목 / 두 줄', real = !!(String(T.top || '').trim() || J.top);
     let lines = raw.includes('/') ? raw.split('/').map(x => x.trim()).filter(Boolean).slice(0, 2) : [raw];
     if (lines.length === 1 && /\s/.test(raw) && raw.replace(/\[\[|\]\]/g, '').length > 4) { const sp = [...raw.matchAll(/\s+/g)].map(m => m.index), mid = raw.length / 2, k = sp.sort((a, b) => Math.abs(a - mid) - Math.abs(b - mid))[0]; lines = [raw.slice(0, k).trim(), raw.slice(k).trim()]; }
     const pv = box.querySelector('[data-pv]'), W = pv ? pv.clientWidth * 950 / 1080 : 0;
     const fitEl = (el, px) => { el.style.fontSize = (px / 10.8) + 'cqw'; el.style.display = 'inline-block'; let f = px; while (W && el.scrollWidth > W + 1 && f > 40) { f -= 4; el.style.fontSize = (f / 10.8) + 'cqw'; } };
     const top = box.querySelector('[data-th="top"]'), bot = box.querySelector('[data-th="bot"]');
-    if (top) { top.innerHTML = lines.map(l => escH(l).replace(/\[\[(.+?)\]\]/g, `<span style="color:${red}">$1</span>`)).join('<br>'); top.style.opacity = real ? 1 : .45; fitEl(top, 190); }
+    if (top) { top.style.lineHeight = FK.lh; top.innerHTML = lines.map(l => escH(l).replace(/\[\[(.+?)\]\]/g, `<span style="color:${red}">$1</span>`)).join('<br>'); top.style.opacity = real ? 1 : .45; fitEl(top, 190); }
     const bt = String(T.bot || '').trim() || J.bot || '아래 한 줄 (비우면 Claude)';
     if (bot) { bot.textContent = bt.replace(/\[\[|\]\]/g, ''); bot.style.opacity = (String(T.bot || '').trim() || J.bot) ? 1 : .45; fitEl(bot, 84); }
-    if (document.fonts && !box.dataset.fw) { box.dataset.fw = 1; document.fonts.ready.then(() => ytThPrevMount()); }
+    const fk = T.font + T.fontEn; if (document.fonts && box.dataset.fw !== fk) { box.dataset.fw = fk; setTimeout(() => document.fonts.ready.then(() => ytThPrevMount()), 300); }
     const note = box.querySelector('[data-th-note]');
     if (note) note.innerHTML = ['위 제목은 띄어쓰기에서 두 줄로 나뉘어요. 직접 나누려면 <b>/</b> (예: 전설의 / 방어).', '<b>[[단어]]</b> 는 빨강.', step('aithumb').status === 'done' && J.layout !== 'poster' ? '지금 썸네일은 예전 모양이에요. "다시 만들기"를 누르면 이 모양으로 다시 그려요.' : ''].filter(Boolean).join('<br>');
   }
@@ -1429,7 +1449,10 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
     const c6 = card(5, {
       body: () => cutDone ? `<div class="pl-ya-form"><label>상단 카피 직접 쓰기 <span class="small">(비우면 Claude 가 써요 · 큰 노랑 글씨, [[단어]] 는 빨강)</span><input class="pl-input" id="plThTop" data-pl-th="top" maxlength="30" placeholder="예: 금메달이 잡았다" value="${esc(TT.top)}"></label>
         <label>하단 카피 직접 쓰기 <span class="small">(비우면 Claude 가 써요 · 흰 글씨, 빨강/파랑 띠)</span><input class="pl-input" id="plThBot" data-pl-th="bot" maxlength="40" placeholder="예: 도발했다가 1초 만에 넘어갔다" value="${esc(TT.bot)}"></label>
-        <p class="small">썸네일을 한 번 만든 뒤에 카피만 바꾸면, 장면은 그대로 두고 바로 다시 그려요 (몇 초).</p></div>${ep ? `<div data-keep-id="thpv-${esc(ep.ep)}" id="plThPrev" data-ep="${esc(ep.ep)}"></div>` : ''}` : '',
+        ${ep && (ep.brandLook || {}).thumb === 'poster' ? (() => { Object.values(TF_KO).forEach(f => tfLoad(f.css)); Object.values(TF_EN).forEach(f => tfLoad(f.css)); const ok = runnerApi >= 44, chips = (k, list, sample) => `<div role="radiogroup" style="display:flex;gap:6px;flex-wrap:wrap">${Object.entries(list).map(([v, f]) => `<label class="pl-chip ${TT[k] === v ? 'on' : ''}" style="cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:6px 10px"><input type="radio" name="plTh_${k}" data-pl-th="${k}" value="${v}" ${TT[k] === v ? 'checked' : ''} ${ok ? '' : 'disabled'} style="position:absolute;opacity:0"><span style="font-family:${esc(k === 'font' ? tfFamily(f, { family: '' }) : (f.family || "'Pretendard'") + ',sans-serif')};font-weight:${k === 'font' ? f.weight : 900};font-size:20px;line-height:1.1">${sample}</span><span class="small">${esc(f.name)}</span></label>`).join('')}</div>`;
+          return `<div style="grid-column:1/-1"><b>제목 글꼴 · 한글</b> <span class="small">(고르면 바로 미리보기에. 다음 썸네일에도 기억해요)</span>${chips('font', TF_KO, '전설의 방어')}
+            <p style="margin:10px 0 4px"><b>제목 글꼴 · 영어</b> <span class="small">(영문·숫자만 이 글꼴, 한글은 위 글꼴로 · Figma 썸네일 글꼴 목록에서)</span></p>${chips('fontEn', TF_EN, 'THE WALL 20')}${ok ? '' : '<p class="small">실행기를 업데이트하면 고를 수 있어요.</p>'}</div>`; })() : ''}
+        <p class="small">썸네일을 한 번 만든 뒤에 카피·글꼴만 바꾸면, 장면은 그대로 두고 바로 다시 그려요 (몇 초).</p></div>${ep ? `<div data-keep-id="thpv-${esc(ep.ep)}" id="plThPrev" data-ep="${esc(ep.ep)}"></div>` : ''}` : '',
       desc: !cutDone ? '1차 컷이 끝나면 열려요.' : '쇼츠 크기(세로 1080x1920). 위 큰 노랑 후킹 카피(12자 이하) + 빨강/파랑 띠 반전 카피(16자 이하) + 그 아래 장면 2분할(액션 | 리액션 표정). Claude 가 카피와 두 장면을 골라요.',
       btn: () => runIn(TH) ? '실행 멈춤' : thDone ? '다시 만들기' : '썸네일 만들기',
       attrs: stopOr(TH, 'data-ya-steps="aithumb"'), cls: runIn(TH) ? 'danger' : '',
@@ -2034,7 +2057,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
     else if (t.hasAttribute('data-pl-caption')) { const p = c === 'insta' && window.InstaToon.current(); if (p) { p.caption = t.value; persist(); } }
     else if (t.id === 'plYlFile') ylUpload(t.files && t.files[0]);
     else if (t.dataset.plSub) { const { it } = evalSteps('youtube'), d = ytSubDraft(it.ep); d[t.dataset.plSub] = t.type === 'checkbox' ? t.checked : t.value; if (t.dataset.plSub === 'nobottom') { persist(); repaint('youtube', true); return; } if (t.type === 'radio') t.closest('[role=radiogroup]')?.querySelectorAll('label').forEach(l => { l.classList.toggle('on', l.contains(t)); if (l.hasAttribute('data-cap-card')) l.style.borderColor = l.contains(t) ? 'var(--accent,#3b82f6)' : 'var(--line)'; }); }
-    else if (t.dataset.plTh) { const { it } = evalSteps('youtube'); ytThumbDraft(it.ep)[t.dataset.plTh] = t.value; ytThPrevMount(); }
+    else if (t.dataset.plTh) { const { it } = evalSteps('youtube'); ytThumbDraft(it.ep)[t.dataset.plTh] = t.value; if (t.dataset.plTh === 'font' || t.dataset.plTh === 'fontEn') { db[t.dataset.plTh === 'font' ? 'ytThumbFont' : 'ytThumbFontEn'] = t.value; persist(); t.closest('[role=radiogroup]').querySelectorAll('.pl-chip').forEach(c => c.classList.toggle('on', c.contains(t))); } ytThPrevMount(); }
     else if (t.dataset.plBr) { const { it } = evalSteps('youtube'); ytBrandDraft(it.ep)[t.dataset.plBr] = t.value; ytBrPrevMount(); }
     else if (t.dataset.plTi) { const { it } = evalSteps('youtube'); ytTitleDraft(it.ep)[t.dataset.plTi] = t.value; }
     else if (t.dataset.yl) { if (t.dataset.yl === 'url') ylSetUrl(t.value); else if (t.dataset.yl === 'title') { YL.title = t.value; YL.edited = true; } else YL.view = t.value; }

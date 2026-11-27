@@ -1271,6 +1271,27 @@ ${lines.filter(Boolean).map(([a, sty, txt, layer = 1]) => `Dialogue: ${layer},${
 const TW = 1080, TH = 1920, TY = 300, BB = [455, 175], VB = [680, 760];   // TY = 상단 카피 가운데 y, BB/VB = [시작 y, 높이]
 // 채널 포스터 썸네일 (MAT STORY 'B 파이트 포스터' 시안): 장면 하나 꽉 + 위 큰 크림 제목(Black Han Sans) + 빨간 막대 + 아래 프로필·채널명.
 // 글꼴이 맥에 없어서 크롬으로 그려요 (웹 글꼴). 크롬이 없거나 실패하면 null → 기본 3단 배치로 그려요
+// 포스터 제목 글꼴 (작업판에서 골라요 · 웹 글꼴). css = 불러올 주소, ls = 190px 기준 자간, lh = 줄 간격
+export const THUMB_FONTS = {
+  pretendard: { name: '프리텐다드 블랙', family: "'Pretendard'", weight: 900, ls: -7, lh: 1.02, css: 'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css' },
+  notosans: { name: '본고딕 블랙', family: "'Noto Sans KR'", weight: 900, ls: -8, lh: 1.04, css: 'https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@900&display=block' },
+  gothica1: { name: '고딕 A1 블랙', family: "'Gothic A1'", weight: 900, ls: -6, lh: 1.04, css: 'https://fonts.googleapis.com/css2?family=Gothic+A1:wght@900&display=block' },
+  hahmlet: { name: '함렛 (세리프)', family: "'Hahmlet'", weight: 800, ls: -6, lh: 1.06, css: 'https://fonts.googleapis.com/css2?family=Hahmlet:wght@800&display=block' },
+  notoserif: { name: '본명조 블랙 (세리프)', family: "'Noto Serif KR'", weight: 900, ls: -6, lh: 1.08, css: 'https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@900&display=block' },
+  bhs: { name: '검은고딕 (처음 것)', family: "'Black Han Sans'", weight: 400, ls: -2, lh: .98, css: 'https://fonts.googleapis.com/css2?family=Black+Han+Sans&display=block' },
+};
+export const THUMB_FONT_DEFAULT = 'pretendard';
+// 영어 글꼴 (영문·숫자만 이 글꼴, 한글은 위 한글 글꼴로). Figma '썸네일 글꼴 25' 에서 스포츠 포스터에 맞는 것
+export const THUMB_LATIN = {
+  none: { name: '한글 글꼴 그대로', family: '' },
+  anton: { name: 'Anton', family: "'Anton'", css: 'https://fonts.googleapis.com/css2?family=Anton&display=block' },
+  bebas: { name: 'Bebas Neue', family: "'Bebas Neue'", css: 'https://fonts.googleapis.com/css2?family=Bebas+Neue&display=block' },
+  archivo: { name: 'Archivo Black', family: "'Archivo'", css: 'https://fonts.googleapis.com/css2?family=Archivo:wght@900&display=block' },
+  montserrat: { name: 'Montserrat Black', family: "'Montserrat'", css: 'https://fonts.googleapis.com/css2?family=Montserrat:wght@900&display=block' },
+  unbounded: { name: 'Unbounded', family: "'Unbounded'", css: 'https://fonts.googleapis.com/css2?family=Unbounded:wght@800&display=block' },
+  instrument: { name: 'Instrument Serif', family: "'Instrument Serif'", css: 'https://fonts.googleapis.com/css2?family=Instrument+Serif&display=block' },
+};
+export const THUMB_LATIN_DEFAULT = 'anton';
 const CHROME = process.env.FIELDNOTE_CHROME || ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', path.join(HOME, 'Applications/Google Chrome.app/Contents/MacOS/Google Chrome')].find(exists) || '';
 async function posterThumb(E, ctx, j, st, frame) {
   if (!CHROME) { ctx.log('  크롬이 없어서 기본 썸네일 모양으로 그려요.'); return null; }
@@ -1280,14 +1301,15 @@ async function posterThumb(E, ctx, j, st, frame) {
   if (lines.length === 1 && /\s/.test(raw) && raw.replace(/\[\[|\]\]/g, '').length > 4) { const sp = [...raw.matchAll(/\s+/g)].map(m => m.index), mid = raw.length / 2, k = sp.sort((a, b) => Math.abs(a - mid) - Math.abs(b - mid))[0]; lines = [raw.slice(0, k).trim(), raw.slice(k).trim()]; }
   const red = t => h(t).replace(/\[\[(.+?)\]\]/g, '<span style="color:#D3242E">$1</span>');
   const url = f => 'file://' + encodeURI(f).replace(/#/g, '%23');
-  const html = `<!doctype html><html><head><meta charset="utf-8"><link href="https://fonts.googleapis.com/css2?family=Anton&family=Black+Han+Sans&family=JetBrains+Mono:wght@500&display=block" rel="stylesheet">
+  const F = THUMB_FONTS[j.font] || THUMB_FONTS[THUMB_FONT_DEFAULT], LT = THUMB_LATIN[j.fontEn] || THUMB_LATIN[THUMB_LATIN_DEFAULT], k = n => (n / 190).toFixed(4) + 'em';
+  const html = `<!doctype html><html><head><meta charset="utf-8"><link href="https://fonts.googleapis.com/css2?family=Anton&family=JetBrains+Mono:wght@500&display=block" rel="stylesheet"><link href="${F.css}" rel="stylesheet">${LT.css ? `<link href="${LT.css}" rel="stylesheet">` : ''}
 <style>*{margin:0;padding:0;box-sizing:border-box}html,body{width:1080px;height:1920px;overflow:hidden;background:#100E0C}
-.kr{font-family:'Black Han Sans','Apple SD Gothic Neo',sans-serif;letter-spacing:-2px;color:#${B.cream || 'F1EBDD'};white-space:nowrap}
+.kr{font-family:${LT.family ? LT.family + ',' : ''}${F.family},'Apple SD Gothic Neo',sans-serif;font-weight:${F.weight};letter-spacing:${k(F.ls)};color:#${B.cream || 'F1EBDD'};white-space:nowrap}
 #bg{position:absolute;inset:0;background:url("${url(frame)}") center/cover;filter:contrast(1.08) saturate(.85)}
 #sh{position:absolute;inset:0;background:linear-gradient(180deg,rgba(16,14,12,.96) 0%,rgba(16,14,12,.85) 30%,rgba(16,14,12,0) 52%,rgba(16,14,12,0) 70%,rgba(16,14,12,.92) 88%)}
 #av{position:absolute;left:70px;top:1540px;width:150px;height:150px;border-radius:50%;background:url("${logo ? url(logo) : ''}") center/cover #222;box-shadow:0 0 0 6px #100E0C,0 0 0 10px #${B.cream || 'F1EBDD'}}</style></head><body>
 <div id="bg"></div><div id="sh"></div>
-<div style="position:absolute;top:200px;left:70px;right:60px"><div id="t" class="kr" style="font-size:190px;line-height:.98">${lines.map(red).join('<br>')}</div>
+<div style="position:absolute;top:200px;left:70px;right:60px"><div id="t" class="kr" style="font-size:190px;line-height:${F.lh}">${lines.map(red).join('<br>')}</div>
 <div style="width:300px;height:26px;background:#${B.tape || 'D3242E'};margin:40px 0 34px"></div><div id="b" class="kr" style="font-size:84px">${h(String(j.bot || '').replace(/\[\[|\]\]/g, ''))}</div></div>
 ${logo ? '<div id="av"></div>' : ''}<div style="position:absolute;left:${logo ? 250 : 70}px;top:1560px;color:#${B.cream || 'F1EBDD'}"><div style="font-family:Anton,Impact,sans-serif;font-size:64px;line-height:1;letter-spacing:1px">${h(st.name || '')}</div>
 <div style="font-family:'JetBrains Mono',Menlo,monospace;font-size:26px;letter-spacing:3px;opacity:.8;margin-top:10px">${h(String(st.handle || '').toUpperCase())}${B.tag ? ' · ' + h(B.tag) : ''}</div></div>
@@ -1309,12 +1331,12 @@ async function aithumb(E, ctx) {
   const sheetsOf = pre => { try { return fs.readdirSync(E.p(AN)).filter(f => f.startsWith(pre + '_')).sort().map(f => E.p(AN, f)); } catch { return []; } };
   const coarse = sheetsOf('coarse'), fine = sheetsOf('fine');
   const nos = t => String(t || '').replace(/\s/g, '').length;
-  const st = styleOf(E), my = E.s.thumbText || {}, myTop = String(my.top || '').trim(), myBot = String(my.bot || '').trim();
+  const st = styleOf(E), my = E.s.thumbText || {}, myTop = String(my.top || '').trim(), myBot = String(my.bot || '').trim(), myFont = THUMB_FONTS[my.font] ? my.font : '', myEn = THUMB_LATIN[my.fontEn] ? my.fontEn : '';
   let prev = null; try { prev = readJson(E.p('편집/AI썸네일.json')); } catch {}
   const prog = progOf(E, 'aithumb', [['pick', '카피·장면 고르기'], ['render', '그리기'], ['done', '끝']]);
   if (myTop || myBot) prog({ info: [['내 카피', [myTop || '(Claude)', myBot || '(Claude)'].join(' / ')]] });
   let j;
-  if ((myTop || myBot) && prev && prev.left && prev.right) {   // 내가 적은 카피만 바꿀 때: 장면은 그대로, Claude 없이 바로 다시 그려요
+  if ((myTop || myBot || (myFont && myFont !== prev?.font) || (myEn && myEn !== prev?.fontEn)) && prev && prev.left && prev.right) {   // 내가 적은 카피·글꼴만 바꿀 때: 장면은 그대로, Claude 없이 바로 다시 그려요
     j = { ...prev, top: myTop || prev.top, bot: myBot || prev.bot, mine: { top: !!myTop, bot: !!myBot } };
     ctx.log('내가 적은 카피로 바로 다시 그려요 (장면은 전과 같아요).');
   } else {
@@ -1341,7 +1363,7 @@ ${(st.brand || {}).thumb === 'poster' ? '이 채널 썸네일은 왼쪽(left) �
       : ![x.left, x.right].every(f => f && f.t >= 0 && f.t <= dur && f.x >= 0 && f.x <= 1) ? `left/right 의 t 는 0~${Math.round(dur)}, x 는 0~1.` : Math.abs(x.left.t - x.right.t) < 0.5 ? '왼쪽과 오른쪽은 다른 장면이어야 해요.' : ''; });
   j.mine = { top: !!myTop, bot: !!myBot };
   }
-  j.w = TW; j.h = TH;
+  j.w = TW; j.h = TH; j.font = myFont || j.font || THUMB_FONT_DEFAULT; j.fontEn = myEn || j.fontEn || THUMB_LATIN_DEFAULT;
   writeJson(E.p('편집/AI썸네일.json'), j);
   prog({ stage: 'render', info: [['상단', j.top], ['하단', j.bot], ['색', j.color === 'blue' ? '파랑' : '빨강'], ['왼쪽 장면', `${r1(j.left.t)}초 ${j.left.why || ''}`], ['오른쪽 장면', `${r1(j.right.t)}초 ${j.right.why || ''}`]] });
   const fitT = (t, base, w) => { const n = [...String(t)].reduce((a, c) => a + (c === ' ' ? 0.35 : /[ -~]/.test(c) ? 0.6 : 1), 0); return Math.min(base, Math.floor(w / Math.max(1, n))); };
