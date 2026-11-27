@@ -1271,25 +1271,34 @@ ${lines.filter(Boolean).map(([a, sty, txt, layer = 1]) => `Dialogue: ${layer},${
 const TW = 1080, TH = 1920, TY = 300, BB = [455, 175], VB = [680, 760];   // TY = 상단 카피 가운데 y, BB/VB = [시작 y, 높이]
 // 채널 포스터 썸네일 (MAT STORY 'B 파이트 포스터' 시안): 장면 하나 꽉 + 위 큰 크림 제목(Black Han Sans) + 빨간 막대 + 아래 프로필·채널명.
 // 글꼴이 맥에 없어서 크롬으로 그려요 (웹 글꼴). 크롬이 없거나 실패하면 null → 기본 3단 배치로 그려요
-// 포스터 제목 글꼴 (작업판에서 골라요 · 웹 글꼴). css = 불러올 주소, ls = 190px 기준 자간, lh = 줄 간격
+// 포스터 제목 글꼴 (작업판에서 골라요 · 웹 글꼴, 모두 Google Fonts OFL 이라 상업 이용 가능 · 프리텐다드만 jsDelivr). 기억에 남는 것 위주. css = 불러올 주소, ls = 190px 기준 자간, lh = 줄 간격
 export const THUMB_FONTS = {
-  pretendard: { name: '프리텐다드 블랙', family: "'Pretendard'", weight: 900, ls: -7, lh: 1.02, css: 'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css' },
-  notosans: { name: '본고딕 블랙', family: "'Noto Sans KR'", weight: 900, ls: -8, lh: 1.04, css: 'https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@900&display=block' },
-  gothica1: { name: '고딕 A1 블랙', family: "'Gothic A1'", weight: 900, ls: -6, lh: 1.04, css: 'https://fonts.googleapis.com/css2?family=Gothic+A1:wght@900&display=block' },
+  gasoek: { name: '가석체 (조각처럼 두꺼움)', family: "'Gasoek One'", weight: 400, ls: -4, lh: 1.02, css: 'https://fonts.googleapis.com/css2?family=Gasoek+One&display=block' },
+  eastsea: { name: '동해 독도 (붓 · 격투)', family: "'East Sea Dokdo'", weight: 400, ls: 0, lh: 0.95, css: 'https://fonts.googleapis.com/css2?family=East+Sea+Dokdo&display=block' },
+  dokdo: { name: '독도 (거친 붓)', family: "'Dokdo'", weight: 400, ls: 0, lh: 1.0, css: 'https://fonts.googleapis.com/css2?family=Dokdo&display=block' },
+  bwpicture: { name: '흑백사진 (옛 영화 포스터)', family: "'Black And White Picture'", weight: 400, ls: -2, lh: 1.0, css: 'https://fonts.googleapis.com/css2?family=Black+And+White+Picture&display=block' },
+  songmyung: { name: '송명 (먹 명조)', family: "'Song Myung'", weight: 400, ls: -4, lh: 1.08, css: 'https://fonts.googleapis.com/css2?family=Song+Myung&display=block' },
+  moirai: { name: '모이라이 (미래·각)', family: "'Moirai One'", weight: 400, ls: 0, lh: 1.05, css: 'https://fonts.googleapis.com/css2?family=Moirai+One&display=block' },
+  bagel: { name: '베이글 (두툼·통통)', family: "'Bagel Fat One'", weight: 400, ls: -2, lh: 1.02, css: 'https://fonts.googleapis.com/css2?family=Bagel+Fat+One&display=block' },
+  gugi: { name: '구기 (각진 장식)', family: "'Gugi'", weight: 400, ls: -2, lh: 1.05, css: 'https://fonts.googleapis.com/css2?family=Gugi&display=block' },
+  nanumbrush: { name: '나눔 붓글씨', family: "'Nanum Brush Script'", weight: 400, ls: 0, lh: 0.95, css: 'https://fonts.googleapis.com/css2?family=Nanum+Brush+Script&display=block' },
   hahmlet: { name: '함렛 (세리프)', family: "'Hahmlet'", weight: 800, ls: -6, lh: 1.06, css: 'https://fonts.googleapis.com/css2?family=Hahmlet:wght@800&display=block' },
-  notoserif: { name: '본명조 블랙 (세리프)', family: "'Noto Serif KR'", weight: 900, ls: -6, lh: 1.08, css: 'https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@900&display=block' },
-  bhs: { name: '검은고딕 (처음 것)', family: "'Black Han Sans'", weight: 400, ls: -2, lh: .98, css: 'https://fonts.googleapis.com/css2?family=Black+Han+Sans&display=block' },
+  pretendard: { name: '프리텐다드 블랙 (깔끔)', family: "'Pretendard'", weight: 900, ls: -7, lh: 1.02, css: 'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css' },
+  bhs: { name: '검은고딕 (처음 것)', family: "'Black Han Sans'", weight: 400, ls: -2, lh: 0.98, css: 'https://fonts.googleapis.com/css2?family=Black+Han+Sans&display=block' },
 };
 export const THUMB_FONT_DEFAULT = 'pretendard';
-// 영어 글꼴 (영문·숫자만 이 글꼴, 한글은 위 한글 글꼴로). Figma '썸네일 글꼴 25' 에서 스포츠 포스터에 맞는 것
+// 영어 글꼴 (영문·숫자만 이 글꼴, 한글은 위 한글 글꼴로). 기억에 남는 스포츠·포스터 글꼴 위주 (모두 Google Fonts, 상업 이용 가능)
 export const THUMB_LATIN = {
-  none: { name: '한글 글꼴 그대로', family: '' },
   anton: { name: 'Anton', family: "'Anton'", css: 'https://fonts.googleapis.com/css2?family=Anton&display=block' },
+  bigshoulders: { name: 'Big Shoulders (경기장)', family: "'Big Shoulders Display'", css: 'https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@900&display=block' },
+  graduate: { name: 'Graduate (대학 체육복)', family: "'Graduate'", css: 'https://fonts.googleapis.com/css2?family=Graduate&display=block' },
+  blackops: { name: 'Black Ops (스텐실)', family: "'Black Ops One'", css: 'https://fonts.googleapis.com/css2?family=Black+Ops+One&display=block' },
+  bungee: { name: 'Bungee (간판)', family: "'Bungee'", css: 'https://fonts.googleapis.com/css2?family=Bungee&display=block' },
+  rubikmono: { name: 'Rubik Mono (넓고 두꺼움)', family: "'Rubik Mono One'", css: 'https://fonts.googleapis.com/css2?family=Rubik+Mono+One&display=block' },
+  alfaslab: { name: 'Alfa Slab (서부·포스터)', family: "'Alfa Slab One'", css: 'https://fonts.googleapis.com/css2?family=Alfa+Slab+One&display=block' },
+  staatliches: { name: 'Staatliches', family: "'Staatliches'", css: 'https://fonts.googleapis.com/css2?family=Staatliches&display=block' },
   bebas: { name: 'Bebas Neue', family: "'Bebas Neue'", css: 'https://fonts.googleapis.com/css2?family=Bebas+Neue&display=block' },
-  archivo: { name: 'Archivo Black', family: "'Archivo'", css: 'https://fonts.googleapis.com/css2?family=Archivo:wght@900&display=block' },
-  montserrat: { name: 'Montserrat Black', family: "'Montserrat'", css: 'https://fonts.googleapis.com/css2?family=Montserrat:wght@900&display=block' },
-  unbounded: { name: 'Unbounded', family: "'Unbounded'", css: 'https://fonts.googleapis.com/css2?family=Unbounded:wght@800&display=block' },
-  instrument: { name: 'Instrument Serif', family: "'Instrument Serif'", css: 'https://fonts.googleapis.com/css2?family=Instrument+Serif&display=block' },
+  none: { name: '한글 글꼴 그대로', family: '' },
 };
 export const THUMB_LATIN_DEFAULT = 'anton';
 const CHROME = process.env.FIELDNOTE_CHROME || ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', path.join(HOME, 'Applications/Google Chrome.app/Contents/MacOS/Google Chrome')].find(exists) || '';
@@ -1411,6 +1420,27 @@ async function linkVideos(u, format, ctx) {
   const tabs = format === 'long' ? ['videos', 'shorts'] : ['shorts', 'videos'];
   for (const t of tabs) { const a = await rows(`${base}/${t}`, true); if (a.length) return a.map(x => ({ ...x, from: x.from || base.split('/').pop() })); }
   return [];
+}
+// 썸네일 카피 추천: 이 영상 (제목·자막·컷 서사·조사) 을 보고 위/아래 카피 후보를 여러 개. 작업판에서 눌러 칸에 넣어요
+export async function thumbCopyIdeas(E, ctx, { lang = 'both', note = '', count = 6 } = {}) {
+  const info = source(E); let plan = {}, fin = {}; try { plan = readJson(E.p('편집/AI컷.json')); } catch {} try { fin = readJson(E.p('편집/AI완성.json')); } catch {}
+  const st = styleOf(E), en = lang === 'en' || lang === 'both', ko = lang !== 'en', poster = (st.brand || {}).thumb === 'poster';
+  const research = exists(E.p('조사/research.md')) ? `사실은 조사 파일 ${E.p('조사/research.md')} 의 A·B 등급만 (Read 로 확인). ${st.check || ''}` : '확인 안 된 사실(이름·기록·대회)은 쓰지 않는다.';
+  const j = await askClaude(E, ctx, `${skills(ctx, ['thumbnail-3tier'])}너는 ${st.genre} 쇼츠 채널${st.name ? ` "${st.name}"` : ''} 의 썸네일 카피라이터다.
+이번 할 일: 이 영상의 쇼츠 썸네일 카피 후보 ${count}개. 쇼츠 목록에서 스크롤을 멈추게 하는 한 방.
+${poster ? '- 썸네일 모양: 위 큰 제목(2줄, 줄마다 짧게, "/" 로 줄 나눔, [[단어]] 하나만 빨강 강조) + 그 아래 작은 한 줄.' : '- 썸네일 모양: 위 노랑 큰 카피 + 아래 빨강/파랑 띠 카피.'}
+- 위(top): 결정적 순간·인물·반전 중 하나. 공백 빼고 12자 이하. 아래(bot): 궁금증·도발·답을 숨긴 한 줄, 공백 빼고 16자 이하.
+- 후보끼리 각도가 겹치지 않게: 인물 권위 / 숫자·기록 / 반전 / 질문 / 도발 / 직장인 시점(채널 화자) 처럼 서로 다르게.
+- 내용 설명형 문장 금지 (그리고/그래서/했는데/하면서 금지). 낚시성 거짓 금지 — 영상에 실제로 있는 장면만.
+${st.voice ? '화자: ' + st.voice + '\n' : ''}말투: ${st.tone || ''}
+원본: "${info.title}" (${info.channel})
+본편 위 제목·자막: ${JSON.stringify({ frame: fin.frame, captions: (fin.captions || []).slice(0, 30) })}
+장면 정보: ${JSON.stringify({ moments: plan.moments, who: plan.who })}
+${plan.story ? `이 쇼츠의 질문: "${plan.story.question}"` : ''}
+${research}
+${note ? '내 메모 (반영): ' + note + '\n' : ''}${ko ? '' : '카피는 영어로만 쓴다.\n'}JSON 하나만 답해라: {"ideas":[{"top":"","bot":"","angle":"각도 이름","why":"왜 멈추게 하는지 한 줄"${en && ko ? ',"en_top":"영어판 위","en_bot":"영어판 아래"' : ''}}]}`,
+    x => !x || !Array.isArray(x.ideas) || x.ideas.length < 3 ? 'ideas 를 3개 이상 주세요.' : x.ideas.some(i => !i.top || !i.bot) ? '모든 후보에 top, bot 이 있어야 해요.' : '');
+  return { ideas: j.ideas.slice(0, 10).map(i => ({ top: String(i.top).slice(0, 40), bot: String(i.bot).slice(0, 50), angle: String(i.angle || '').slice(0, 30), why: String(i.why || '').slice(0, 160), en_top: String(i.en_top || '').slice(0, 50), en_bot: String(i.en_bot || '').slice(0, 60) })) };
 }
 export async function pickThemeTopics({ channelName, persona, theme, note, format, links, count, existing, used }, ctx) {
   const seen = new Set(used || []), cands = [];
