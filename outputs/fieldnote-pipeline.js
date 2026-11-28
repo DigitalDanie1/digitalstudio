@@ -1854,13 +1854,14 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
     const IT = window.InstaToon;
     const need = (it, fn) => it.toon ? fn(it.toon) : '';
     return [
-      { id: 'story', name: '이야기', title: '이야기 적기', desc: '겪은 일을 순서대로 적으세요. 버튼을 누르면 컷 대본 초안이 나와요.',
-        btn: it => IT.state.busy ? '컷 대본 만드는 중…' : it.toon && toonCount(it.toon) ? '컷 대본 다시 만들기' : '컷 대본 만들기', disabled: () => !!IT.state.busy,
+      { id: 'story', name: '기획', title: '기획 · 중심단어', desc: '중심단어 하나를 적으면 그림툰 기획안 4개가 나와요. 하나 고르고 승인하면 컷 대본 1차 가안이 바로 만들어져요.',
+        noBtn: true,
         isDone: it => !!(it.toon && toonCount(it.toon)),
-        result: it => need(it, p => toonCount(p) ? `<b>컷 ${toonCount(p)}장</b>${p.generation ? ' · ' + esc(p.generation) : ''}` : ''),
-        body: it => `<div class="it pl-it"><label class="it-field"><span>제목</span><input id="itTitle" data-it-field="title" maxlength="120" placeholder="예: 퇴근길에 쇼피를 켰다가" value="${IT.safe(it.toon?.title || '')}"></label>
-          <label class="it-field"><span>겪은 일을 순서대로 적어주세요</span><textarea id="itStory" data-it-field="raw" maxlength="12000" placeholder="오늘 무슨 일이 있었는지, 누가 무슨 말을 했는지, 마지막에 어떤 기분이 들었는지 편하게 적어주세요.">${IT.safe(it.toon?.raw || '')}</textarea></label></div>`,
-        run: () => IT.generateCards() },
+        result: it => need(it, p => toonCount(p) ? `<b>${esc(p.title || '')}</b> · 컷 ${toonCount(p)}장${p.generation ? ' · ' + esc(p.generation) : ''}` : ''),
+        body: it => (window.FNPlan ? FNPlan.body('toon') : '') + `<details class="pl-peek"><summary>또는 겪은 일을 직접 적어서 컷 대본 만들기</summary><div class="it pl-it"><label class="it-field"><span>제목</span><input id="itTitle" data-it-field="title" maxlength="120" placeholder="예: 퇴근길에 쇼피를 켰다가" value="${IT.safe(it.toon?.title || '')}"></label>
+          <label class="it-field"><span>겪은 일을 순서대로 적어주세요</span><textarea id="itStory" data-it-field="raw" maxlength="12000" placeholder="오늘 무슨 일이 있었는지, 누가 무슨 말을 했는지, 마지막에 어떤 기분이 들었는지 편하게 적어주세요.">${IT.safe(it.toon?.raw || '')}</textarea></label></div>
+          <button type="button" class="pl-primary again" data-pl-storygen ${IT.state.busy ? 'disabled' : ''}>${IT.state.busy ? '컷 대본 만드는 중…' : it.toon && toonCount(it.toon) ? '컷 대본 다시 만들기' : '컷 대본 만들기'}</button></details>`,
+        run: () => {} },
       { id: 'cards', name: '컷 대본', title: '컷 대본 다듬기', desc: '컷마다 위 문장·장면·대사·아래 문장을 고치세요. 다 괜찮으면 그림 단계로 가요.',
         btn: '다 오케이, 그림 작업으로', disabled: it => !it.toon || !toonCount(it.toon),
         isDone: it => !!(it.toon && it.toon.approvedAt && it.toon.stage === 'art'),
@@ -1907,6 +1908,66 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
     ];
   }
 
+  // ===== 인스타 영상(릴스): 기획 → 1차 가안 → 영상 만들기 → 업로드 (데이터·기획 화면은 fieldnote-plan.js) =====
+  const FLOW_URL = 'https://labs.google/fx/tools/flow';
+  // 컷마다 첫 장면 그림 (ChatGPT Codex) → Flow '프레임으로 영상 만들기'의 첫 장면으로 쓴다. 글자는 넣지 않는다 (자막은 편집 때 얹음)
+  function reelOpts(r) {
+    if (!r || !r.approvedAt || !r.shots.length) return null;
+    return { c: 'insta', account: 'insta-sing', projectId: r.id, lang: 'ko', title: r.title, item: r, save: () => persist(), aspect: '9:16',
+      cards: r.shots.map((x, i) => ({ label: `컷 ${i + 1} · ${String(x.see || '').slice(0, 24)}`,
+        scene: [x.prompt, x.see ? 'Scene (Korean note): ' + x.see : '', 'This image is the FIRST FRAME of a short vertical video clip: one still moment, photorealistic, NO text, NO captions, NO speech bubbles.'].filter(Boolean).join(' '), text: [] })) };
+  }
+  function reelItem() { const r = window.FNPlan && FNPlan.current(); return { c: 'insta', reel: r, key: r ? 'r:' + r.id : '', title: r ? r.title : '' }; }
+  function reelSteps() {
+    const need = (it, fn) => it.reel ? fn(it.reel) : '';
+    const fld = (r, f, label, rows) => `<label class="pl-own"><span>${label}</span>${rows ? `<textarea class="pl-answer" rows="${rows}" data-fp-reel="${f}">${esc(r[f] || '')}</textarea>` : `<input class="pl-input" data-fp-reel="${f}" value="${esc(r[f] || '')}">`}</label>`;
+    const sfld = (i, x, f, label, rows) => `<label class="pl-own"><span>${label}</span>${rows ? `<textarea class="pl-answer" rows="${rows}" data-fp-shot="${i}:${f}">${esc(x[f] || '')}</textarea>` : `<input class="pl-input" data-fp-shot="${i}:${f}" value="${esc(x[f] || '')}">`}</label>`;
+    return [
+      { id: 'plan', name: '기획', title: '기획 · 중심단어', desc: '중심단어 하나를 적으면 영상 기획안 4개가 나와요. 하나 고르고 승인하면 컷 대본과 AI 영상 프롬프트(1차 가안)가 바로 만들어져요.',
+        noBtn: true, isDone: it => !!it.reel, result: it => need(it, r => `<b>“${esc(r.hook)}”</b> · ${r.shots.length}컷`),
+        body: () => window.FNPlan ? FNPlan.body('reel') : '', run: () => {} },
+      { id: 'draft', name: '1차 가안', title: '1차 가안 다듬기', desc: '위 고정 자막, 컷마다 장면·화면 속 자막·소리·영상 프롬프트를 고치세요. 다 괜찮으면 확정해요.',
+        btn: '가안 확정, 영상 만들기로', disabled: it => !it.reel, hideBtn: it => !!(it.reel && it.reel.approvedAt),
+        isDone: it => !!(it.reel && it.reel.approvedAt),
+        result: it => need(it, r => r.approvedAt ? `<b>✓ 가안 확정</b> · ${r.shots.length}컷` : `${r.shots.length}컷 · 확정 전`),
+        body: it => { const r = it.reel; if (!r) return '<p class="pl-note">먼저 기획 단계에서 기획안을 승인해 주세요.</p>';
+          return `<div class="fp-reel">${fld(r, 'hook', '화면 위 고정 자막')}${fld(r, 'hookEn', '그 아래 작은 영어 한 줄')}${r.shots.map((x, i) => `<fieldset class="fp-shot"><legend>컷 ${i + 1}${x.sec ? ' · ' + esc(x.sec) : ''}</legend>${sfld(i, x, 'see', '화면에 보이는 것', 2)}${sfld(i, x, 'sub', '화면 속 자막')}${sfld(i, x, 'sound', '소리')}${sfld(i, x, 'prompt', 'AI 영상 프롬프트 (영어)', 4)}</fieldset>`).join('')}${fld(r, 'caption', '캡션', 4)}</div>`
+            + (r.approvedAt ? '<p class="small"><button type="button" class="pl-link" data-pl-reelunapprove>확정 취소하고 다시 고치기</button></p>' : ''); },
+        run: it => { it.reel.approvedAt = Date.now(); it.reel.updated = Date.now(); persist(); toast('가안을 확정했어요. 이제 영상을 만들어요.'); } },
+      Object.assign(codexArtStep('insta', it => reelOpts(it.reel),
+        it => it.reel && it.reel.approvedAt ? `<p class="small"><button type="button" class="pl-link" data-pl-reelskipart>${it.reel.artSkip ? '✓ 그림 없이 넘어가기로 했어요' : '그림 없이 Flow 에서 바로 영상 만들기 (건너뛰기)'}</button></p>` : '',
+        it => !!(it.reel && it.reel.artSkip)), { name: '첫 장면', title: '첫 장면 그림 (ChatGPT)', desc: 'ChatGPT Codex 가 컷마다 세로 9:16 첫 장면을 그려요 (글자 없이). 이 그림을 다음 단계에서 Flow 영상의 첫 장면으로 넣으면 그림 퀄리티 그대로 움직여요.' }),
+      { id: 'make', name: '영상', title: '영상 만들기 (구글 Flow · 무료)', desc: '구글 Flow 의 "프레임으로 영상 만들기"에 앞 단계 그림을 첫 장면으로 넣고, 그 컷의 영어 프롬프트를 붙여 넣어 세로(9:16) 영상을 만드세요. 위 고정 자막은 인스타·캡컷 편집기에서 글자로 얹어요.',
+        btn: it => it.reel && it.reel.madeAt ? '영상 다 만들었어요 (다시 표시)' : '영상 다 만들었어요', disabled: it => !(it.reel && it.reel.approvedAt),
+        isDone: it => !!(it.reel && it.reel.madeAt),
+        result: it => need(it, r => r.madeAt ? `<b>✓ 영상 준비됨</b> · ${relative(r.madeAt)}` : ''),
+        body: it => { const r = it.reel; if (!r || !r.approvedAt) return '<p class="pl-note">먼저 1차 가안을 확정해 주세요.</p>';
+          const subs = r.shots.map(x => x.sub).filter(Boolean);
+          const o = reelOpts(r), n = o ? CXI().doneCount(o) : 0;
+          return `<p><a class="pl-link" href="${FLOW_URL}" target="_blank" rel="noopener noreferrer">구글 Flow 열기 ↗</a> <span class="small">· Veo 무료 크레딧으로 만들 수 있어요</span>${n ? ` · <button type="button" class="pl-link" data-pl-cxdl>첫 장면 그림 ${n}장 저장</button>` : ''}</p>
+            <ol class="fp-make">${r.shots.map((x, i) => `<li><b>컷 ${i + 1}</b>${x.sec ? ' · ' + esc(x.sec) : ''} — ${esc(x.see)}<pre>${esc(x.prompt)}</pre><button type="button" class="pl-nav-btn" data-pl-reelcopy="${i}">컷 ${i + 1} 프롬프트 복사</button></li>`).join('')}</ol>
+            <p class="small">편집 때 얹을 글자 · 위: <b>“${esc(r.hook)}”</b>${r.hookEn ? ' / ' + esc(r.hookEn) : ''}${subs.length ? ' · 화면 속: ' + subs.map(x => '“' + esc(x) + '”').join(', ') : ''}</p>`; },
+        run: it => { it.reel.madeAt = Date.now(); it.reel.updated = Date.now(); persist(); } },
+      { id: 'upload', name: '캡션·업로드', title: '캡션 쓰고 인스타에 올리기', desc: "캡션을 복사하고 인스타를 열어요. 만든 영상을 릴스로 올리고, 'AI 정보' 표시를 켜세요.",
+        btn: it => it.reel && uploaded(it.key, null) ? '주소 남기기' : '캡션 복사 · 인스타 열기', disabled: it => !(it.reel && it.reel.madeAt),
+        hideBtn: it => !!(it.reel && it.reel.publicationCheck), isDone: it => !!(it.reel && it.reel.publicationCheck),
+        result: it => need(it, r => r.publicationCheck ? `<b>${doneLink(r.publicationCheck)}</b>` : uploaded(it.key, null) ? '올리는 중 · 올린 뒤 아래에 주소를 남겨 주세요' : ''),
+        body: it => !it.reel ? '' : fld(it.reel, 'caption', '캡션', 5) + (uploaded(it.key, null) && !it.reel.publicationCheck ? urlFormHtml(it.key) : ''),
+        run: it => {
+          const r = it.reel; if (r.publicationCheck) return;
+          if (!uploaded(it.key, null)) {
+            const pending = copyText(r.caption || r.hook); window.open(WRITE_URL.insta, '_blank', 'noopener');
+            pending.then(ok => { S.opened[it.key] = true; save(); toast(ok ? '캡션을 복사했고 인스타를 열었어요.' : '복사가 안 됐어요. 캡션 칸을 직접 복사해 주세요.'); repaint('insta'); });
+            return;
+          }
+          try { r.publicationCheck = readUrl(it.key); T.err.insta = ''; log('인스타 영상 게시 확인: ' + it.title); persist(); toast('주소를 남겼어요. 한 편 끝!'); } catch (e) { T.err.insta = e.message; }
+          repaint('insta');
+        } },
+    ];
+  }
+  if (window.FNPlan) FNPlan.onDone = k => { S.instaMode = k; S.sel.insta = { kind: k }; save(); T.view.insta = 1; T.err.insta = ''; repaint('insta', true); };
+  window.addEventListener('fp-change', () => repaint('insta', true));
+
   // ===== 어댑터: 플랫폼마다 "지금 작업", "작업 목록", "단계" =====
   const GENERIC = ['blog', 'x', 'telegram', 'threads'];
   function adapter(c) {
@@ -1928,12 +1989,14 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
         item: () => {
           const s = S.sel.insta = S.sel.insta || {};
           if (!toonOn() || s.kind === 'post' || (!s.kind && S.instaMode === 'post')) { const g = gItem('insta'); g.kind = 'post'; return g; }
+          if (s.kind === 'reel' || (!s.kind && S.instaMode === 'reel')) { const r = reelItem(); r.kind = 'reel'; return r; }
           const t = toonItem(); t.kind = 'toon'; return t;
         },
-        steps: it => it.kind === 'post' ? genericSteps('insta') : toonSteps(),
+        steps: it => it.kind === 'post' ? genericSteps('insta') : it.kind === 'reel' ? reelSteps() : toonSteps(),
         list: it => {
           const out = [], IT = window.InstaToon;
           if (igCur() === 'insta-sing') IT.list().filter(p => (p.raw.trim() || toonCount(p)) && (!p.publicationCheck || (it.toon && it.toon.id === p.id))).forEach(p => out.push({ key: 't:' + p.id, label: '🎨 ' + (p.title || p.raw.slice(0, 24) || '제목 없는 이야기') }));
+          if (igCur() === 'insta-sing' && window.FNPlan) FNPlan.reels().filter(r => !r.publicationCheck || (it.reel && it.reel.id === r.id)).forEach(r => out.push({ key: 'r:' + r.id, label: '🎬 ' + r.title }));
           unfinished('insta').forEach(p => out.push({ key: 'p:' + p.id, label: '🖼 ' + p.title }));
           if (it.kind === 'post' && it.idea && !it.post) out.push({ key: 'i:' + it.idea.id, label: '🖼 ' + it.idea.title });
           return out;
@@ -1941,10 +2004,11 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
         select: key => {
           const IT = window.InstaToon;
           if (key.startsWith('t:')) { S.sel.insta = { kind: 'toon' }; IT.remember(key.slice(2)); }
+          else if (key.startsWith('r:')) { S.sel.insta = { kind: 'reel' }; FNPlan.setCur(key.slice(2)); }
           else { S.sel.insta = { kind: 'post', ...(key.startsWith('p:') ? { postId: key.slice(2) } : { ideaId: key.slice(2) }) }; }
           save();
         },
-        fresh: () => { window.InstaToon.remember(''); S.sel.insta = { kind: toonOn() ? 'toon' : 'post', empty: true }; save(); },
+        fresh: () => { window.InstaToon.remember(''); if (window.FNPlan) FNPlan.setCur(''); S.sel.insta = { kind: !toonOn() ? 'post' : S.instaMode === 'reel' ? 'reel' : 'toon', empty: true }; save(); },
       };
     }
     return {
@@ -1980,7 +2044,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
       return `<li class="${st8} ${k === v ? 'view' : ''}"><button type="button" ${can ? `data-pl-go="${k}"` : 'disabled'} ${k === v ? 'aria-current="step"' : ''}><span class="pl-n" aria-hidden="true">${done[k] ? '✓' : k + 1}</span><span class="pl-nm">${esc(st.name)}</span></button></li>`;
     }).join('')}</ol>`;
     const items = c === 'youtube' ? ytWipHtml(it.idea ? it.idea.id : '') : `<div class="pl-items"><label><span>작업 중</span><select data-pl-item aria-label="작업 중인 글">${list.length ? '' : '<option value="">작업 없음</option>'}${list.map(o => `<option value="${esc(o.key)}" ${o.key === cur ? 'selected' : ''}>${esc(o.label.length > 36 ? o.label.slice(0, 36) + '…' : o.label)}</option>`).join('')}</select></label><button type="button" class="pl-newbtn" data-pl-new>＋ 새 작업</button></div>`;
-    const insta = c === 'insta' && igCur() === 'insta-sing' ? `<div class="pl-chips pl-instamode" role="group" aria-label="만들 것"><button type="button" class="pl-chip ${(it.kind || 'toon') === 'toon' ? 'on' : ''}" data-pl-instamode="toon">🎨 인스타툰</button><button type="button" class="pl-chip ${it.kind === 'post' ? 'on' : ''}" data-pl-instamode="post">🖼 카드뉴스·릴스</button></div>` : '';
+    const insta = c === 'insta' && igCur() === 'insta-sing' ? `<div class="pl-chips pl-instamode" role="group" aria-label="만들 것"><button type="button" class="pl-chip ${(it.kind || 'toon') === 'toon' ? 'on' : ''}" data-pl-instamode="toon">🎨 그림툰</button><button type="button" class="pl-chip ${it.kind === 'reel' ? 'on' : ''}" data-pl-instamode="reel">🎬 영상(릴스)</button><button type="button" class="pl-chip ${it.kind === 'post' ? 'on' : ''}" data-pl-instamode="post">🖼 카드뉴스·릴스</button></div>` : '';
     const dis = !!(s.disabled && s.disabled(it)), hide = !!(s.noBtn || (s.hideBtn && s.hideBtn(it) && done[v]));
     const attrs = s.attrs ? s.attrs(it) : 'data-pl-run';
     const btn = hide ? '' : `<button type="button" class="pl-primary ${done[v] ? 'again' : ''} ${s.cls || ''}" ${attrs} ${dis ? 'disabled' : ''}>${esc(val(s.btn, it))}</button>`;
@@ -2109,7 +2173,11 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
     if (t.hasAttribute('data-pl-lkcommit')) { if (commitTopic(c)) { T.view[c] = 1; repaint(c, true); } return; }
     if (t.dataset.plPngmode) { const pr = window.InstaToon.current(); if (pr) { pr.pngMode = t.dataset.plPngmode; window.InstaToon.flush(); } repaint(c, true); return; }
     if (t.hasAttribute('data-pl-copybrief')) { window.InstaToon.copyBrief(); return; }
-    if (t.hasAttribute('data-pl-cxdl')) { const { it } = ctx(), o = it.toon ? toonOpts(it.toon) : postOpts(c, it); if (o) CXI().downloadAll(o); return; }
+    if (t.hasAttribute('data-pl-storygen')) { window.InstaToon.generateCards(); return; }
+    if (t.dataset.plReelcopy !== undefined) { const { it } = ctx(), x = it.reel && it.reel.shots[+t.dataset.plReelcopy]; if (x) copyText(x.prompt).then(ok => toast(ok ? `컷 ${+t.dataset.plReelcopy + 1} 프롬프트를 복사했어요. Flow 에 붙여 넣으세요.` : '복사하지 못했어요. 칸을 직접 복사해 주세요.')); return; }
+    if (t.hasAttribute('data-pl-reelunapprove')) { const { it } = ctx(); if (it.reel) { it.reel.approvedAt = 0; it.reel.madeAt = 0; persist(); T.view.insta = 1; repaint('insta', true); } return; }
+    if (t.hasAttribute('data-pl-reelskipart')) { const { it } = ctx(); if (it.reel) { it.reel.artSkip = !it.reel.artSkip; persist(); repaint('insta', true); } return; }
+    if (t.hasAttribute('data-pl-cxdl')) { const { it } = ctx(), o = it.toon ? toonOpts(it.toon) : it.reel ? reelOpts(it.reel) : postOpts(c, it); if (o) CXI().downloadAll(o); return; }
     if (t.hasAttribute('data-pl-cx2old')) {
       const { it } = ctx(), o = toonOpts(it.toon); if (!o) return;
       CXI().chosenBlobs(o).then(async list => { for (const x of list) await window.InstaToon.setCardImage(it.toon.cards[x.index].id, x.blob); toast(list.length ? `그림 ${list.length}장을 가져왔어요.` : '가져올 그림이 없어요.'); }).catch(() => toast('그림을 가져오지 못했어요. 실행기가 켜져 있나요?'));
@@ -2205,6 +2273,7 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
     else if (t.id === 'plCustom') T.custom[c] = t.value;
     else if (t.id === 'plAnswer') T.answer[c] = t.value;
     else if (t.dataset.plUrlinput) T.url[t.dataset.plUrlinput] = t.value;
+    else if (t.dataset.fpReel || t.dataset.fpShot) { const r = window.FNPlan && FNPlan.current(); if (!r) return; if (t.dataset.fpReel) r[t.dataset.fpReel] = t.value; else { const [i, f] = t.dataset.fpShot.split(':'); if (r.shots[+i]) r.shots[+i][f] = t.value; } FNPlan.touch(r); }
     else if (t.hasAttribute('data-pl-caption')) { const p = c === 'insta' && window.InstaToon.current(); if (p) { p.caption = t.value; persist(); } }
     else if (t.id === 'plYlFile') ylUpload(t.files && t.files[0]);
     else if (t.dataset.plSub) { const { it } = evalSteps('youtube'), d = ytSubDraft(it.ep); d[t.dataset.plSub] = t.type === 'checkbox' ? t.checked : t.value; if (t.dataset.plSub === 'nobottom') { persist(); repaint('youtube', true); return; } if (t.type === 'radio') t.closest('[role=radiogroup]')?.querySelectorAll('label').forEach(l => { l.classList.toggle('on', l.contains(t)); if (l.hasAttribute('data-cap-card')) l.style.borderColor = l.contains(t) ? 'var(--accent,#3b82f6)' : 'var(--line)'; }); }
@@ -2223,6 +2292,8 @@ ${sec('⑦ 우리 쇼츠에 이렇게 적용해요', li(a.apply) + '<p class="sm
   // ===== 스타일 =====
   const css = document.createElement('style');
   css.textContent = `
+.fp-reel{display:grid;gap:10px}.fp-shot{border:1px solid var(--line);border-radius:12px;padding:10px 14px 14px;display:grid;gap:8px;margin:0}.fp-shot legend{font-weight:700;padding:0 6px;color:var(--pc)}
+.fp-make{display:grid;gap:12px;padding-left:20px}.fp-make pre{white-space:pre-wrap;font-size:13px;background:#0f1216;border:1px solid var(--line);border-radius:8px;padding:10px;margin:6px 0}
 .pl-head{margin:0 0 14px;--pc:var(--lime)}
 .pl-head .eyebrow{color:var(--pc)}
 .pl-head h1{font-size:28px;margin:2px 0 4px}

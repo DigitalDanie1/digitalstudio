@@ -27,6 +27,10 @@
       "destination": "/outputs/fieldnote-codex-img.js"
     },
     {
+      "source": "/fieldnote-plan.js",
+      "destination": "/outputs/fieldnote-plan.js"
+    },
+    {
       "source": "/fieldnote-pipeline.js",
       "destination": "/outputs/fieldnote-pipeline.js"
     },

@@ -106,7 +106,7 @@
   // ----- 그리기 -----
   function payload(ctx, i) {
     const d = cardData(ctx, i);
-    return { account: ctx.account, projectId: ctx.projectId, cardIndex: i, styleId: styleId(ctx), prompt: d.prompt, text: d.text, lang: ctx.lang, aspect: '4:5' };
+    return { account: ctx.account, projectId: ctx.projectId, cardIndex: i, styleId: styleId(ctx), prompt: d.prompt, text: d.text, lang: ctx.lang, aspect: ctx.aspect || '4:5' };
   }
   async function generate(ctx, i) {
     if (!styleId(ctx)) { X.err = '먼저 그림체를 골라 주세요.'; emit(); return false; }
@@ -204,7 +204,7 @@
       'Use your built-in image generation tool exactly ONCE to create ONE image.',
       'The attached reference image(s) define the art style. Match them exactly: the same character designs, line quality, colour palette, shading and lettering style.',
       st && st.desc ? 'Style notes: ' + st.desc : '',
-      'Format: portrait 4:5 (Instagram feed, about 1080x1350), full bleed, no watermark, no logo, no signature.',
+      `Format: ${ctx.aspect === '9:16' ? 'tall 9:16 (Instagram Reels, about 1080x1920)' : 'portrait 4:5 (Instagram feed, about 1080x1350)'}, full bleed, no watermark, no logo, no signature.`,
       'Scene: ' + d.prompt,
       d.text.length ? `Draw ONLY this text in the image, spelled exactly, in ${ko ? 'Korean (Hangul)' : 'English'}, inside speech bubbles / title banners / caption boxes in the same lettering style as the references. Text lines, in order:\n` + d.text.map(t => `- ${t.role}: "${t.text}"`).join('\n') : 'Do not put any text in the image.',
     ].filter(Boolean).join('\n\n');

@@ -13,7 +13,7 @@ TARGET="${FIELDNOTE_INSTALL_DIR:-$HOME_ROOT/실행기}"
 PORT="${FIELDNOTE_RUNNER_PORT:-4777}"
 BIN="$HOME/.local/bin"
 STAMP="$(date +%Y%m%d-%H%M)"
-FILES=(server.mjs steps.mjs ai.mjs util.mjs images.mjs highlights.mjs whisper.mjs test.mjs README.md "실행기 켜기.command" "자동실행 켜기.command" "자동실행 끄기.command" "유튜브 로그인 연결.command")
+FILES=(server.mjs steps.mjs ai.mjs plan.mjs util.mjs images.mjs highlights.mjs whisper.mjs test.mjs README.md "실행기 켜기.command" "자동실행 켜기.command" "자동실행 끄기.command" "유튜브 로그인 연결.command")
 
 say() { echo; echo "▶ $*"; }
 finish() { echo; if [ -t 0 ]; then read -r -p "엔터를 누르면 닫혀요"; fi; exit "${1:-0}"; }
