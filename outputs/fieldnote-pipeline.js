@@ -60,7 +60,8 @@
     .sort((a, b) => (a.sample === b.sample ? 0 : a.sample ? 1 : -1) || (b.created || 0) - (a.created || 0));
   const sampleTag = p => (p && p.sample ? ' <span class="sampletag">예시</span>' : '');
 
-  function askText(c, idea) {
+  const DRAFT_JSON = '답은 이 모양으로만 (앞뒤 설명 없이):\n<title>제목</title>\n<body>\n본문 전체 (마크다운)\n</body>';
+  function askText(c, idea, fmt) {
     const pf = PF_NAME[c], tone = c === 'blog' ? (db.profile.blogVoice || db.profile.tone) : db.profile.tone;
     if (c === 'insta') {
       const a = igOf(idea.igAccount ? idea : { igAccount: igCur() }), en = IG_BY_ID[a].lang === 'en', rules = en ? ['Facts first: keep fact, quote and opinion separate, and name the source.', 'Cross-check key numbers and dates; mark anything unverified as [확인 필요].', 'Never invent prices, dates, quotes or availability.', 'Do not generalise one person or scene to a whole country or group.', 'Use only short, credited quotes and visuals.'] : COMMON_RULES;
@@ -73,7 +74,7 @@
         igDirective(a),
         idea.fromLink ? igLinkDirective(idea) : '',
         (en ? 'Rules:\n' : '꼭 지켜 주세요:\n') + rules.map(r => '- ' + r).join('\n'),
-        en ? 'Reply format: first line = title, blank line, then the cards and caption. No other commentary.' : '답은 이렇게만 주세요:\n첫 줄에 제목\n한 줄 비우고 본문\n(다른 설명은 붙이지 마세요)',
+        fmt || (en ? 'Reply format: first line = title, blank line, then the cards and caption. No other commentary.' : '답은 이렇게만 주세요:\n첫 줄에 제목\n한 줄 비우고 본문\n(다른 설명은 붙이지 마세요)'),
       ].filter(Boolean).join('\n\n');
     }
     return [
@@ -86,7 +87,7 @@
       '꼭 지켜 주세요:\n' + [...COMMON_RULES,
         '제가 직접 겪은 일은 지어내지 말고 [내 경험: 무엇을 쓸지] 자리로 비워 두세요.',
         '확인하지 못한 숫자·사실·링크는 만들지 말고 [확인 필요]로 표시하세요.'].map(r => '- ' + r).join('\n'),
-      '답은 이렇게만 주세요:\n첫 줄에 제목\n한 줄 비우고 본문\n(다른 설명은 붙이지 마세요)',
+      fmt || '답은 이렇게만 주세요:\n첫 줄에 제목\n한 줄 비우고 본문\n(다른 설명은 붙이지 마세요)',
     ].filter(Boolean).join('\n\n');
   }
   function readAnswer(text) {
@@ -150,8 +151,28 @@
     if (ex) toast('이 주제로 만든 원고가 있어서 이어서 해요.');
     save(); return true;
   }
+  // AI 초안: 맥 실행기(맥의 Claude Code 구독)로 먼저. 실행기가 없으면 서버 AI(유료, 보통 꺼져 있음) → 그것도 안 되면 Claude 채팅 복사로.
+  // requestAiDraft 를 바꿔 끼워서 단계 틀의 'AI 초안 만들기'와 편집기의 '원고 생성' 버튼이 둘 다 이 길로 가요.
+  // requestAiDraft 는 페이지 맨 끝 스크립트에 있어서, 페이지가 다 뜬 뒤(DOMContentLoaded)에 바꿔 끼워요.
+  function installDraft() {
+    if (typeof requestAiDraft !== 'function' || requestAiDraft.viaRunner) return;
+    const paidDraft = requestAiDraft;
+    const wrapped = async function (c, categoryName, idea) {
+      try {
+        const j = await FNPlan.runner('postDraft', askText(c, idea, DRAFT_JSON), 51);
+        return { title: String(j.title).trim().slice(0, 300), body: String(j.body).trim(), memo: 'AI 1차 초안 · 맥 실행기(Claude Code)' };
+      } catch (e) {
+        if (!e.offline) throw e;
+        try { return await paidDraft(c, categoryName, idea); } catch (_) { throw e; }
+      }
+    };
+    wrapped.viaRunner = true;
+    requestAiDraft = wrapped;
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', installDraft); else installDraft();
   async function autoDraft(c, it) {
     if (T.busy[c]) return;
+    installDraft();
     T.busy[c] = true; T.err[c] = ''; repaint(c);
     try {
       const r = await requestAiDraft(c, it.idea.naverCategory, it.idea);
@@ -160,7 +181,7 @@
       db.posts.unshift(post); log('AI 원고 생성: ' + post.title); persist();
       S.sel[c] = { postId: post.id }; save(); toast('AI 초안을 만들었어요.');
     } catch (e) {
-      T.manual[c] = true; T.err[c] = isLocalOnly() ? 'AI 자동 생성은 배포된 사이트에서만 돼요.' : 'AI 자동 생성이 안 됐어요. (' + e.message + ')';
+      T.manual[c] = true; T.err[c] = e.offline ? e.message + ' 그래서 Claude 채팅으로 이어가요.' : 'AI 자동 생성이 안 됐어요. (' + e.message + ')';
       toast('자동 생성을 못 썼어요. Claude 채팅으로 이어가요.');
     } finally { T.busy[c] = false; repaint(c); }
   }

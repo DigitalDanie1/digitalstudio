@@ -72,15 +72,15 @@
     : { hook: S(o.hook, 60), hookEn: S(o.hookEn, 120), situation: S(o.situation, 300), shots: (o.shots || []).map(x => S(String(x || '').replace(/^\s*(?:컷\s*)?\d+\s*[.)—:\-–]\s*/, ''), 200)).filter(Boolean).slice(0, 6), line: S(o.line, 80), why: S(o.why, 200) });
 
   // ----- 실행기 -----
-  async function viaRunner(kind, prompt) {
+  async function viaRunner(kind, prompt, need = NEED) {
     let h;
     try { h = await fetch(RUN + '/health', { cache: 'no-store' }).then(r => r.json()); }
     catch (_) { const e = Error('맥 실행기가 꺼져 있어요 (또는 이 브라우저에서 실행기에 닿지 않아요).'); e.offline = true; throw e; }
-    if (!(Number(h && h.api) >= NEED)) { const e = Error('맥 실행기가 예전 버전이에요. YouTube 작업판의 "실행기 업데이트"를 한 번 눌러 주세요.'); e.offline = true; throw e; }
+    if (!(Number(h && h.api) >= need)) { const e = Error('맥 실행기가 예전 버전이에요. YouTube 작업판의 "실행기 업데이트"를 한 번 눌러 주세요.'); e.offline = true; throw e; }
     const r = await fetch(RUN + '/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind, prompt }) });
     const j = await r.json().catch(() => null);
     if (!r.ok || !j || !j.ok) throw Error((j && j.error) || '실행기에서 기획을 못 만들었어요.');
-    const err = CHECK[kind](j); if (err) throw Error(err);
+    const err = CHECK[kind] ? CHECK[kind](j) : ''; if (err) throw Error(err);
     return j;
   }
   async function ask(k, what, prompt, apply) {
@@ -221,5 +221,5 @@
 .fp-approve{margin-top:4px}.fp-manual{margin:10px 0}`;
   document.head.appendChild(css);
 
-  window.FNPlan = { body, st, reels, current, setCur, touch, onDone: null, REF, LABEL };
+  window.FNPlan = { body, st, reels, current, setCur, touch, onDone: null, REF, LABEL, runner: viaRunner };
 })();
