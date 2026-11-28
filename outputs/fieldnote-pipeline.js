@@ -703,21 +703,34 @@
   const YL = { url: '', title: '', view: '', orig: '', author: '', state: '', vid: '', edited: false, timer: 0 };
   const YT_URL_RE = /^https?:\/\/(?:www\.|m\.)?(?:youtube\.com\/(?:watch\?(?:[^#]*&)?v=|shorts\/)|youtu\.be\/)([\w-]{6,})/;
   const ytVidOf = u => { const m = String(u || '').trim().match(YT_URL_RE); return m ? m[1] : ''; };
+  // 인스타 게시물·릴스 링크 (실행기 yt-dlp 로 받아요). 제목은 실행기 GET /linkinfo (api 52) 가 본문 첫 줄로 읽어 줘요
+  const IG_URL_RE = /^https?:\/\/(?:www\.|m\.)?instagram\.com\/(?:[\w.]+\/)?(?:p|reels?|tv)\/([\w-]{5,})/i;
+  const igIdOf = u => { const m = String(u || '').trim().match(IG_URL_RE); return m ? m[1] : ''; };
+  const IG_TIP = '인스타 릴스는 세로 영상이에요. 매트 스토리 룩은 가운데만 잘라 써서 위아래가 잘려요 → 스타일은 꽉 찬 화면(리플레이·기술 분석·한 단어 자막)이 잘 맞아요.';
   function ytLinkSources(ch) {
     const g = (typeof YT_SOURCE_CHANNELS !== 'undefined' ? YT_SOURCE_CHANNELS : []).find(x => x.id === ch), seen = {};
     return (g ? g.sources : []).filter(s => s.enabled !== false && s.candidate && s.candidate.url && !seen[s.candidate.url] && (seen[s.candidate.url] = 1)).slice(0, 4);
   }
-  function ytLinkReset() { Object.assign(YL, { url: '', title: '', view: '', orig: '', author: '', state: '', vid: '', edited: false, upMsg: '' }); clearTimeout(YL.timer); }
+  function ytLinkReset() { Object.assign(YL, { url: '', title: '', view: '', orig: '', author: '', state: '', vid: '', ig: false, edited: false, upMsg: '' }); clearTimeout(YL.timer); }
   function ylPaint() {
     const o = document.getElementById('plYlOrig'), t = document.getElementById('plYlTitle'), h = document.getElementById('plYlHint');
     if (o) o.textContent = YL.orig ? `원본: ${YL.orig}${YL.author ? ' · ' + YL.author : ''}` : '';
     if (t && t.value !== YL.title) t.value = YL.title;
-    if (t) t.placeholder = YL.state === 'fail' ? '제목을 직접 적어 주세요' : '링크를 넣으면 제목이 들어와요';
-    if (h) h.textContent = YL.state === 'fail' ? '제목을 직접 적어 주세요.' : '한국어 제목으로 바꿔도 돼요.';
+    if (t) t.placeholder = YL.state === 'fail' ? '제목을 직접 적어 주세요' : YL.state === 'load' ? '제목 읽는 중…' : '링크를 넣으면 제목이 들어와요';
+    if (h) h.textContent = (YL.state === 'fail' ? '제목을 직접 적어 주세요.' : '한국어 제목으로 바꿔도 돼요.') + (YL.ig ? ' ' + IG_TIP : '');
   }
   function ylFetch() {
-    const url = YL.url.trim(), vid = ytVidOf(url);
+    const url = YL.url.trim(), ig = igIdOf(url), vid = ytVidOf(url) || (ig ? 'ig:' + ig : '');
+    YL.ig = !!ig;
     if (!vid) { YL.vid = ''; YL.orig = ''; YL.author = ''; YL.state = ''; ylPaint(); return; }
+    if (ig) {   // 인스타: 브라우저에서는 제목을 못 읽어서 맥 실행기에 물어봐요 (꺼져 있거나 옛 버전이면 직접 적기)
+      if (vid !== YL.vid) { YL.vid = vid; YL.orig = ''; YL.author = ''; YL.edited = false; }
+      if (!(runnerOnline && runnerApi >= 52)) { YL.state = 'fail'; ylPaint(); return; }
+      YL.state = 'load'; ylPaint();
+      runnerFetch('/linkinfo?url=' + encodeURIComponent(url)).then(d => { if (YL.vid !== vid) return; YL.orig = d.title || ''; YL.author = d.author ? d.author + (d.handle ? ' (@' + d.handle + ')' : '') : ''; YL.state = YL.orig ? 'ok' : 'fail'; if (!YL.edited && YL.orig) YL.title = YL.orig; ylPaint(); })
+        .catch(() => { if (YL.vid !== vid) return; YL.state = 'fail'; ylPaint(); });
+      return;
+    }
     if (vid !== YL.vid) { YL.vid = vid; YL.orig = ''; YL.author = ''; YL.edited = false; }
     YL.state = 'load'; ylPaint();
     fetch('https://www.youtube.com/oembed?format=json&url=' + encodeURIComponent(url))
@@ -752,9 +765,9 @@
   }
   function ytLinkStart(it) {
     if (it.idea) return;
-    const url = YL.url.trim(), local = /^(\/|~\/)/.test(url), vid = local ? '' : ytVidOf(url), title = YL.title.trim();
+    const url = YL.url.trim(), local = /^(\/|~\/)/.test(url), vid = local ? '' : ytVidOf(url) || igIdOf(url), title = YL.title.trim();
     if (YL.upping) { toast('영상을 다 올린 뒤에 시작하세요.'); return; }
-    if (!vid && !local) { toast('유튜브 영상 링크를 넣거나 내 영상 파일을 올려 주세요.'); return; }
+    if (!vid && !local) { toast('유튜브·인스타 영상 링크를 넣거나 내 영상 파일을 올려 주세요.'); return; }
     if (!title) { toast('영상 제목을 적어 주세요.'); return; }
     const ch = ytLock || ytTab();
     let idea = db.ideas.find(i => ideaPlatform(i) === 'YouTube' && ytCh(i) === ch && String(i.sources || '').includes(vid || url));
@@ -803,12 +816,12 @@
         const vids = ytLinkSources(ytLock || ytTab());
         const chips = vids.length ? `<div class="pl-chips" role="group" aria-label="추천 소스 영상">${vids.map(x => `<button type="button" class="pl-chip" data-pl-ylchip="${esc(x.candidate.url)}" title="${esc(x.candidate.title || '')}">${esc(x.name)}</button>`).join('')}</div>` : '';
         const orig = YL.orig ? `원본: ${esc(YL.orig)}${YL.author ? ' · ' + esc(YL.author) : ''}` : '';
-        const form = `<div class="pl-yl"><label>유튜브 영상 링크<input class="pl-input pl-yl-url" id="plYlUrl" data-yl="url" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off" value="${esc(YL.url)}"></label>${chips}
+        const form = `<div class="pl-yl"><label>유튜브·인스타 영상 링크<input class="pl-input pl-yl-url" id="plYlUrl" data-yl="url" placeholder="https://www.youtube.com/watch?v=… 또는 https://www.instagram.com/reel/…" autocomplete="off" value="${esc(YL.url)}"></label>${chips}
           <label class="pl-yl-file">또는 내 영상 파일 올리기 <span class="small">(mp4·mov 등, 맥 실행기로 바로 올라가요)</span><input type="file" id="plYlFile" accept="video/*,.mkv" ${runnerOnline === false ? 'disabled' : ''}></label>
           <p class="small" id="plYlUp" aria-live="polite">${esc(YL.upMsg || '')}</p>
           <p class="small pl-yl-orig" id="plYlOrig" aria-live="polite">${orig}</p>
           <label>영상 제목<input class="pl-input" id="plYlTitle" data-yl="title" placeholder="${esc(YL.state === 'fail' ? '제목을 직접 적어 주세요' : '링크를 넣으면 제목이 들어와요')}" value="${esc(YL.title)}"></label>
-          <p class="small" id="plYlHint">${esc(YL.state === 'fail' ? '제목을 직접 적어 주세요.' : '한국어 제목으로 바꿔도 돼요.')}</p>
+          <p class="small" id="plYlHint">${esc((YL.state === 'fail' ? '제목을 직접 적어 주세요.' : '한국어 제목으로 바꿔도 돼요.') + (YL.ig ? ' ' + IG_TIP : ''))}</p>
           <label>내 관점 한 줄 (선택)<textarea class="pl-input" rows="2" id="plYlView" data-yl="view" placeholder="이 영상에서 내가 말하고 싶은 것">${esc(YL.view)}</textarea></label></div>`;
         const list = ytIdeas(), pg = (T.page.youtube || 0) % Math.max(1, Math.ceil(list.length / PAGE)), shown = list.slice(pg * PAGE, pg * PAGE + PAGE), longMode = ytPipe.format === 'long';
         const vw = v => ytLock ? ytLock + '/' + v : v;

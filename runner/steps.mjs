@@ -424,10 +424,10 @@ async function research(E, ctx) {
       info = { url: src.url, local: true, title: path.basename(f), channel: '(내 파일)', duration: pr.duration, id: path.basename(f) };
     } else {
       let r;
-      try { r = await run(YTDLP, ['-O', '%(.{id,title,channel,uploader,duration,webpage_url,license})j', '--no-playlist', '--no-warnings', src.url], ctx); }  // --dump-json 은 영상에 따라 10MB를 넘어 잘려요 → 필요한 칸만
+      try { r = await run(YTDLP, ['-O', '%(.{id,title,channel,uploader,duration,webpage_url,license,description})j', '--no-playlist', '--no-warnings', src.url], ctx); }  // --dump-json 은 영상에 따라 10MB를 넘어 잘려요 → 필요한 칸만
       catch (e) { if (e instanceof StopError) throw e; throw new StepError(`yt-dlp가 이 영상을 받지 못했어요: ${lastLines(e.err) || e.message}`); }
       let j; try { j = JSON.parse(r.out.split('\n').filter(Boolean)[0]); } catch { throw new StepError('yt-dlp 응답을 읽지 못했어요.'); }
-      info = { url: j.webpage_url || src.url, local: false, title: j.title, channel: j.channel || j.uploader || '', duration: j.duration ?? null, id: j.id, license: j.license || null };
+      info = { url: j.webpage_url || src.url, local: false, title: linkTitle(j), channel: j.channel || j.uploader || '', duration: j.duration ?? null, id: j.id, license: j.license || null, ...(isInsta(src.url) ? { site: 'instagram' } : {}) };
     }
     for (const r of ranges) {
       const [, e] = rangeSecs(r);
@@ -439,6 +439,13 @@ async function research(E, ctx) {
   writeJson(E.p('소스.json'), out);
   ctx.log(`소스 ${out.length}개 확인 끝. 소스.json 저장.`);
 }
+
+// 인스타 릴스: yt-dlp 제목이 "Video by 계정" 뿐이라, 본문 첫 줄(해시태그 빼고)을 제목으로 써요
+export const isInsta = u => /^https?:\/\/(www\.)?instagram\.com\//i.test(String(u || ''));
+export const linkTitle = j => { const t = String(j.title || '').trim();
+  if (!/^(Video|Post|Reel) by /i.test(t) && t) return t;
+  const d = String(j.description || '').split(/\r?\n/).map(l => l.replace(/#[^\s#]+/g, '').trim()).find(Boolean);
+  return d ? d.slice(0, 80) : t || String(j.id || ''); };
 
 // ---------- 2. 영상 받기: 링크 영상을 통째로 (+ 영어 자막) ----------
 export const SRC_FORMAT = 'bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080][ext=mp4]/b[ext=mp4]/b';
